@@ -12,15 +12,18 @@ import ulises_jeremias.langchainv.schema
 
 const default_base_url = 'https://api.openai.com/v1'
 const default_model = 'gpt-3.5-turbo'
+const default_embedding_model = 'text-embedding-ada-002'
 
-// Config configures a text chat completion client.
+// Config configures the OpenAI chat completion and embedding client.
 @[params]
 pub struct Config {
 pub:
-	api_key      string
-	model        string = default_model
-	base_url     string = default_base_url
-	organization string
+	api_key              string
+	model                string = default_model
+	base_url             string = default_base_url
+	organization         string
+	embedding_model      string = default_embedding_model
+	embedding_dimensions int
 }
 
 // Client implements the provider-neutral model and completion contracts.
@@ -35,6 +38,9 @@ pub fn new(config Config) !Client {
 	if api_key.trim_space() == '' {
 		return error('OpenAI API key is required; set Config.api_key or OPENAI_API_KEY')
 	}
+	if config.embedding_dimensions < 0 {
+		return error('embedding dimensions cannot be negative')
+	}
 	model := if config.model.trim_space() == '' { default_model } else { config.model }
 	base_url := if config.base_url.trim_space() == '' {
 		default_base_url
@@ -43,10 +49,16 @@ pub fn new(config Config) !Client {
 	}
 	return Client{
 		config: Config{
-			api_key:      api_key
-			model:        model
-			base_url:     base_url
-			organization: config.organization
+			api_key:              api_key
+			model:                model
+			base_url:             base_url
+			organization:         config.organization
+			embedding_model:      if config.embedding_model.trim_space() == '' {
+				default_embedding_model
+			} else {
+				config.embedding_model
+			}
+			embedding_dimensions: config.embedding_dimensions
 		}
 	}
 }
@@ -116,6 +128,65 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 		return error('OpenAI returned no completion choices')
 	}
 	return response.choices[0].content
+}
+
+// create_embedding returns one vector for each input text. It implements the
+// shared embeddings.EmbedderClient contract and preserves the API response order.
+pub fn (client Client) create_embedding(mut ctx context.Context, texts []string) ![][]f32 {
+	if texts.len == 0 {
+		return []
+	}
+	context_error := ctx.err()
+	if context_error !is none {
+		return context_error
+	}
+	body := json2.encode(embedding_payload(client.config, texts), json2.EncoderOptions{})
+	mut header := http.new_header()
+	header.set(.content_type, 'application/json')
+	header.set(.authorization, 'Bearer ${client.config.api_key}')
+	if client.config.organization != '' {
+		header.set_custom('OpenAI-Organization', client.config.organization)!
+	}
+	response := httputil.fetch(http.FetchConfig{
+		url:            '${client.config.base_url}/embeddings'
+		method:         .post
+		header:         header
+		data:           body
+		allow_redirect: false
+	})!
+	request_context_error := ctx.err()
+	if request_context_error !is none {
+		return request_context_error
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('OpenAI embedding request failed with HTTP ${response.status_code}')
+	}
+	decoded := json2.decode[EmbeddingResponse](response.body, json2.DecoderOptions{}) or {
+		return error('OpenAI returned an invalid embedding response')
+	}
+	return embeddings_from_response(decoded, texts.len)
+}
+
+fn embedding_payload(config Config, texts []string) json2.Any {
+	mut inputs := []json2.Any{cap: texts.len}
+	for text in texts {
+		inputs << json2.Any(text)
+	}
+	mut payload := map[string]json2.Any{
+		'model': json2.Any(config.embedding_model)
+		'input': json2.Any(inputs)
+	}
+	if config.embedding_dimensions > 0 {
+		payload['dimensions'] = config.embedding_dimensions
+	}
+	return json2.Any(payload)
+}
+
+fn embeddings_from_response(response EmbeddingResponse, expected_count int) ![][]f32 {
+	if response.data.len != expected_count {
+		return error('OpenAI returned ${response.data.len} embeddings for ${expected_count} inputs')
+	}
+	return response.data.map(it.embedding)
 }
 
 fn chat_payload(config Config, messages []schema.Message, options llms.CallOptions) !json2.Any {
@@ -271,4 +342,12 @@ struct ChatUsage {
 	prompt_tokens     int
 	completion_tokens int
 	total_tokens      int
+}
+
+struct EmbeddingResponse {
+	data []EmbeddingDatum
+}
+
+struct EmbeddingDatum {
+	embedding []f32
 }

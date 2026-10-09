@@ -1,9 +1,15 @@
 # OpenAI chat completions
 
 This package currently implements text chat completions through the shared
-`llms.Model` and `llms.CompletionModel` interfaces. It reads `OPENAI_API_KEY`
-when `Config.api_key` is empty and defaults to `gpt-3.5-turbo` and
-`https://api.openai.com/v1`.
+`llms.Model` and `llms.CompletionModel` interfaces, plus `create_embedding`
+through the shared `embeddings.EmbedderClient` contract. It reads
+`OPENAI_API_KEY` when `Config.api_key` is empty and defaults to
+`gpt-3.5-turbo`, `text-embedding-ada-002`, and `https://api.openai.com/v1`.
+
+Set `Config.embedding_model` and `Config.embedding_dimensions` to override the
+embedding endpoint defaults. The provider returns vectors in the response's
+original order; preprocessing and batching are provided by the core embedding
+helpers.
 
 ```v
 import context
@@ -18,9 +24,9 @@ response := client.generate_content(mut ctx, [schema.text_message(.human, 'Hello
 println(response.choices[0].content)
 ```
 
-Only text parts are supported in this initial slice. The adapter does not yet
-implement streaming, tool calls, embeddings, the legacy completions endpoint,
-or Azure-specific authentication and URL behavior. V's standard HTTP client
+Only text parts are supported in chat requests. The adapter does not yet
+implement streaming, tool calls, the legacy completions endpoint, or
+Azure-specific authentication and URL behavior. V's standard HTTP client
 does not expose request-context cancellation while a request is in flight;
 the adapter checks cancellation before and after each request.
 

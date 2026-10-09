@@ -91,6 +91,45 @@ fn test_parse_chat_response_and_usage() {
 	assert response.usage.total_tokens == 5
 }
 
+fn test_embedding_payload_maps_model_inputs_and_dimensions() {
+	encoded := json2.encode(embedding_payload(Config{
+		embedding_model:      'text-embedding-3-small'
+		embedding_dimensions: 256
+	}, ['first', 'second']), json2.EncoderOptions{})
+	decoded := json2.decode[json2.Any](encoded, json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	assert json_value_string(json_value(object, 'model')) == 'text-embedding-3-small'
+	assert json_value_int(json_value(object, 'dimensions')) == 256
+	inputs := json_value_array(json_value(object, 'input'))
+	assert inputs.len == 2
+	assert json_value_string(inputs[0]) == 'first'
+	assert json_value_string(inputs[1]) == 'second'
+}
+
+fn test_parse_embeddings_in_response_order() {
+	response := json2.decode[EmbeddingResponse]('{"data":[{"embedding":[0.1,0.2],"index":0},{"embedding":[0.3,0.4],"index":1}]}',
+		json2.DecoderOptions{}) or { panic(err) }
+	assert response.data.len == 2
+	assert response.data[0].embedding == [f32(0.1), f32(0.2)]
+	assert response.data[1].embedding == [f32(0.3), f32(0.4)]
+	embeddings := embeddings_from_response(response, 2) or { panic(err) }
+	assert embeddings.len == 2
+	assert embeddings[1] == [f32(0.3), f32(0.4)]
+}
+
+fn test_reject_partial_embedding_response() {
+	response := EmbeddingResponse{
+		data: [EmbeddingDatum{
+			embedding: [f32(0.1)]
+		}]
+	}
+	embeddings_from_response(response, 2) or {
+		assert err.msg() == 'OpenAI returned 1 embeddings for 2 inputs'
+		return
+	}
+	assert false
+}
+
 fn json_value(object map[string]json2.Any, key string) json2.Any {
 	return object[key] or { panic('missing JSON key `${key}`') }
 }

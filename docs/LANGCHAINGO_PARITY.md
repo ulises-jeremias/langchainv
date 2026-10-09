@@ -49,12 +49,13 @@ The inventory is based on upstream commit
 | Maritaca | not started |
 | Mistral | not started |
 | Ollama | not started |
-| OpenAI | partial: text chat completions, text prompt adapter, common sampling/token options, JSON mode, usage, and redacted HTTP errors; streaming, multimodal content, tool calls, embeddings, legacy completions, Azure, and provider-specific options remain |
+| OpenAI | partial: text chat completions, text prompt adapter, embeddings, common sampling/token options, JSON mode, usage, and redacted HTTP errors; streaming, multimodal content, tool calls, legacy completions, Azure, and provider-specific options remain |
 | IBM watsonx | not started |
 
 ## Embedding providers
 
-Bedrock, Cybertron, Hugging Face, Jina, OpenAI, and VoyageAI — all not started.
+OpenAI is partial through `llms.openai.Client.create_embedding`; Bedrock,
+Cybertron, Hugging Face, Jina, and VoyageAI are not started.
 
 ## Vector stores
 
