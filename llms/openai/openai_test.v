@@ -458,7 +458,7 @@ fn test_chat_payload_rejects_unimplemented_requested_options() {
 	assert false
 }
 
-fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
+fn test_chat_payload_accepts_tool_streaming_and_rejects_invalid_choice() {
 	client := Config{
 		api_key: 'unit-test-key'
 	}
@@ -469,10 +469,8 @@ fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
 		streaming_func: discard_stream_chunk
 	}
 	chat_payload(client, [schema.text_message(.human, 'hello')], streaming_tools) or {
-		assert err.msg().contains('streaming tool calls are not implemented')
-		return
+		panic(err)
 	}
-	assert false, 'expected streamed tool calls to fail'
 	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
 		tool_choice: schema.ToolChoice{
 			mode: 'auto'
@@ -494,6 +492,44 @@ fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
 		return
 	}
 	assert false, 'expected invalid tool choice configuration to fail'
+}
+
+fn test_process_stream_event_accumulates_tool_call_deltas() {
+	mut ctx := context.background()
+	mut state := StreamState{
+		ctx:      ctx
+		callback: discard_stream_chunk
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup","arguments":""}}]}}]}') or {
+		panic(err)
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"q\\":"}}]}}]}') or {
+		panic(err)
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"x\\"}"}}]},"finish_reason":"tool_calls"}]}') or {
+		panic(err)
+	}
+	process_stream_event(mut state, 'data: [DONE]') or { panic(err) }
+	assert state.tool_calls.len == 1
+	assert state.tool_calls[0].id == 'call_1'
+	assert state.tool_calls[0].name == 'lookup'
+	assert state.tool_calls[0].arguments == '{"q":"x"}'
+	assert state.finish_reason == 'tool_calls'
+	assert state.done
+}
+
+fn test_process_stream_event_rejects_non_contiguous_tool_call_indices() {
+	mut ctx := context.background()
+	mut state := StreamState{
+		ctx:      ctx
+		callback: discard_stream_chunk
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":1000000,"id":"call_1"}]}}]}') or {
+		assert err.msg().contains('non-contiguous streamed tool call index')
+		assert state.tool_calls.len == 0
+		return
+	}
+	assert false, 'expected a streamed tool call index gap to be rejected'
 }
 
 fn test_process_stream_event_emits_content_and_records_finish_reason() {

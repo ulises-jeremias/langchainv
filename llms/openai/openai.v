@@ -239,12 +239,30 @@ fn (client Client) stream_content(mut ctx context.Context, messages []schema.Mes
 		return error('OpenAI event stream ended before the completion marker')
 	}
 	if state.content == '' && state.finish_reason == '' {
-		return error('OpenAI returned no streamed chat choice')
+		if state.tool_calls.len == 0 {
+			return error('OpenAI returned no streamed chat choice')
+		}
+	}
+	mut tool_calls := []schema.ToolCall{cap: state.tool_calls.len}
+	for call in state.tool_calls {
+		if call.id.trim_space() == '' || call.call_type != 'function'
+			|| call.name.trim_space() == '' {
+			return error('OpenAI returned an incomplete streamed tool call')
+		}
+		tool_calls << schema.ToolCall{
+			id:            call.id
+			call_type:     call.call_type
+			function_call: schema.FunctionCall{
+				name:      call.name
+				arguments: call.arguments
+			}
+		}
 	}
 	return llms.Response{
 		choices: [llms.Choice{
 			content:         state.content
 			stop_reason:     state.finish_reason
+			tool_calls:      tool_calls
 			generation_info: {
 				'index': i64(0)
 			}
@@ -343,9 +361,6 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 				return error('OpenAI named tool choice must match a provided tool definition')
 			}
 		}
-	}
-	if options.streaming_func != none && (options.tools.len > 0 || options.tool_choice != none) {
-		return error('OpenAI streaming tool calls are not implemented')
 	}
 	if options.top_k != 0 || options.min_length != 0 || options.max_length != 0
 		|| options.repetition_penalty != 0 {
@@ -675,6 +690,7 @@ mut:
 	content         string
 	finish_reason   string
 	usage           llms.Usage
+	tool_calls      []StreamToolCallState
 	done            bool
 	callback_failed bool
 }
@@ -691,7 +707,28 @@ struct ChatChunkChoice {
 }
 
 struct ChatDelta {
-	content ?string
+	content    ?string
+	tool_calls []ChatChunkToolCall
+}
+
+struct ChatChunkToolCall {
+	index         int
+	id            ?string
+	call_type     ?string                @[json: 'type']
+	function_call ?ChatChunkFunctionCall @[json: 'function']
+}
+
+struct ChatChunkFunctionCall {
+	name      ?string
+	arguments ?string
+}
+
+struct StreamToolCallState {
+mut:
+	id        string
+	call_type string
+	name      string
+	arguments string
 }
 
 fn consume_stream_bytes(mut state StreamState, chunk []u8) ! {
@@ -752,6 +789,48 @@ fn process_stream_event(mut state StreamState, event string) ! {
 				state.callback(mut state.ctx, content.bytes()) or {
 					state.callback_failed = true
 					return err
+				}
+			}
+		}
+		for tool_call in choice.delta.tool_calls {
+			if tool_call.index < 0 {
+				state.callback_failed = true
+				return error('OpenAI returned a negative streamed tool call index')
+			}
+			if tool_call.index > state.tool_calls.len {
+				state.callback_failed = true
+				return error('OpenAI returned a non-contiguous streamed tool call index')
+			}
+			if tool_call.index == state.tool_calls.len {
+				state.tool_calls << StreamToolCallState{}
+			}
+			if id := tool_call.id {
+				if state.tool_calls[tool_call.index].id != ''
+					&& state.tool_calls[tool_call.index].id != id {
+					state.callback_failed = true
+					return error('OpenAI changed a streamed tool call ID')
+				}
+				state.tool_calls[tool_call.index].id = id
+			}
+			if call_type := tool_call.call_type {
+				if state.tool_calls[tool_call.index].call_type != ''
+					&& state.tool_calls[tool_call.index].call_type != call_type {
+					state.callback_failed = true
+					return error('OpenAI changed a streamed tool call type')
+				}
+				state.tool_calls[tool_call.index].call_type = call_type
+			}
+			if function_call := tool_call.function_call {
+				if name := function_call.name {
+					if state.tool_calls[tool_call.index].name != ''
+						&& state.tool_calls[tool_call.index].name != name {
+						state.callback_failed = true
+						return error('OpenAI changed a streamed function name')
+					}
+					state.tool_calls[tool_call.index].name = name
+				}
+				if arguments := function_call.arguments {
+					state.tool_calls[tool_call.index].arguments += arguments
 				}
 			}
 		}

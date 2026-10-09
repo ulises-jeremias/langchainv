@@ -43,7 +43,8 @@ selected with `CallOptions.tool_choice`.
 Returned calls are available through
 `llms.Choice.tool_calls` and can be replayed with `Response.assistant_message()`;
 tool results use a `.tool` message with one `schema.ToolResult` part. Streaming
-tool calls and audio output are not supported. Streaming text is available through
+tool call deltas are accumulated and returned in the final response; the streaming
+callback continues to emit text only. Audio output is not supported. Streaming text is available through
 `CallOptions.streaming_func` for one choice; it parses SSE incrementally, caps
 each incomplete event at 1 MiB, and returns the accumulated text and usage when
 the stream completes. The shared callback contract has no choice index, so
