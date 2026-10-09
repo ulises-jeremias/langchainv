@@ -1,5 +1,47 @@
 module embeddings
 
+import context
+
+struct LengthEmbedderClient {}
+
+fn (client LengthEmbedderClient) create_embedding(mut ctx context.Context, texts []string) ![][]f32 {
+	return texts.map([f32(it.len)])
+}
+
+struct EmptyEmbedderClient {}
+
+fn (client EmptyEmbedderClient) create_embedding(mut ctx context.Context, texts []string) ![][]f32 {
+	return []
+}
+
+fn test_batched_embedder_preprocesses_and_batches_documents() {
+	mut ctx := context.background()
+	embedder := new_embedder(LengthEmbedderClient{}, Options{
+		batch_size: 2
+	}) or { panic(err) }
+	vectors := embedder.embed_documents(mut ctx, ['a\nb', 'cat', 'fox']) or { panic(err) }
+	assert vectors == [[3.0], [3.0], [3.0]]
+}
+
+fn test_batched_embedder_preserves_newlines_when_configured() {
+	mut ctx := context.background()
+	embedder := new_embedder(LengthEmbedderClient{}, Options{
+		strip_newlines: false
+	}) or { panic(err) }
+	vector := embedder.embed_query(mut ctx, 'a\nb') or { panic(err) }
+	assert vector == [f32(3)]
+}
+
+fn test_batched_embedder_rejects_incomplete_client_response() {
+	mut ctx := context.background()
+	embedder := new_embedder(EmptyEmbedderClient{}, Options{}) or { panic(err) }
+	embedder.embed_documents(mut ctx, ['one']) or {
+		assert err.msg().contains('returned 0 vectors for 1 inputs')
+		return
+	}
+	assert false, 'expected incomplete embedding response to fail'
+}
+
 fn test_batch_texts_preserves_order_and_bounds() {
 	batches := batch_texts(['a', 'b', 'c', 'd', 'e'], 2) or { panic(err) }
 	assert batches == [['a', 'b'], ['c', 'd'], ['e']]

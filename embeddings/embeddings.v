@@ -22,6 +22,64 @@ pub mut:
 	batch_size     int  = 128
 }
 
+// BatchedEmbedder preprocesses input and uses an EmbedderClient for requests.
+pub struct BatchedEmbedder {
+	client  EmbedderClient
+	options Options
+}
+
+// new_embedder creates an embedder that strips newlines and batches by default.
+pub fn new_embedder(client EmbedderClient, options Options) !BatchedEmbedder {
+	if options.batch_size <= 0 {
+		return error('batch size must be greater than zero')
+	}
+	return BatchedEmbedder{
+		client:  client
+		options: options
+	}
+}
+
+// embed_query creates a vector for a single query.
+pub fn (embedder BatchedEmbedder) embed_query(mut ctx context.Context, text string) ![]f32 {
+	err := ctx.err()
+	if err !is none {
+		return err
+	}
+	input := remove_newlines([text], embedder.options.strip_newlines)
+	embeddings := embedder.client.create_embedding(mut ctx, input)!
+	request_error := ctx.err()
+	if request_error !is none {
+		return request_error
+	}
+	if embeddings.len != 1 {
+		return error('embedding client returned ${embeddings.len} vectors for one query')
+	}
+	return embeddings[0]
+}
+
+// embed_documents preprocesses and embeds documents in bounded batches.
+pub fn (embedder BatchedEmbedder) embed_documents(mut ctx context.Context, texts []string) ![][]f32 {
+	inputs := remove_newlines(texts, embedder.options.strip_newlines)
+	batches := batch_texts(inputs, embedder.options.batch_size)!
+	mut vectors := [][]f32{cap: texts.len}
+	for batch in batches {
+		err := ctx.err()
+		if err !is none {
+			return err
+		}
+		batch_vectors := embedder.client.create_embedding(mut ctx, batch)!
+		request_error := ctx.err()
+		if request_error !is none {
+			return request_error
+		}
+		if batch_vectors.len != batch.len {
+			return error('embedding client returned ${batch_vectors.len} vectors for ${batch.len} inputs')
+		}
+		vectors << batch_vectors
+	}
+	return vectors
+}
+
 // remove_newlines returns a copy whose line breaks are replaced with spaces.
 pub fn remove_newlines(texts []string, enabled bool) []string {
 	if !enabled {
