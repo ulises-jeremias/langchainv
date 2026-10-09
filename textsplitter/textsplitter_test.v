@@ -167,6 +167,45 @@ fn test_markdown_splitter_resolves_reference_links() {
 	assert chunks[0].contains('[V](<https://example.com>')
 }
 
+fn test_markdown_splitter_resolves_escaped_destination_and_following_line_title() {
+	splitter := new_markdown_text_splitter(
+		chunk_size:      256
+		chunk_overlap:   0
+		reference_links: true
+	) or { panic(err) }
+	text := '[V][docs]\n\n[docs]: https://example.com/a\\ b\n"Reference"'
+	chunks := splitter.split_text(text) or { panic(err) }
+	assert chunks.len == 1
+	assert chunks[0].contains('[V](https://example.com/a\\ b "Reference")')
+}
+
+fn test_markdown_splitter_keeps_first_duplicate_reference_definition() {
+	splitter := new_markdown_text_splitter(
+		chunk_size:      256
+		chunk_overlap:   0
+		reference_links: true
+	) or { panic(err) }
+	text := '[docs]: not a title with spaces\n[V][docs]\n\n[docs]: https://first.example\n[docs]: https://second.example'
+	chunks := splitter.split_text(text) or { panic(err) }
+	assert chunks.len == 1
+	assert chunks[0].contains('[V](<https://first.example>)')
+	assert !chunks[0].contains('second.example')
+}
+
+fn test_markdown_splitter_ignores_reference_title_with_escaped_closing_quote() {
+	splitter := new_markdown_text_splitter(
+		chunk_size:      256
+		chunk_overlap:   0
+		reference_links: true
+	) or { panic(err) }
+	invalid_definition := '[docs]: https://broken.example "bad\\"'
+	text := invalid_definition + '\n[V][docs]\n\n[docs]: https://good.example "Good"'
+	chunks := splitter.split_text(text) or { panic(err) }
+	assert chunks.len == 1
+	assert chunks[0].contains('https://good.example')
+	assert !chunks[0].contains('https://broken.example')
+}
+
 fn test_markdown_splitter_keeps_indented_code_reference_unchanged() {
 	splitter := new_markdown_text_splitter(
 		chunk_size:      256

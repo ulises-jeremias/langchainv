@@ -396,13 +396,12 @@ struct MarkdownLinkReference {
 fn resolve_markdown_reference_links(source string, mut lines []string) {
 	mut parser := vmarkdown.Markdown.new(vmarkdown.Options{})
 	parser.parse(source)
-	document := parser.parse(source)
 	mut references := map[string]MarkdownLinkReference{}
 	mut definitions := map[string]bool{}
 	for label, _ in parser.ref_map {
 		definitions[label] = true
 	}
-	collect_markdown_link_references(document, mut references)
+	collect_markdown_link_references(source, definitions, mut references)
 	mut in_fence := false
 	mut fence_marker := ''
 	mut fence_length := 0
@@ -429,16 +428,137 @@ fn resolve_markdown_reference_links(source string, mut lines []string) {
 	}
 }
 
-fn collect_markdown_link_references(node &vmarkdown.Node, mut references map[string]MarkdownLinkReference) {
-	if node.label != '' && (node.kind == .link || node.kind == .image) {
-		references[node.label] = MarkdownLinkReference{
-			destination: node.dest
-			title:       node.title
+fn collect_markdown_link_references(source string, definitions map[string]bool, mut references map[string]MarkdownLinkReference) {
+	mut in_fence := false
+	mut fence_marker := ''
+	mut fence_length := 0
+	lines := source.split_into_lines()
+	for i, line in lines {
+		trimmed := line.trim_left(' \t')
+		if in_fence {
+			if is_closing_fence(line, fence_marker, fence_length) {
+				in_fence = false
+			}
+			continue
+		}
+		if fence := opening_fence(line) {
+			in_fence = true
+			fence_marker = fence.marker
+			fence_length = fence.length
+			continue
+		}
+		if line.starts_with('    ') || line.starts_with('\t')
+			|| !is_reference_definition_line(trimmed, definitions) {
+			continue
+		}
+		label_end := markdown_bracket_close(trimmed, 0)
+		label := normalize_markdown_reference_label(trimmed[1..label_end])
+		mut value := trimmed[label_end + 2..].trim_space()
+		mut destination := ''
+		if value.starts_with('<') {
+			close := value.index('>') or { continue }
+			destination = value[1..close]
+			value = value[close + 1..].trim_space()
+		} else {
+			mut end := 0
+			mut parentheses := 0
+			for end < value.len {
+				if value[end] == `\\` && end + 1 < value.len {
+					end += 2
+					continue
+				}
+				if value[end] in [` `, `\t`] {
+					break
+				}
+				if value[end] == `(` {
+					parentheses++
+				} else if value[end] == `)` {
+					if parentheses == 0 {
+						break
+					}
+					parentheses--
+				}
+				end++
+			}
+			if parentheses != 0 {
+				continue
+			}
+			destination = value[..end]
+			value = value[end..].trim_space()
+		}
+		if destination == '' {
+			continue
+		}
+		mut title := ''
+		if value != '' {
+			title = parse_markdown_reference_title(value) or { continue }
+		} else if i + 1 < lines.len {
+			next_line := lines[i + 1].trim_left(' \t')
+			if parsed_title := parse_markdown_reference_title(next_line) {
+				title = parsed_title
+			}
+		}
+		if label !in references {
+			references[label] = MarkdownLinkReference{
+				destination: destination
+				title:       title
+			}
 		}
 	}
-	for child in node.children {
-		collect_markdown_link_references(child, mut references)
+}
+
+fn parse_markdown_reference_title(value string) ?string {
+	if value.len < 2 {
+		return none
 	}
+	opening := value[0]
+	closing := if opening == `(` { `)` } else { opening }
+	if opening !in [`"`, `\'`, `(`] || value[value.len - 1] != closing {
+		return none
+	}
+	mut preceding_backslashes := 0
+	mut previous := value.len - 2
+	for previous >= 0 && value[previous] == `\\` {
+		preceding_backslashes++
+		previous--
+	}
+	if preceding_backslashes % 2 == 1 {
+		return none
+	}
+	mut index := 1
+	for index < value.len - 1 {
+		if value[index] == `\\` && index + 1 < value.len - 1 {
+			index += 2
+			continue
+		}
+		if value[index] == closing {
+			return none
+		}
+		index++
+	}
+	return unescape_markdown_reference_component(value[1..value.len - 1])
+}
+
+fn unescape_markdown_reference_component(value string) string {
+	mut output := ''
+	mut index := 0
+	for index < value.len {
+		if value[index] == `\\` && index + 1 < value.len && is_ascii_punctuation(value[index + 1]) {
+			output += value[index + 1..index + 2]
+			index += 2
+		} else {
+			output += value[index..index + 1]
+			index++
+		}
+	}
+	return output
+}
+
+fn is_ascii_punctuation(char u8) bool {
+	return char >= `!` && char <= `~`
+		&& !(char >= `0` && char <= `9`)
+		&& !(char >= `A` && char <= `Z`)
+		&& !(char >= `a` && char <= `z`)
 }
 
 fn inline_reference_links(line string, references map[string]MarkdownLinkReference) string {
@@ -514,7 +634,11 @@ fn inline_reference_links(line string, references map[string]MarkdownLinkReferen
 }
 
 fn markdown_inline_destination(reference MarkdownLinkReference) string {
-	mut target := '<${reference.destination}>'
+	mut target := if reference.destination.contains(' ') {
+		reference.destination
+	} else {
+		'<${reference.destination}>'
+	}
 	if reference.title != '' {
 		title := reference.title
 		if title.contains('"') && !title.contains("'") {
