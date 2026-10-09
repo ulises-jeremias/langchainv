@@ -363,7 +363,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 						image_url['detail'] = part.detail
 					}
 					content_parts << json2.Any(map[string]json2.Any{
-						'type':      'image_url'
+						'type':      json2.Any('image_url')
 						'image_url': json2.Any(image_url)
 					})
 					has_image = true
@@ -382,7 +382,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 					'text': '${system_content}\n\n'
 				})
 				with_system << content_parts
-				content_parts = with_system
+				content_parts = with_system.clone()
 				system_content = ''
 			}
 			message_content = json2.Any(content_parts)
@@ -391,7 +391,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			system_content = ''
 		}
 		item := map[string]json2.Any{
-			'role':    role
+			'role':    json2.Any(role)
 			'content': message_content
 		}
 		if role == 'tool' {
