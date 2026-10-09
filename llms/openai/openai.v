@@ -612,7 +612,7 @@ struct ChatMessage {
 
 struct ChatToolCall {
 	id            string
-	call_type     string          @[json: 'type']
+	call_type     string           @[json: 'type']
 	function_call ChatFunctionCall @[json: 'function']
 }
 

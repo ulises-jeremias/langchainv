@@ -132,7 +132,7 @@ fn test_chat_payload_maps_tool_definitions_and_named_choice() {
 	payload := chat_payload(Config{
 		api_key: 'unit-test-key'
 	}, [schema.text_message(.human, 'Weather in Paris?')], llms.CallOptions{
-		tools: [schema.ToolDefinition{
+		tools:       [schema.ToolDefinition{
 			name:        'lookup_weather'
 			description: 'Look up current weather'
 			parameters:  ?json2.Any(parameters)
@@ -163,7 +163,7 @@ fn test_chat_payload_maps_tool_definitions_and_named_choice() {
 
 fn test_chat_payload_replays_assistant_tool_calls_and_results() {
 	assistant := schema.Message{
-		role: .ai
+		role:  .ai
 		parts: [
 			schema.ContentPart(schema.TextPart{
 				text: 'Checking the weather.'
@@ -179,7 +179,7 @@ fn test_chat_payload_replays_assistant_tool_calls_and_results() {
 		]
 	}
 	tool_result := schema.Message{
-		role: .tool
+		role:  .tool
 		parts: [schema.ContentPart(schema.ToolResult{
 			call_id: 'call_weather'
 			name:    'lookup_weather'
@@ -329,7 +329,7 @@ fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
 		api_key: 'unit-test-key'
 	}
 	streaming_tools := llms.CallOptions{
-		tools: [schema.ToolDefinition{
+		tools:          [schema.ToolDefinition{
 			name: 'lookup'
 		}]
 		streaming_func: discard_stream_chunk
@@ -348,7 +348,7 @@ fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
 		return
 	}
 	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
-		tools: [schema.ToolDefinition{
+		tools:       [schema.ToolDefinition{
 			name: 'ping'
 		}]
 		tool_choice: schema.ToolChoice{
