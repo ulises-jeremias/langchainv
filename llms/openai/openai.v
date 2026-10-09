@@ -13,6 +13,7 @@ import ulises_jeremias.langchainv.schema
 const default_base_url = 'https://api.openai.com/v1'
 const default_model = 'gpt-3.5-turbo'
 const default_embedding_model = 'text-embedding-ada-002'
+const max_sse_event_bytes = 1_048_576
 
 // Config configures the OpenAI chat completion and embedding client.
 @[params]
@@ -71,6 +72,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	if err !is none {
 		return err
 	}
+	if options.streaming_reasoning_func != none {
+		return error('OpenAI reasoning streaming is not implemented')
+	}
+	if options.streaming_func != none {
+		return client.stream_content(mut ctx, messages, options)
+	}
 	llms.validate_messages(messages)!
 	options.validate()!
 	payload := chat_payload(client.config, messages, options)!
@@ -118,6 +125,91 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 			completion_tokens: decoded.usage.completion_tokens
 			total_tokens:      decoded.usage.total_tokens
 		}
+	}
+}
+
+fn (client Client) stream_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
+	llms.validate_messages(messages)!
+	options.validate()!
+	choice_count := if options.n > 0 { options.n } else { options.candidate_count }
+	if choice_count > 1 {
+		return error('OpenAI streaming supports one choice because StreamFunc has no choice index')
+	}
+	callback := options.streaming_func or {
+		return error('OpenAI streaming requires a streaming callback')
+	}
+	mut payload := chat_payload(client.config, messages, options)!
+	mut request_payload := payload as map[string]json2.Any
+	request_payload['stream'] = true
+	request_payload['stream_options'] = json2.Any(map[string]json2.Any{
+		'include_usage': true
+	})
+	body := json2.encode(json2.Any(request_payload), json2.EncoderOptions{})
+	mut header := http.new_header()
+	header.set(.content_type, 'application/json')
+	header.set(.authorization, 'Bearer ${client.config.api_key}')
+	header.set_custom('Accept', 'text/event-stream')!
+	if client.config.organization != '' {
+		header.set_custom('OpenAI-Organization', client.config.organization)!
+	}
+	mut state := StreamState{
+		ctx:      ctx
+		callback: callback
+	}
+	response := httputil.fetch(http.FetchConfig{
+		url:              '${client.config.base_url}/chat/completions'
+		method:           .post
+		header:           header
+		data:             body
+		allow_redirect:   false
+		max_retries:      1
+		on_progress_body: fn [mut state] (request &http.Request, chunk []u8, body_read_so_far u64, body_expected_size u64, status_code int) ! {
+			_ = request
+			_ = body_read_so_far
+			_ = body_expected_size
+			if status_code < 200 || status_code >= 300 {
+				return
+			}
+			consume_stream_bytes(mut state, chunk) or {
+				state.callback_failed = true
+				return err
+			}
+		}
+	}) or {
+		request_context_error := ctx.err()
+		if request_context_error !is none {
+			return request_context_error
+		}
+		if state.callback_failed {
+			return error('OpenAI streaming callback or event processing failed')
+		}
+		return err
+	}
+	request_context_error := ctx.err()
+	if request_context_error !is none {
+		return request_context_error
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('OpenAI chat request failed with HTTP ${response.status_code}')
+	}
+	flush_stream_pending(mut state) or {
+		return error('OpenAI returned an invalid event stream')
+	}
+	if !state.done {
+		return error('OpenAI event stream ended before the completion marker')
+	}
+	if state.content == '' && state.finish_reason == '' {
+		return error('OpenAI returned no streamed chat choice')
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:         state.content
+			stop_reason:     state.finish_reason
+			generation_info: {
+				'index': i64(0)
+			}
+		}]
+		usage:   state.usage
 	}
 }
 
@@ -191,8 +283,8 @@ fn embeddings_from_response(response EmbeddingResponse, expected_count int) ![][
 
 fn chat_payload(config Config, messages []schema.Message, options llms.CallOptions) !json2.Any {
 	model_name := if options.model != '' { options.model } else { config.model }
-	if options.streaming_func != none || options.streaming_reasoning_func != none {
-		return error('OpenAI streaming is not implemented yet')
+	if options.streaming_reasoning_func != none {
+		return error('OpenAI reasoning streaming is not implemented')
 	}
 	if options.tools.len > 0 || options.functions.len > 0 || options.tool_choice != none
 		|| options.function_call_behavior != '' {
@@ -342,6 +434,116 @@ struct ChatUsage {
 	prompt_tokens     int
 	completion_tokens int
 	total_tokens      int
+}
+
+struct StreamState {
+mut:
+	ctx             context.Context
+	callback        llms.StreamFunc
+	pending         string
+	content         string
+	finish_reason   string
+	usage           llms.Usage
+	done            bool
+	callback_failed bool
+}
+
+struct ChatCompletionChunk {
+	choices []ChatChunkChoice
+	usage   ?ChatUsage
+}
+
+struct ChatChunkChoice {
+	index         int
+	delta         ChatDelta
+	finish_reason ?string
+}
+
+struct ChatDelta {
+	content ?string
+}
+
+fn consume_stream_bytes(mut state StreamState, chunk []u8) ! {
+	context_error := state.ctx.err()
+	if context_error !is none {
+		return context_error
+	}
+	state.pending += chunk.bytestr()
+	state.pending = state.pending.replace('\r\n', '\n')
+	for {
+		separator := state.pending.index('\n\n') or { break }
+		if separator > max_sse_event_bytes {
+			state.callback_failed = true
+			return error('OpenAI stream event exceeded the configured buffer limit')
+		}
+		event := state.pending[..separator]
+		state.pending = state.pending[separator + 2..]
+		process_stream_event(mut state, event)!
+	}
+	if state.pending.len > max_sse_event_bytes {
+		state.callback_failed = true
+		return error('OpenAI stream event exceeded the configured buffer limit')
+	}
+}
+
+fn flush_stream_pending(mut state StreamState) ! {
+	if state.pending.trim_space() != '' {
+		process_stream_event(mut state, state.pending)!
+		state.pending = ''
+	}
+}
+
+fn process_stream_event(mut state StreamState, event string) ! {
+	data := sse_event_data(event) or { return }
+	if data == '[DONE]' {
+		state.done = true
+		return
+	}
+	chunk := json2.decode[ChatCompletionChunk](data, json2.DecoderOptions{}) or {
+		state.callback_failed = true
+		return error('invalid OpenAI stream event')
+	}
+	if usage := chunk.usage {
+		state.usage = llms.Usage{
+			prompt_tokens:     usage.prompt_tokens
+			completion_tokens: usage.completion_tokens
+			total_tokens:      usage.total_tokens
+		}
+	}
+	for choice in chunk.choices {
+		if choice.index != 0 {
+			state.callback_failed = true
+			return error('OpenAI returned an unsupported streamed choice index')
+		}
+		if content := choice.delta.content {
+			if content != '' {
+				state.content += content
+				state.callback(mut state.ctx, content.bytes()) or {
+					state.callback_failed = true
+					return err
+				}
+			}
+		}
+		if finish_reason := choice.finish_reason {
+			if finish_reason != '' {
+				state.finish_reason = finish_reason
+			}
+		}
+	}
+}
+
+fn sse_event_data(event string) ?string {
+	mut lines := []string{}
+	for line in event.split('\n') {
+		if line.starts_with('data:') {
+			value := line[5..]
+			lines << if value.starts_with(' ') { value[1..] } else { value }
+		}
+	}
+	if lines.len == 0 {
+		return none
+	}
+	return lines.join('\n')
 }
 
 struct EmbeddingResponse {

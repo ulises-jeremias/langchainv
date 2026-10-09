@@ -24,11 +24,18 @@ response := client.generate_content(mut ctx, [schema.text_message(.human, 'Hello
 println(response.choices[0].content)
 ```
 
-Only text parts are supported in chat requests. The adapter does not yet
-implement streaming, tool calls, the legacy completions endpoint, or
-Azure-specific authentication and URL behavior. V's standard HTTP client
-does not expose request-context cancellation while a request is in flight;
-the adapter checks cancellation before and after each request.
+Only text parts are supported in chat requests. Streaming is available through
+`CallOptions.streaming_func` for one choice; it parses SSE incrementally, caps
+each incomplete event at 1 MiB, and returns the accumulated text and usage when
+the stream completes. The shared callback contract has no choice index, so
+streaming multiple alternatives is rejected. Tool calls, the legacy
+completions endpoint, and Azure-specific authentication and URL behavior are
+not implemented. V's standard HTTP client does not expose request-context
+cancellation while waiting for the next network chunk; cancellation is checked
+as chunks arrive and before/after the request. It also retains the complete raw
+SSE response until the request finishes, even though callbacks receive parsed
+text deltas as chunks arrive. Set `CallOptions.max_tokens` when a bounded
+completion size is important.
 
 The adapter rejects options it does not implement instead of silently ignoring
 them. It disables redirects on authenticated requests so an API key cannot be

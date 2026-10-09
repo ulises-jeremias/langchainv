@@ -1,6 +1,7 @@
 module openai
 
 import json2
+import context
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
@@ -81,6 +82,35 @@ fn test_chat_payload_rejects_unimplemented_requested_options() {
 		return
 	}
 	assert false
+}
+
+fn test_process_stream_event_emits_content_and_records_finish_reason() {
+	mut ctx := context.background()
+	mut state := StreamState{
+		ctx:      ctx
+		callback: discard_stream_chunk
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"content":"hel"}}]}') or {
+		panic(err)
+	}
+	process_stream_event(mut state, 'data: {"choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}') or {
+		panic(err)
+	}
+	process_stream_event(mut state, 'data: [DONE]') or { panic(err) }
+	assert state.content == 'hello'
+	assert state.finish_reason == 'stop'
+	assert state.done
+}
+
+fn test_sse_event_data_joins_data_lines_and_ignores_comments() {
+	data := sse_event_data(': keepalive\ndata: first\ndata: second') or { panic(err) }
+	assert data == 'first\nsecond'
+	assert sse_event_data(': keepalive') == none
+}
+
+fn discard_stream_chunk(mut ctx context.Context, chunk []u8) ! {
+	_ = ctx
+	_ = chunk
 }
 
 fn test_parse_chat_response_and_usage() {
