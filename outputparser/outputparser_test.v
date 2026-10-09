@@ -51,7 +51,7 @@ fn test_regex_dict_omits_no_update_values() {
 		'answer': 'Answer'
 		'source': 'Source'
 	}, 'UNCHANGED') or { panic(err) }
-	parsed := parser.parse('Answer: sky.\nSource: UNCHANGED') or { panic(err) }
+	parsed := parser.parse('Answer: sky. Extra words\nSource: UNCHANGED') or { panic(err) }
 	assert parsed is map[string]json2.Any
 	values := parsed as map[string]json2.Any
 	assert (values['answer'] or { panic('missing answer') }) == json2.Any('sky.')

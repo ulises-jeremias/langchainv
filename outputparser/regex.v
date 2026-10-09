@@ -4,7 +4,7 @@ module outputparser
 import json2
 import regex
 
-const regex_dict_pattern = '(?:%s):\\s?(?P<value>(?:[^.\\x0a\\x27]*)\\.?)'
+const regex_dict_pattern = '(?:%s):\\s?(?P<value>(?:[^.\\x27]*)\\.?)'
 
 // RegexParser extracts capture groups into a map. Named groups use their
 // names as keys; unnamed groups use an empty key, matching LangChainGo.
@@ -85,14 +85,22 @@ pub fn (parser RegexDict) parse(text string) !json2.Any {
 	mut result := map[string]json2.Any{}
 	for key, format in parser.output_key_to_format {
 		pattern := regex_dict_pattern.replace('%s', format)
-		mut expression := regex.regex_opt(pattern)!
-		start, _ := expression.find(text)
-		if start < 0 {
-			return error('no match found for expression ${pattern}')
+		mut found := false
+		for line in text.split_into_lines() {
+			mut expression := regex.regex_opt(pattern)!
+			start, _ := expression.find(line)
+			if start < 0 {
+				continue
+			}
+			found = true
+			value := expression.get_group_by_name(line, 'value')
+			if value != parser.no_update_value {
+				result[key] = json2.Any(value)
+			}
+			break
 		}
-		value := expression.get_group_by_name(text, 'value')
-		if value != parser.no_update_value {
-			result[key] = json2.Any(value)
+		if !found {
+			return error('no match found for expression ${pattern}')
 		}
 	}
 	return json2.Any(result)
