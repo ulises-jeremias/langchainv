@@ -27,7 +27,7 @@ The inventory is based on upstream commit
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | not started |
 | `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract |
 | `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter |
-| `httputil` | shared HTTP client/transport, user-agent, logging transport | not started |
+| `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: safe V `http.fetch` wrapper, API-key query helper, and redacted body-free request diagnostics; custom Go `RoundTripper` has no direct V `net.http` equivalent |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | not started |
 | `exp` | experimental public API surface present upstream | not started |
