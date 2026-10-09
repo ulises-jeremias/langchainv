@@ -31,7 +31,7 @@ pub mut:
 	// required lists object properties that must be present.
 	required []string
 	// items describes array elements when this definition has type `array`.
-	items ?Definition
+	items ?&Definition
 }
 
 // to_any converts this definition recursively to a JSON-compatible value.

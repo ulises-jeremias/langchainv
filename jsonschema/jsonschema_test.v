@@ -37,9 +37,9 @@ fn test_definition_serializes_nested_properties_and_optional_fields() {
 			}
 		}
 		required:    ['name', 'age']
-		items:       ?Definition(Definition{
+		items:       &Definition{
 			schema_type: string_type
-		})
+		}
 	}
 	encoded := json2.encode(definition, json2.EncoderOptions{})
 	decoded := json2.decode[json2.Any](encoded, json2.DecoderOptions{}) or { panic(err) }
