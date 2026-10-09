@@ -41,8 +41,8 @@ fn test_regex_parser_returns_named_capture_groups() {
 	parsed := parser.parse('Question: why?\nAnswer: because') or { panic(err) }
 	assert parsed is map[string]json2.Any
 	values := parsed as map[string]json2.Any
-	assert values['question'] == json2.Any('why?')
-	assert values['answer'] == json2.Any('because')
+	assert (values['question'] or { panic('missing question') }) == json2.Any('why?')
+	assert (values['answer'] or { panic('missing answer') }) == json2.Any('because')
 }
 
 fn test_regex_dict_omits_no_update_values() {
@@ -53,7 +53,7 @@ fn test_regex_dict_omits_no_update_values() {
 	parsed := parser.parse('Answer: sky.\nSource: UNCHANGED') or { panic(err) }
 	assert parsed is map[string]json2.Any
 	values := parsed as map[string]json2.Any
-	assert values['answer'] == json2.Any('sky.')
+	assert (values['answer'] or { panic('missing answer') }) == json2.Any('sky.')
 	assert 'source' !in values
 }
 
@@ -67,7 +67,7 @@ fn test_structured_parser_requires_and_returns_schema_fields() {
 	parsed := parser.parse('```json\n{"answer":"42"}\n```') or { panic(err) }
 	assert parsed is map[string]json2.Any
 	values := parsed as map[string]json2.Any
-	assert values['answer'] == json2.Any('42')
+	assert (values['answer'] or { panic('missing answer') }) == json2.Any('42')
 }
 
 fn test_combining_parser_merges_string_maps_in_section_order() {
@@ -77,8 +77,8 @@ fn test_combining_parser_merges_string_maps_in_section_order() {
 	parsed := parser.parse('one\n\ntwo') or { panic(err) }
 	assert parsed is map[string]json2.Any
 	values := parsed as map[string]json2.Any
-	assert values['first'] == json2.Any('one')
-	assert values['second'] == json2.Any('two')
+	assert (values['first'] or { panic('missing first') }) == json2.Any('one')
+	assert (values['second'] or { panic('missing second') }) == json2.Any('two')
 }
 
 struct DefinedExampleChild {

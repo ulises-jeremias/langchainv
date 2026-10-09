@@ -85,49 +85,48 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_name = ''
 			}
 		}
-		if field_name == '' {
-			continue
+		if field_name != '' {
+			mut field_type := ''
+			$if field.typ is string {
+				field_type = 'string'
+			} $else $if field.typ is bool {
+				field_type = 'boolean'
+			} $else $if field.typ is $int || field.typ is $float {
+				field_type = 'number'
+			} $else $if field.typ is ?string {
+				field_type = 'string | null'
+			} $else $if field.typ is ?bool {
+				field_type = 'boolean | null'
+			} $else $if field.typ is ?int || field.typ is ?i64 || field.typ is ?i32 || field.typ is ?i16 || field.typ is ?i8 || field.typ is ?u64 || field.typ is ?u32 || field.typ is ?u16 || field.typ is ?u8 || field.typ is ?f32 || field.typ is ?f64 {
+				field_type = 'number | null'
+			} $else $if field.typ is []string {
+				field_type = 'string[]'
+			} $else $if field.typ is []bool {
+				field_type = 'boolean[]'
+			} $else $if field.typ is []int || field.typ is []i64 || field.typ is []i32 || field.typ is []i16 || field.typ is []i8 || field.typ is []u64 || field.typ is []u32 || field.typ is []u16 || field.typ is []u8 || field.typ is []f32 || field.typ is []f64 {
+				field_type = 'number[]'
+			} $else $if field.typ is map[string]string {
+				field_type = 'Record<string, string>'
+			} $else $if field.typ is map[string]bool {
+				field_type = 'Record<string, boolean>'
+			} $else $if field.typ is map[string]int || field.typ is map[string]i64 || field.typ is map[string]i32 || field.typ is map[string]i16 || field.typ is map[string]i8 || field.typ is map[string]u64 || field.typ is map[string]u32 || field.typ is map[string]u16 || field.typ is map[string]u8 || field.typ is map[string]f32 || field.typ is map[string]f64 {
+				field_type = 'Record<string, number>'
+			} $else $if field.is_enum {
+				field_type = 'number'
+			} $else $if field.typ is $struct {
+				// Include the parent schema path so identically named fields at
+				// different nesting levels cannot emit duplicate interface names.
+				field_type = '${name}_${field.name.capitalize()}'
+				nested_schemas << defined_struct_schema(source.$(field.name), field_type)!
+			} $else {
+				return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices and maps, enums, and nested structs')
+			}
+			mut line := '\t"${field_name}": ${field_type};'
+			if description != '' {
+				line += ' // ${description}'
+			}
+			fields << line
 		}
-		mut field_type := ''
-		$if field.typ is string {
-			field_type = 'string'
-		} $else $if field.typ is bool {
-			field_type = 'boolean'
-		} $else $if field.typ is $int || field.typ is $float {
-			field_type = 'number'
-		} $else $if field.typ is ?string {
-			field_type = 'string | null'
-		} $else $if field.typ is ?bool {
-			field_type = 'boolean | null'
-		} $else $if field.typ is ?int || field.typ is ?i64 || field.typ is ?i32 || field.typ is ?i16 || field.typ is ?i8 || field.typ is ?u64 || field.typ is ?u32 || field.typ is ?u16 || field.typ is ?u8 || field.typ is ?f32 || field.typ is ?f64 {
-			field_type = 'number | null'
-		} $else $if field.typ is []string {
-			field_type = 'string[]'
-		} $else $if field.typ is []bool {
-			field_type = 'boolean[]'
-		} $else $if field.typ is []int || field.typ is []i64 || field.typ is []i32 || field.typ is []i16 || field.typ is []i8 || field.typ is []u64 || field.typ is []u32 || field.typ is []u16 || field.typ is []u8 || field.typ is []f32 || field.typ is []f64 {
-			field_type = 'number[]'
-		} $else $if field.typ is map[string]string {
-			field_type = 'Record<string, string>'
-		} $else $if field.typ is map[string]bool {
-			field_type = 'Record<string, boolean>'
-		} $else $if field.typ is map[string]int || field.typ is map[string]i64 || field.typ is map[string]i32 || field.typ is map[string]i16 || field.typ is map[string]i8 || field.typ is map[string]u64 || field.typ is map[string]u32 || field.typ is map[string]u16 || field.typ is map[string]u8 || field.typ is map[string]f32 || field.typ is map[string]f64 {
-			field_type = 'Record<string, number>'
-		} $else $if field.is_enum {
-			field_type = 'number'
-		} $else $if field.typ is $struct {
-			// Include the parent schema path so identically named fields at
-			// different nesting levels cannot emit duplicate interface names.
-			field_type = '${name}_${field.name.capitalize()}'
-			nested_schemas << defined_struct_schema(source.$(field.name), field_type)!
-		} $else {
-			return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices and maps, enums, and nested structs')
-		}
-		mut line := '\t"${field_name}": ${field_type};'
-		if description != '' {
-			line += ' // ${description}'
-		}
-		fields << line
 	}
 	if fields.len == 0 {
 		return error('defined parser source struct ${T.name} has no supported fields')
