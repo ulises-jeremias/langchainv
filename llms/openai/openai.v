@@ -381,7 +381,9 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 					'type': 'text'
 					'text': '${system_content}\n\n'
 				})
-				with_system << content_parts
+				for part in content_parts {
+					with_system << part
+				}
 				content_parts = with_system.clone()
 				system_content = ''
 			}

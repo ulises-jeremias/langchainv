@@ -174,7 +174,8 @@ fn test_reasoning_model_payload_merges_system_prompt_and_omits_temperature() {
 	messages := json_value_array(json_value(object, 'messages'))
 	assert messages.len == 1
 	assert json_value_string(json_value(messages[0] as map[string]json2.Any, 'role')) == 'user'
-	assert json_value_string(json_value(messages[0] as map[string]json2.Any, 'content')) == 'think carefully\n\nsolve'
+	content := json_value_string(json_value(messages[0] as map[string]json2.Any, 'content'))
+	assert content == 'think carefully\n\nsolve', 'unexpected reasoning prompt content: ${content}'
 }
 
 fn test_chat_payload_rejects_unimplemented_requested_options() {
