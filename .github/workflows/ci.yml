@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: langchainv-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  v-checks:
+    runs-on: ubuntu-24.04
+    env:
+      VJOBS: '2'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: langchainv
+
+      - name: Set up V
+        uses: vlang/setup-v@v1.7
+        with:
+          check-latest: true
+
+      - name: Install under the V module path
+        run: |
+          mkdir -p "$HOME/.vmodules/ulises_jeremias"
+          mv langchainv "$HOME/.vmodules/ulises_jeremias/langchainv"
+
+      - name: Format and test implemented packages
+        run: |
+          cd "$HOME/.vmodules/ulises_jeremias/langchainv"
+          sudo systemd-run --scope --property=MemoryMax=4G \
+            --property=MemorySwapMax=0 --setenv=HOME="$HOME" \
+            --setenv=PATH="$PATH" --setenv=VJOBS=2 -- \
+            bash -euc '
+              cd "$HOME/.vmodules/ulises_jeremias/langchainv"
+              v fmt -verify .
+              for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders; do
+                v test "./$package"
+              done
+            '
