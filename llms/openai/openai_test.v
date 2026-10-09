@@ -71,6 +71,7 @@ fn test_chat_payload_encodes_mixed_text_and_image_parts() {
 	payload := chat_payload(client, [message], llms.CallOptions{}) or { panic(err) }
 	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
 		json2.DecoderOptions{}) or { panic(err) }
+	assert decoded is map[string]json2.Any, 'chat payload must encode as an object'
 	object := decoded as map[string]json2.Any
 	messages := json_value_array(json_value(object, 'messages'))
 	assert messages[0] is map[string]json2.Any, 'message must encode as an object'
@@ -143,6 +144,7 @@ fn test_reasoning_model_keeps_image_after_system_prefix() {
 		llms.CallOptions{}) or { panic(err) }
 	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
 		json2.DecoderOptions{}) or { panic(err) }
+	assert decoded is map[string]json2.Any, 'reasoning chat payload must encode as an object'
 	object := decoded as map[string]json2.Any
 	messages := json_value_array(json_value(object, 'messages'))
 	assert messages[0] is map[string]json2.Any, 'reasoning message must encode as an object'
