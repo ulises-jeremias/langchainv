@@ -2,8 +2,6 @@
 // headings and block boundaries available to downstream retrieval pipelines.
 module textsplitter
 
-import x.markdown as vmarkdown
-
 // MarkdownTextSplitterOptions configures structural Markdown chunking.
 @[params]
 pub struct MarkdownTextSplitterOptions {
@@ -70,7 +68,6 @@ pub fn (splitter MarkdownTextSplitter) split_text(text string) ![]string {
 	mut fence_length := 0
 	for i := 0; i < lines.len; i++ {
 		line := lines[i]
-		trimmed := line.trim_left(' \t')
 		if in_fence {
 			if splitter.code_blocks {
 				block << line
@@ -394,14 +391,8 @@ struct MarkdownLinkReference {
 }
 
 fn resolve_markdown_reference_links(source string, mut lines []string) {
-	mut parser := vmarkdown.Markdown.new(vmarkdown.Options{})
-	parser.parse(source)
 	mut references := map[string]MarkdownLinkReference{}
-	mut definitions := map[string]bool{}
-	for label, _ in parser.ref_map {
-		definitions[label] = true
-	}
-	collect_markdown_link_references(source, definitions, mut references)
+	collect_markdown_link_references(source, mut references)
 	mut in_fence := false
 	mut fence_marker := ''
 	mut fence_length := 0
@@ -421,14 +412,14 @@ fn resolve_markdown_reference_links(source string, mut lines []string) {
 			fence_length = fence.length
 			continue
 		}
-		if is_indented_code || is_reference_definition_line(trimmed, definitions) {
+		if is_indented_code || is_reference_definition_line(trimmed) {
 			continue
 		}
 		lines[i] = inline_reference_links(line, references)
 	}
 }
 
-fn collect_markdown_link_references(source string, definitions map[string]bool, mut references map[string]MarkdownLinkReference) {
+fn collect_markdown_link_references(source string, mut references map[string]MarkdownLinkReference) {
 	mut in_fence := false
 	mut fence_marker := ''
 	mut fence_length := 0
@@ -447,8 +438,7 @@ fn collect_markdown_link_references(source string, definitions map[string]bool, 
 			fence_length = fence.length
 			continue
 		}
-		if line.starts_with('    ') || line.starts_with('\t')
-			|| !is_reference_definition_line(trimmed, definitions) {
+		if line.starts_with('    ') || line.starts_with('\t') || !is_reference_definition_line(trimmed) {
 			continue
 		}
 		label_end := markdown_bracket_close(trimmed, 0)
@@ -682,7 +672,7 @@ fn normalize_markdown_reference_label(label string) string {
 	return words.join(' ')
 }
 
-fn is_reference_definition_line(line string, definitions map[string]bool) bool {
+fn is_reference_definition_line(line string) bool {
 	if !line.starts_with('[') {
 		return false
 	}
@@ -690,8 +680,7 @@ fn is_reference_definition_line(line string, definitions map[string]bool) bool {
 	if close <= 1 || close + 1 >= line.len || line[close + 1] != `:` {
 		return false
 	}
-	label := normalize_markdown_reference_label(line[1..close])
-	return label in definitions
+	return normalize_markdown_reference_label(line[1..close]) != ''
 }
 
 fn split_with_recursive_character(text string, chunk_size int, chunk_overlap int, length_fn fn (string) int) ![]string {
