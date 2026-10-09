@@ -412,7 +412,10 @@ fn resolve_markdown_reference_links(source string, mut lines []string) {
 			fence_length = fence.length
 			continue
 		}
-		if is_indented_code || is_reference_definition_line(trimmed) {
+		if is_indented_code {
+			continue
+		}
+		if is_reference_definition_line(trimmed) {
 			continue
 		}
 		lines[i] = inline_reference_links(line, references)

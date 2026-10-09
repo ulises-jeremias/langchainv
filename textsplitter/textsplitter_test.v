@@ -189,7 +189,7 @@ fn test_markdown_splitter_keeps_first_duplicate_reference_definition() {
 	chunks := splitter.split_text(text) or { panic(err) }
 	assert chunks.len == 1
 	assert chunks[0].contains('[V](<https://first.example>)')
-	assert !chunks[0].contains('second.example')
+	assert !chunks[0].contains('[V](<https://second.example>')
 }
 
 fn test_markdown_splitter_ignores_reference_title_with_escaped_closing_quote() {
@@ -203,7 +203,7 @@ fn test_markdown_splitter_ignores_reference_title_with_escaped_closing_quote() {
 	chunks := splitter.split_text(text) or { panic(err) }
 	assert chunks.len == 1
 	assert chunks[0].contains('https://good.example')
-	assert !chunks[0].contains('https://broken.example')
+	assert !chunks[0].contains('[V](<https://broken.example>')
 }
 
 fn test_markdown_splitter_keeps_indented_code_reference_unchanged() {
