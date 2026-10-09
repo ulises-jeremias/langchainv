@@ -73,14 +73,20 @@ fn test_chat_payload_encodes_mixed_text_and_image_parts() {
 		json2.DecoderOptions{}) or { panic(err) }
 	object := decoded as map[string]json2.Any
 	messages := json_value_array(json_value(object, 'messages'))
+	assert messages[0] is map[string]json2.Any, 'message must encode as an object'
 	parts := json_value_array(json_value(messages[0] as map[string]json2.Any, 'content'))
 	assert parts.len == 3
+	assert parts[0] is map[string]json2.Any, 'text content part must encode as an object'
 	assert json_value_string(json_value(parts[0] as map[string]json2.Any, 'text')) == 'Describe this'
+	assert parts[1] is map[string]json2.Any, 'image content part must encode as an object'
 	image_part := parts[1] as map[string]json2.Any
 	assert json_value_string(json_value(image_part, 'type')) == 'image_url'
-	image_url := json_value(image_part, 'image_url') as map[string]json2.Any
+	image_url_value := json_value(image_part, 'image_url')
+	assert image_url_value is map[string]json2.Any, 'image_url must encode as an object'
+	image_url := image_url_value as map[string]json2.Any
 	assert json_value_string(json_value(image_url, 'url')) == 'https://example.test/image.png'
 	assert json_value_string(json_value(image_url, 'detail')) == 'high'
+	assert parts[2] is map[string]json2.Any, 'trailing text content part must encode as an object'
 	assert json_value_string(json_value(parts[2] as map[string]json2.Any, 'text')) == ' in one sentence'
 }
 
@@ -139,9 +145,12 @@ fn test_reasoning_model_keeps_image_after_system_prefix() {
 		json2.DecoderOptions{}) or { panic(err) }
 	object := decoded as map[string]json2.Any
 	messages := json_value_array(json_value(object, 'messages'))
+	assert messages[0] is map[string]json2.Any, 'reasoning message must encode as an object'
 	parts := json_value_array(json_value(messages[0] as map[string]json2.Any, 'content'))
 	assert parts.len == 2
+	assert parts[0] is map[string]json2.Any, 'reasoning prefix must encode as an object'
 	assert json_value_string(json_value(parts[0] as map[string]json2.Any, 'text')) == 'inspect carefully\n\n'
+	assert parts[1] is map[string]json2.Any, 'reasoning image must encode as an object'
 	assert json_value_string(json_value(parts[1] as map[string]json2.Any, 'type')) == 'image_url'
 }
 
