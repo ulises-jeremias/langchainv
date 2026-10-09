@@ -21,13 +21,13 @@ fn test_chat_payload_maps_text_roles_and_generation_options() {
 	encoded := json2.encode(payload, json2.EncoderOptions{})
 	decoded := json2.decode[json2.Any](encoded, json2.DecoderOptions{}) or { panic(err) }
 	object := decoded as map[string]json2.Any
-	assert object['model'] as string == 'gpt-test'
-	assert object['max_completion_tokens'] as int == 80
-	assert object['response_format'] is map[string]json2.Any
-	messages := object['messages'] as []json2.Any
+	assert test_json_string(test_json_value(object, 'model')) == 'gpt-test'
+	assert test_json_int(test_json_value(object, 'max_completion_tokens')) == 80
+	assert test_json_value(object, 'response_format') is map[string]json2.Any
+	messages := test_json_array(test_json_value(object, 'messages'))
 	assert messages.len == 2
-	assert (messages[0] as map[string]json2.Any)['role'] as string == 'system'
-	assert (messages[1] as map[string]json2.Any)['content'] as string == 'hello'
+	assert test_json_string(test_json_value(messages[0] as map[string]json2.Any, 'role')) == 'system'
+	assert test_json_string(test_json_value(messages[1] as map[string]json2.Any, 'content')) == 'hello'
 }
 
 fn test_chat_payload_rejects_unsupported_multimodal_parts() {
@@ -62,10 +62,10 @@ fn test_reasoning_model_payload_merges_system_prompt_and_omits_temperature() {
 	decoded := json2.decode[json2.Any](encoded, json2.DecoderOptions{}) or { panic(err) }
 	object := decoded as map[string]json2.Any
 	assert 'temperature' !in object
-	messages := object['messages'] as []json2.Any
+	messages := test_json_array(test_json_value(object, 'messages'))
 	assert messages.len == 1
-	assert (messages[0] as map[string]json2.Any)['role'] as string == 'user'
-	assert (messages[0] as map[string]json2.Any)['content'] as string == 'think carefully\n\nsolve'
+	assert test_json_string(test_json_value(messages[0] as map[string]json2.Any, 'role')) == 'user'
+	assert test_json_string(test_json_value(messages[0] as map[string]json2.Any, 'content')) == 'think carefully\n\nsolve'
 }
 
 fn test_chat_payload_rejects_unimplemented_requested_options() {
@@ -89,4 +89,20 @@ fn test_parse_chat_response_and_usage() {
 	assert response.choices.len == 1
 	assert response.choices[0].message.content == 'ok'
 	assert response.usage.total_tokens == 5
+}
+
+fn test_json_value(object map[string]json2.Any, key string) json2.Any {
+	return object[key] or { panic('missing JSON key `${key}`') }
+}
+
+fn test_json_string(value json2.Any) string {
+	return value as string
+}
+
+fn test_json_int(value json2.Any) int {
+	return value as int
+}
+
+fn test_json_array(value json2.Any) []json2.Any {
+	return value as []json2.Any
 }

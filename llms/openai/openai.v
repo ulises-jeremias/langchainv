@@ -31,22 +31,23 @@ pub:
 
 // new creates a client using the key in config or OPENAI_API_KEY.
 pub fn new(config Config) !Client {
-	mut resolved := config
-	if resolved.api_key == '' {
-		resolved.api_key = os.getenv('OPENAI_API_KEY')
-	}
-	if resolved.api_key.trim_space() == '' {
+	api_key := if config.api_key == '' { os.getenv('OPENAI_API_KEY') } else { config.api_key }
+	if api_key.trim_space() == '' {
 		return error('OpenAI API key is required; set Config.api_key or OPENAI_API_KEY')
 	}
-	if resolved.model.trim_space() == '' {
-		resolved.model = default_model
+	model := if config.model.trim_space() == '' { default_model } else { config.model }
+	base_url := if config.base_url.trim_space() == '' {
+		default_base_url
+	} else {
+		config.base_url.trim_right('/')
 	}
-	if resolved.base_url.trim_space() == '' {
-		resolved.base_url = default_base_url
-	}
-	resolved.base_url = resolved.base_url.trim_right('/')
 	return Client{
-		config: resolved
+		config: Config{
+			api_key:      api_key
+			model:        model
+			base_url:     base_url
+			organization: config.organization
+		}
 	}
 }
 
@@ -54,7 +55,8 @@ pub fn new(config Config) !Client {
 // It checks context cancellation before and after the HTTP call. V's net.http
 // does not currently expose request-context cancellation to an in-flight fetch.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
-	if err := ctx.err() {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
 	llms.validate_messages(messages)!
@@ -74,8 +76,9 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		data:           body
 		allow_redirect: false
 	})!
-	if err := ctx.err() {
-		return err
+	request_context_error := ctx.err()
+	if request_context_error !is none {
+		return request_context_error
 	}
 	if response.status_code < 200 || response.status_code >= 300 {
 		return error('OpenAI chat request failed with HTTP ${response.status_code}')
@@ -86,15 +89,9 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	if decoded.choices.len == 0 {
 		return error('OpenAI returned no chat choices')
 	}
-	mut result := llms.Response{
-		usage: llms.Usage{
-			prompt_tokens:     decoded.usage.prompt_tokens
-			completion_tokens: decoded.usage.completion_tokens
-			total_tokens:      decoded.usage.total_tokens
-		}
-	}
+	mut choices := []llms.Choice{cap: decoded.choices.len}
 	for choice in decoded.choices {
-		result.choices << llms.Choice{
+		choices << llms.Choice{
 			content:         choice.message.content
 			stop_reason:     choice.finish_reason
 			generation_info: {
@@ -102,7 +99,14 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 			}
 		}
 	}
-	return result
+	return llms.Response{
+		choices: choices
+		usage:   llms.Usage{
+			prompt_tokens:     decoded.usage.prompt_tokens
+			completion_tokens: decoded.usage.completion_tokens
+			total_tokens:      decoded.usage.total_tokens
+		}
+	}
 }
 
 // complete generates text from a prompt using the configured chat model.
@@ -198,8 +202,8 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 		return error('reasoning models require a user message to carry system instructions')
 	}
 	mut payload := map[string]json2.Any{
-		'model':    model_name
-		'messages': request_messages
+		'model':    json2.Any(model_name)
+		'messages': json2.Any(request_messages)
 	}
 	if !omits_temperature(model_name) {
 		payload['temperature'] = options.temperature
