@@ -25,7 +25,7 @@ pub:
 	model                string = default_model
 	base_url             string = default_base_url
 	organization         string
-	azure_api_key_auth    bool
+	azure_api_key_auth   bool
 	embedding_model      string = default_embedding_model
 	embedding_dimensions int
 }
@@ -70,7 +70,7 @@ pub fn new(config Config) !Client {
 			model:                model
 			base_url:             base_url
 			organization:         config.organization
-			azure_api_key_auth:    config.azure_api_key_auth
+			azure_api_key_auth:   config.azure_api_key_auth
 			embedding_model:      if config.embedding_model.trim_space() == '' {
 				default_embedding_model
 			} else {

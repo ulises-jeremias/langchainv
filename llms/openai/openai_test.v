@@ -35,8 +35,8 @@ fn test_chat_payload_maps_text_roles_and_generation_options() {
 
 fn test_azure_foundry_api_key_auth_uses_api_key_header() {
 	client := new(Config{
-		api_key:           'unit-test-key'
-		base_url:          'https://example.test/openai/v1/'
+		api_key:            'unit-test-key'
+		base_url:           'https://example.test/openai/v1/'
 		azure_api_key_auth: true
 	}) or { panic(err) }
 	header := client.request_header() or { panic(err) }
