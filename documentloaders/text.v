@@ -37,7 +37,8 @@ pub fn new_text_loader(path string, max_bytes i64) !TextLoader {
 
 // load reads the file only after checking cancellation and its size.
 pub fn (loader TextLoader) load(mut ctx context.Context) ![]schema.Document {
-	if err := ctx.err() {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
 	if loader.max_bytes <= 0 {
