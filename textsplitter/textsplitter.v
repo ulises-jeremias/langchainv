@@ -165,11 +165,11 @@ pub fn create_documents(splitter TextSplitter, texts []string, metadatas []map[s
 }
 
 fn clone_metadata(metadata map[string]json2.Any) map[string]json2.Any {
-	mut copy := map[string]json2.Any{}
+	mut cloned := map[string]json2.Any{}
 	for key, value in metadata {
-		copy[key] = value
+		cloned[key] = value
 	}
-	return copy
+	return cloned
 }
 
 fn merge_splits(splits []string, separator string, chunk_size int, chunk_overlap int, length_fn fn (string) int) []string {

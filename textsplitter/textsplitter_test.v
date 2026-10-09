@@ -114,8 +114,8 @@ fn test_split_documents_copies_metadata_and_score() {
 	assert documents.len == 2
 	assert documents[0].page_content == 'aa bb'
 	assert documents[1].page_content == 'bb cc'
-	assert documents[0].metadata['origin'] == json2.Any('fixture.txt')
-	assert documents[1].metadata['origin'] == json2.Any('fixture.txt')
+	assert (documents[0].metadata['origin'] or { panic('missing first origin') }) == json2.Any('fixture.txt')
+	assert (documents[1].metadata['origin'] or { panic('missing second origin') }) == json2.Any('fixture.txt')
 	assert documents[0].score == 0.75
 	assert documents[1].score == 0.75
 }

@@ -554,11 +554,11 @@ fn unescape_markdown_reference_component(value string) string {
 	return output
 }
 
-fn is_ascii_punctuation(char u8) bool {
-	return char >= `!` && char <= `~`
-		&& !(char >= `0` && char <= `9`)
-		&& !(char >= `A` && char <= `Z`)
-		&& !(char >= `a` && char <= `z`)
+fn is_ascii_punctuation(character u8) bool {
+	return character >= `!` && character <= `~`
+		&& !(character >= `0` && character <= `9`)
+		&& !(character >= `A` && character <= `Z`)
+		&& !(character >= `a` && character <= `z`)
 }
 
 fn inline_reference_links(line string, references map[string]MarkdownLinkReference) string {
