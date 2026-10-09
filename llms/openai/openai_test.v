@@ -103,7 +103,9 @@ fn test_process_stream_event_emits_content_and_records_finish_reason() {
 }
 
 fn test_sse_event_data_joins_data_lines_and_ignores_comments() {
-	data := sse_event_data(': keepalive\ndata: first\ndata: second') or { panic(err) }
+	data := sse_event_data(': keepalive\ndata: first\ndata: second') or {
+		panic('missing SSE data lines')
+	}
 	assert data == 'first\nsecond'
 	assert sse_event_data(': keepalive') == none
 }
