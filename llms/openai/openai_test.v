@@ -94,7 +94,7 @@ fn test_chat_payload_encodes_mixed_text_and_image_parts() {
 
 fn test_chat_payload_encodes_mixed_text_and_audio_parts() {
 	message := schema.Message{
-		role: .human
+		role:  .human
 		parts: [
 			schema.ContentPart(schema.TextPart{
 				text: 'Transcribe this:'
