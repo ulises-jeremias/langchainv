@@ -126,6 +126,139 @@ fn test_chat_payload_rejects_image_in_assistant_message() {
 	assert false, 'expected assistant image input to fail'
 }
 
+fn test_chat_payload_maps_tool_definitions_and_named_choice() {
+	parameters := json2.decode[json2.Any]('{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}',
+		json2.DecoderOptions{}) or { panic(err) }
+	payload := chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [schema.text_message(.human, 'Weather in Paris?')], llms.CallOptions{
+		tools: [schema.ToolDefinition{
+			name:        'lookup_weather'
+			description: 'Look up current weather'
+			parameters:  ?json2.Any(parameters)
+			strict:      true
+		}]
+		tool_choice: schema.ToolChoice{
+			mode: 'function'
+			name: 'lookup_weather'
+		}
+	}) or { panic(err) }
+	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
+		json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	tools := json_value_array(json_value(object, 'tools'))
+	assert tools.len == 1
+	tool := tools[0] as map[string]json2.Any
+	assert json_value_string(json_value(tool, 'type')) == 'function'
+	function := json_value(tool, 'function') as map[string]json2.Any
+	assert json_value_string(json_value(function, 'name')) == 'lookup_weather'
+	assert json_value_string(json_value(function, 'description')) == 'Look up current weather'
+	assert json_value(function, 'strict') == json2.Any(true)
+	assert json_value(function, 'parameters') is map[string]json2.Any
+	choice := json_value(object, 'tool_choice') as map[string]json2.Any
+	assert json_value_string(json_value(choice, 'type')) == 'function'
+	choice_function := json_value(choice, 'function') as map[string]json2.Any
+	assert json_value_string(json_value(choice_function, 'name')) == 'lookup_weather'
+}
+
+fn test_chat_payload_replays_assistant_tool_calls_and_results() {
+	assistant := schema.Message{
+		role: .ai
+		parts: [
+			schema.ContentPart(schema.TextPart{
+				text: 'Checking the weather.'
+			}),
+			schema.ContentPart(schema.ToolCall{
+				id:            'call_weather'
+				call_type:     'function'
+				function_call: schema.FunctionCall{
+					name:      'lookup_weather'
+					arguments: '{"city":"Paris"}'
+				}
+			}),
+		]
+	}
+	tool_result := schema.Message{
+		role: .tool
+		parts: [schema.ContentPart(schema.ToolResult{
+			call_id: 'call_weather'
+			name:    'lookup_weather'
+			content: 'Sunny'
+		})]
+	}
+	payload := chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [assistant, tool_result], llms.CallOptions{}) or { panic(err) }
+	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
+		json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	messages := json_value_array(json_value(object, 'messages'))
+	assert messages.len == 2
+	assistant_message := messages[0] as map[string]json2.Any
+	assert json_value_string(json_value(assistant_message, 'role')) == 'assistant'
+	assert json_value_string(json_value(assistant_message, 'content')) == 'Checking the weather.'
+	calls := json_value_array(json_value(assistant_message, 'tool_calls'))
+	assert calls.len == 1
+	call := calls[0] as map[string]json2.Any
+	assert json_value_string(json_value(call, 'id')) == 'call_weather'
+	assert json_value_string(json_value(call, 'type')) == 'function'
+	function := json_value(call, 'function') as map[string]json2.Any
+	assert json_value_string(json_value(function, 'name')) == 'lookup_weather'
+	assert json_value_string(json_value(function, 'arguments')) == '{"city":"Paris"}'
+	result := messages[1] as map[string]json2.Any
+	assert json_value_string(json_value(result, 'role')) == 'tool'
+	assert json_value_string(json_value(result, 'tool_call_id')) == 'call_weather'
+	assert json_value_string(json_value(result, 'content')) == 'Sunny'
+	assert json_value_string(json_value(result, 'name')) == 'lookup_weather'
+}
+
+fn test_chat_payload_rejects_non_function_tool_calls_and_non_object_parameters() {
+	client := Config{
+		api_key: 'unit-test-key'
+	}
+	invalid_call := schema.Message{
+		role:  .ai
+		parts: [schema.ContentPart(schema.ToolCall{
+			id:            'call_custom'
+			call_type:     'custom'
+			function_call: schema.FunctionCall{
+				name:      'lookup'
+				arguments: '{}'
+			}
+		})]
+	}
+	chat_payload(client, [invalid_call], llms.CallOptions{}) or {
+		assert err.msg().contains('only supports function tool calls')
+		return
+	}
+	assert false, 'expected an unsupported tool call type to fail'
+	invalid_parameters := schema.ToolDefinition{
+		name:       'lookup'
+		parameters: ?json2.Any(json2.Any([json2.Any('invalid')]))
+	}
+	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		tools: [invalid_parameters]
+	}) or {
+		assert err.msg().contains('parameters must be a JSON object')
+		return
+	}
+	assert false, 'expected non-object tool parameters to fail'
+}
+
+fn test_chat_payload_allows_tools_without_parameters() {
+	payload := chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		tools: [schema.ToolDefinition{
+			name: 'ping'
+		}]
+	}) or { panic(err) }
+	object := payload as map[string]json2.Any
+	tool := json_value_array(json_value(object, 'tools'))[0] as map[string]json2.Any
+	function := json_value(tool, 'function') as map[string]json2.Any
+	assert 'parameters' !in function
+}
+
 fn test_reasoning_model_keeps_image_after_system_prefix() {
 	client := Config{
 		api_key: 'unit-test-key'
@@ -183,14 +316,50 @@ fn test_chat_payload_rejects_unimplemented_requested_options() {
 		api_key: 'unit-test-key'
 	}
 	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
-		tools: [schema.ToolDefinition{
-			name: 'lookup'
-		}]
+		top_k: 1
 	}) or {
-		assert err.msg().contains('tool calling is not implemented')
+		assert err.msg().contains('requested generation option is not supported')
 		return
 	}
 	assert false
+}
+
+fn test_chat_payload_rejects_tool_streaming_and_choice_without_tools() {
+	client := Config{
+		api_key: 'unit-test-key'
+	}
+	streaming_tools := llms.CallOptions{
+		tools: [schema.ToolDefinition{
+			name: 'lookup'
+		}]
+		streaming_func: discard_stream_chunk
+	}
+	chat_payload(client, [schema.text_message(.human, 'hello')], streaming_tools) or {
+		assert err.msg().contains('streaming tool calls are not implemented')
+		return
+	}
+	assert false, 'expected streamed tool calls to fail'
+	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		tool_choice: schema.ToolChoice{
+			mode: 'auto'
+		}
+	}) or {
+		assert err.msg().contains('requires at least one tool definition')
+		return
+	}
+	chat_payload(client, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		tools: [schema.ToolDefinition{
+			name: 'ping'
+		}]
+		tool_choice: schema.ToolChoice{
+			mode: 'function'
+			name: 'missing'
+		}
+	}) or {
+		assert err.msg().contains('must match a provided tool definition')
+		return
+	}
+	assert false, 'expected invalid tool choice configuration to fail'
 }
 
 fn test_process_stream_event_emits_content_and_records_finish_reason() {
@@ -228,8 +397,28 @@ fn test_parse_chat_response_and_usage() {
 	response := json2.decode[ChatCompletionResponse]('{"choices":[{"index":0,"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}',
 		json2.DecoderOptions{}) or { panic(err) }
 	assert response.choices.len == 1
-	assert response.choices[0].message.content == 'ok'
+	assert response.choices[0].message.content or { '' } == 'ok'
 	assert response.usage.total_tokens == 5
+}
+
+fn test_parse_tool_call_response_and_build_replayable_message() {
+	decoded := json2.decode[ChatCompletionResponse]('{"choices":[{"index":0,"message":{"content":null,"tool_calls":[{"id":"call_weather","type":"function","function":{"name":"lookup_weather","arguments":"{\\"city\\":\\"Paris\\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":8,"completion_tokens":4,"total_tokens":12}}',
+		json2.DecoderOptions{}) or { panic(err) }
+	response := response_from_chat_completion(decoded) or { panic(err) }
+	assert response.choices.len == 1
+	assert response.choices[0].content == ''
+	assert response.choices[0].stop_reason == 'tool_calls'
+	assert response.choices[0].tool_calls.len == 1
+	call := response.choices[0].tool_calls[0]
+	assert call.id == 'call_weather'
+	assert call.call_type == 'function'
+	assert call.function_call.name == 'lookup_weather'
+	assert call.function_call.arguments == '{"city":"Paris"}'
+	assert response.usage.total_tokens == 12
+	message := response.assistant_message()
+	assert message.role == .ai
+	assert message.parts.len == 1
+	assert message.parts[0] is schema.ToolCall
 }
 
 fn test_embedding_payload_maps_model_inputs_and_dimensions() {

@@ -28,18 +28,26 @@ Chat requests support text parts and user image URL parts, including data URLs,
 with optional `auto`, `low`, or `high` detail, following the
 [Chat Completions message content format](https://platform.openai.com/docs/api-reference/chat/object).
 The adapter passes image URLs through to OpenAI and does not download or inspect
-the referenced images. Raw binary, audio, tool, and reasoning content parts
-remain unsupported. Streaming is available through
+the referenced images. Raw binary, audio, and reasoning content parts remain
+unsupported. Function tools can be declared with `CallOptions.tools`, including
+an optional JSON Schema parameter object, and selected with
+`CallOptions.tool_choice`, following the
+[Chat Completions API](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+Returned calls are available through
+`llms.Choice.tool_calls` and can be replayed with `Response.assistant_message()`;
+tool results use a `.tool` message with one `schema.ToolResult` part. Streaming
+tool calls are not supported. Streaming text is available through
 `CallOptions.streaming_func` for one choice; it parses SSE incrementally, caps
 each incomplete event at 1 MiB, and returns the accumulated text and usage when
 the stream completes. The shared callback contract has no choice index, so
-streaming multiple alternatives is rejected. Tool calls, the legacy
-completions endpoint, and Azure-specific authentication and URL behavior are
-not implemented. V's standard HTTP client does not expose request-context
-cancellation while waiting for the next network chunk; cancellation is checked
-as chunks arrive and before/after the request. It also retains the complete raw
-SSE response until the request finishes, even though callbacks receive parsed
-text deltas as chunks arrive. Set `CallOptions.max_tokens` when a bounded
+streaming multiple alternatives is rejected. Legacy function calling options,
+the legacy completions endpoint, and Azure-specific authentication and URL
+behavior are not implemented. V's standard HTTP client does not expose
+request-context cancellation while waiting for the next network chunk.
+Cancellation is checked as chunks arrive and before and after the request. The
+client also retains the complete raw SSE response until the request finishes,
+even though callbacks receive parsed text deltas as chunks arrive. Set
+`CallOptions.max_tokens` when a bounded
 completion size is important.
 
 The adapter rejects options it does not implement instead of silently ignoring

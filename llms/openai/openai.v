@@ -64,7 +64,7 @@ pub fn new(config Config) !Client {
 	}
 }
 
-// generate_content sends text messages to the OpenAI chat completions endpoint.
+// generate_content sends messages to the OpenAI chat completions endpoint.
 // It checks context cancellation before and after the HTTP call. V's net.http
 // does not currently expose request-context cancellation to an in-flight fetch.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
@@ -105,14 +105,33 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	decoded := json2.decode[ChatCompletionResponse](response.body, json2.DecoderOptions{}) or {
 		return error('OpenAI returned an invalid chat response')
 	}
+	return response_from_chat_completion(decoded)
+}
+
+fn response_from_chat_completion(decoded ChatCompletionResponse) !llms.Response {
 	if decoded.choices.len == 0 {
 		return error('OpenAI returned no chat choices')
 	}
 	mut choices := []llms.Choice{cap: decoded.choices.len}
 	for choice in decoded.choices {
+		mut tool_calls := []schema.ToolCall{cap: choice.message.tool_calls.len}
+		for tool_call in choice.message.tool_calls {
+			if tool_call.call_type != 'function' {
+				return error('OpenAI returned an unsupported tool call type')
+			}
+			tool_calls << schema.ToolCall{
+				id:            tool_call.id
+				call_type:     tool_call.call_type
+				function_call: schema.FunctionCall{
+					name:      tool_call.function_call.name
+					arguments: tool_call.function_call.arguments
+				}
+			}
+		}
 		choices << llms.Choice{
-			content:         choice.message.content
+			content:         choice.message.content or { '' }
 			stop_reason:     choice.finish_reason
+			tool_calls:      tool_calls
 			generation_info: {
 				'index': i64(choice.index)
 			}
@@ -219,6 +238,9 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 	if response.choices.len == 0 {
 		return error('OpenAI returned no completion choices')
 	}
+	if response.choices[0].tool_calls.len > 0 {
+		return error('OpenAI prompt completion does not support tool calls')
+	}
 	return response.choices[0].content
 }
 
@@ -286,9 +308,28 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 	if options.streaming_reasoning_func != none {
 		return error('OpenAI reasoning streaming is not implemented')
 	}
-	if options.tools.len > 0 || options.functions.len > 0 || options.tool_choice != none
-		|| options.function_call_behavior != '' {
-		return error('OpenAI tool calling is not implemented yet')
+	if options.functions.len > 0 || options.function_call_behavior != '' {
+		return error('OpenAI legacy function calling is not implemented')
+	}
+	if options.tool_choice != none && options.tools.len == 0 {
+		return error('OpenAI tool choice requires at least one tool definition')
+	}
+	if tool_choice := options.tool_choice {
+		if tool_choice.mode in ['function', 'named'] {
+			mut found_tool := false
+			for tool in options.tools {
+				if tool.name == tool_choice.name {
+					found_tool = true
+					break
+				}
+			}
+			if !found_tool {
+				return error('OpenAI named tool choice must match a provided tool definition')
+			}
+		}
+	}
+	if options.streaming_func != none && (options.tools.len > 0 || options.tool_choice != none) {
+		return error('OpenAI streaming tool calls are not implemented')
 	}
 	if options.top_k != 0 || options.min_length != 0 || options.max_length != 0
 		|| options.repetition_penalty != 0 {
@@ -334,8 +375,28 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			.tool { 'tool' }
 			.generic { 'user' }
 		}
+		if message.role == .tool {
+			if message.parts.len != 1 || message.parts[0] !is schema.ToolResult {
+				return error('OpenAI tool messages require exactly one tool result part')
+			}
+			tool_result := message.parts[0] as schema.ToolResult
+			if tool_result.call_id.trim_space() == '' {
+				return error('OpenAI tool result call ID cannot be empty')
+			}
+			mut result_message := map[string]json2.Any{
+				'role':         json2.Any('tool')
+				'content':      json2.Any(tool_result.content)
+				'tool_call_id': json2.Any(tool_result.call_id)
+			}
+			if tool_result.name != '' {
+				result_message['name'] = json2.Any(tool_result.name)
+			}
+			request_messages << json2.Any(result_message)
+			continue
+		}
 		mut content := strings.new_builder(64)
 		mut content_parts := []json2.Any{cap: message.parts.len}
+		mut tool_calls := []json2.Any{}
 		mut has_image := false
 		for part in message.parts {
 			match part {
@@ -368,6 +429,25 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 					})
 					has_image = true
 				}
+				schema.ToolCall {
+					if message.role != .ai {
+						return error('OpenAI tool calls are only supported in assistant messages')
+					}
+					if part.call_type != '' && part.call_type != 'function' {
+						return error('OpenAI only supports function tool calls')
+					}
+					if part.id.trim_space() == '' || part.function_call.name.trim_space() == '' {
+						return error('OpenAI tool calls require an ID and function name')
+					}
+					tool_calls << json2.Any(map[string]json2.Any{
+						'id':       json2.Any(part.id)
+						'type':     json2.Any('function')
+						'function': json2.Any(map[string]json2.Any{
+							'name':      json2.Any(part.function_call.name)
+							'arguments': json2.Any(part.function_call.arguments)
+						})
+					})
+				}
 				else {
 					return error('OpenAI chat adapter does not support this message content part yet')
 				}
@@ -393,12 +473,12 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			message_content = json2.Any('${system_content}\n\n${content_text}')
 			system_content = ''
 		}
-		item := map[string]json2.Any{
+		mut item := map[string]json2.Any{
 			'role':    json2.Any(role)
 			'content': message_content
 		}
-		if role == 'tool' {
-			return error('OpenAI tool replies require tool-call metadata, not supported yet')
+		if tool_calls.len > 0 {
+			item['tool_calls'] = json2.Any(tool_calls)
 		}
 		request_messages << item
 	}
@@ -442,7 +522,65 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			'type': 'json_object'
 		})
 	}
+	if options.tools.len > 0 {
+		payload['tools'] = json2.Any(openai_tools(options.tools)!)
+	}
+	if tool_choice := options.tool_choice {
+		payload['tool_choice'] = openai_tool_choice(tool_choice)!
+	}
 	return json2.Any(payload)
+}
+
+fn openai_tools(tools []schema.ToolDefinition) ![]json2.Any {
+	mut encoded_tools := []json2.Any{cap: tools.len}
+	for tool in tools {
+		mut function := map[string]json2.Any{
+			'name': json2.Any(tool.name)
+		}
+		if tool.description != '' {
+			function['description'] = json2.Any(tool.description)
+		}
+		if parameters := tool.parameters {
+			if parameters is map[string]json2.Any {
+				function['parameters'] = parameters
+			} else {
+				return error('OpenAI tool parameters must be a JSON object')
+			}
+		}
+		if tool.strict {
+			function['strict'] = json2.Any(true)
+		}
+		encoded_tools << json2.Any(map[string]json2.Any{
+			'type':     json2.Any('function')
+			'function': json2.Any(function)
+		})
+	}
+	return encoded_tools
+}
+
+fn openai_tool_choice(choice schema.ToolChoice) !json2.Any {
+	match choice.mode {
+		'auto', 'none', 'required' {
+			if choice.name != '' {
+				return error('OpenAI named tool choice must use mode `function`')
+			}
+			return json2.Any(choice.mode)
+		}
+		'function', 'named' {
+			if choice.name.trim_space() == '' {
+				return error('OpenAI named tool choice requires a function name')
+			}
+			return json2.Any(map[string]json2.Any{
+				'type':     json2.Any('function')
+				'function': json2.Any(map[string]json2.Any{
+					'name': json2.Any(choice.name)
+				})
+			})
+		}
+		else {
+			return error('OpenAI tool choice must be auto, none, required, or a named function')
+		}
+	}
 }
 
 fn supports_system_messages(model string) bool {
@@ -468,7 +606,19 @@ struct ChatChoice {
 }
 
 struct ChatMessage {
-	content string
+	content    ?string
+	tool_calls []ChatToolCall
+}
+
+struct ChatToolCall {
+	id            string
+	call_type     string          @[json: 'type']
+	function_call ChatFunctionCall @[json: 'function']
+}
+
+struct ChatFunctionCall {
+	name      string
+	arguments string
 }
 
 struct ChatUsage {

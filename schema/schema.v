@@ -56,12 +56,13 @@ pub:
 	arguments string
 }
 
-// ToolDefinition describes a callable function offered to a model.
+// ToolDefinition describes a callable function offered to a model. Parameters
+// contains an optional JSON Schema object.
 pub struct ToolDefinition {
 pub:
 	name        string
 	description string
-	parameters  json2.Any
+	parameters  ?json2.Any
 	strict      bool
 }
 
