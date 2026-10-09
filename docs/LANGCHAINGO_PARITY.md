@@ -17,7 +17,7 @@ The inventory is based on upstream commit
 | `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle handler contract and ordered text dispatch |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract and input/output validation |
 | `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file loader |
-| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, newline preprocessing, batching, dot product, cosine similarity |
+| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, `BatchedEmbedder` preprocessing and bounded batching over provider clients, dot product, cosine similarity |
 | `jsonschema` | JSON Schema data types, recursive definitions, and JSON serialization | implemented: all upstream definition fields and data-type constants, recursive conversion/encoding, and always-present empty `properties`; covered by package CI |
 | `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract |
 | `memory` | buffer, window buffer, token buffer, simple/chat memory, message history, AlloyDB, Cloud SQL, MongoDB, SQLite, Zep | partial: in-memory chat history and conversation buffer |
@@ -49,12 +49,13 @@ The inventory is based on upstream commit
 | Maritaca | not started |
 | Mistral | not started |
 | Ollama | not started |
-| OpenAI | not started |
+| OpenAI | partial: text, image URL, and WAV/MP3 audio chat input, non-streaming and streamed function tool calls, SSE text streaming, text prompt adapter, embeddings, Azure AI Foundry v1 API-key auth, common sampling/token options, JSON mode, usage, and redacted HTTP errors; audio output, legacy functions/completions, Azure deployment URLs, and provider-specific options remain |
 | IBM watsonx | not started |
 
 ## Embedding providers
 
-Bedrock, Cybertron, Hugging Face, Jina, OpenAI, and VoyageAI — all not started.
+OpenAI is partial through `llms.openai.Client.create_embedding`; Bedrock,
+Cybertron, Hugging Face, Jina, and VoyageAI are not started.
 
 ## Vector stores
 

@@ -1,11 +1,16 @@
 # V standard-library catalog for LangChainV
 
-This catalog was checked against V commit
-`5bd67093f97f3574b36bc1a9f19f56a9c0a4ad07` (V 0.5.2), the compiler currently
-installed on the workstation. The upstream `vlib` tree at that commit has 67
-top-level entries and 62 module README files. This is an inventory for the
-framework, not a promise that every V platform has identical support. Check the
-module's platform guards and tests before relying on a particular backend.
+This catalog was checked against the workstation's V 0.5.2 source commit
+`407c52edddca9715fb57e6571afeef0d193f2465` and cross-checked against upstream
+`master` at `a6826c4db0e28d306160fcc9e96baca90ea78f40` on 2026-10-09. Both trees
+have the same 65 top-level module directories, 62 module-level README files,
+and 182 README files recursively. The upstream tree has 67 root entries when
+the root `README.md` and `.vdocignore` are included. The three commits between
+these snapshots change 15 `vlib` paths, limited to one `builtin` implementation
+file and V compiler internals, tests, and help; they add or remove no standard
+library module. This inventory does not promise identical support on every V
+platform. Check a module's platform guards and tests before relying on a
+particular backend.
 
 ## Directly useful modules
 
@@ -38,7 +43,7 @@ fallback if callback streaming is unavailable.
 
 ## Full top-level inventory
 
-The 67 entries in the inspected `vlib` tree are:
+The 65 module directories in the inspected `vlib` tree are:
 
 `archive`, `arena`, `arrays`, `benchmark`, `bitfield`, `build`, `builtin`,
 `cli`, `clipboard`, `compress`, `context`, `coroutines`, `crypto`,
@@ -83,8 +88,12 @@ The 67 entries in the inspected `vlib` tree are:
 
 ## Source inventory
 
-Inventoried the README summaries and package structure in the exact V source
-archive above, and inspected full documentation for the directly relevant
-packages. The installed binary's `v where` command could not be
-used because it attempted to create a cache in a read-only compiler checkout;
-the archive and V source tree were read directly without invoking compilation.
+Enumerated all 65 top-level module directories and all 182 recursive README
+files in the local source tree. Reviewed the module summaries for available
+APIs and read the full docs for modules directly relevant to this framework:
+`context`, `json2`, `net.http`, `net.urllib`, HTTP/SSE streaming, file and
+encoding packages, cryptography and identifiers, optional database drivers,
+and V's testing/logging/concurrency helpers. Compared that source snapshot with
+upstream `master`; its 15 changed paths add no standard-library package. Read
+source files and docs directly rather than invoking `v where` because that
+command attempted to write a cache into the compiler checkout.

@@ -107,8 +107,12 @@ change, and keep completed, partial, and unavailable behavior distinct.
 - LangChainGo source tree inspected at commit
   `039fbb6c6469a8ffcdae615ec7bdc465c83abadc` (`main`, GitHub tree returned on
   2026-10-09; 1,500 entries in the tree).
-- V standard library inspected at V commit
-  `5bd67093f97f3574b36bc1a9f19f56a9c0a4ad07`, matching the installed V 0.5.2
-  compiler (`/tmp/v-5bd67093f97f3574b36bc1a9f19f56a9c0a4ad07/vlib`).
+- Workstation V standard library inspected at commit
+  `407c52edddca9715fb57e6571afeef0d193f2465` (V 0.5.2), then compared with
+  upstream `master` at `a6826c4db0e28d306160fcc9e96baca90ea78f40` on
+  2026-10-09. Both trees have 65 module directories, 62 module-level READMEs,
+  and 182 recursive READMEs. The intervening three commits changed 15 paths
+  under `vlib/`, limited to a built-in implementation and compiler internals,
+  tests, and help files; module coverage is unchanged.
 - Source references: <https://github.com/tmc/langchaingo> and
   <https://github.com/vlang/v/tree/master/vlib>.

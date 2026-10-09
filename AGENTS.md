@@ -19,6 +19,11 @@ V compilation can create many compiler processes and use substantial memory.
 Run one V command at a time. Do not run full `v test .` suites on the
 workstation; full-suite coverage belongs in bounded CI jobs.
 
+CI commands run directly on their GitHub-hosted runner with a bounded `VJOBS`
+value. Never wrap a CI command in `systemd-run`; that is only a local resource
+scoping tool. Keep optimized, native-library, VSL, and VTL backends optional,
+with the pure-V path remaining usable and covered by the default CI job.
+
 For local checks, use a focused file or package and a systemd memory scope, for
 example:
 
@@ -36,6 +41,10 @@ Before a local V invocation, confirm no other V compiler is active with
 `pgrep -a -x v`. Never terminate unrelated compiler processes. Keep temporary
 build and generated files inside the repository or an explicitly bounded temp
 directory.
+
+For numerical code, test against a tolerance rather than exact floating-point
+equality. Put tests next to the package or in its `tests/` directory, name them
+`*_test.v`, and preserve backend-specific tests behind explicit feature gates.
 
 ## Validation and review
 
