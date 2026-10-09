@@ -268,10 +268,10 @@ fn test_markdown_splitter_does_not_treat_indented_fence_as_fence() {
 }
 
 fn test_markdown_splitter_preflights_table_row_count() {
-	splitter := new_markdown_text_splitter(.{
+	splitter := new_markdown_text_splitter(
 		chunk_size:    512
 		chunk_overlap: 0
-	}) or { panic(err) }
+	) or { panic(err) }
 	text := '| name |\n| --- |\n| one |\n| two |'
 	splitter.split_text_bounded(text, 2, 128, 1024) or {
 		assert err.msg().contains('could exceed the 2-chunk limit')
@@ -281,12 +281,12 @@ fn test_markdown_splitter_preflights_table_row_count() {
 }
 
 fn test_recursive_splitter_enforces_bounded_chunk_count() {
-	splitter := new_recursive_character_text_splitter(.{
+	splitter := new_recursive_character_text_splitter(
 		chunk_size:     2
 		chunk_overlap:  0
 		separators:     ['']
 		keep_separator: false
-	}) or { panic(err) }
+	) or { panic(err) }
 	splitter.split_text_bounded('abcdef', 2, 6, 16) or {
 		assert err.msg().contains('could exceed the 2-chunk limit')
 		return

@@ -19,7 +19,8 @@ fn test_csv_loader_formats_each_row_and_keeps_one_based_row_metadata() {
 fn test_csv_loader_filters_columns_and_preserves_quoted_values() {
 	mut ctx := context.background()
 	loader := new_csv_loader('name,notes,city\nJane,"likes, tea",London\nJohn,"first line\nsecond line",Paris',
-		columns: ['notes', 'city']) or { panic(err) }
+		columns: ['notes', 'city']
+	) or { panic(err) }
 	documents := loader.load(mut ctx) or { panic(err) }
 	assert documents.len == 2
 	assert documents[0].page_content == 'notes: likes, tea\ncity: London'
@@ -65,8 +66,8 @@ fn test_csv_loader_rejects_rows_with_different_field_counts() {
 fn test_csv_loader_rejects_unclosed_and_misplaced_quotes() {
 	mut ctx := context.background()
 	for input, expected in {
-		'name,notes\nJane,"unclosed': 'inside a quoted field'
-		'name,notes\nJane,has"quote': 'quote in an unquoted field'
+		'name,notes\nJane,"unclosed':    'inside a quoted field'
+		'name,notes\nJane,has"quote':    'quote in an unquoted field'
 		'name,notes\nJane,"closed"tail': 'after a quoted CSV field'
 	} {
 		loader := new_csv_loader(input) or { panic(err) }
@@ -161,12 +162,12 @@ fn test_csv_loader_can_split_documents_and_preserve_row_metadata() {
 	loader := new_csv_loader('name,notes\nJane,"first paragraph\n\nsecond paragraph"', max_bytes: 0) or {
 		panic(err)
 	}
-	splitter := textsplitter.new_recursive_character_text_splitter(.{
+	splitter := textsplitter.new_recursive_character_text_splitter(
 		chunk_size:     20
 		chunk_overlap:  0
 		separators:     ['\n\n', '\n', ' ', '']
 		keep_separator: false
-	}) or { panic(err) }
+	) or { panic(err) }
 	documents := loader.load_and_split(mut ctx, splitter) or { panic(err) }
 	assert documents.len >= 2
 	for document in documents {
@@ -177,12 +178,12 @@ fn test_csv_loader_can_split_documents_and_preserve_row_metadata() {
 fn test_csv_loader_preflights_split_document_budget() {
 	mut ctx := context.background()
 	loader := new_csv_loader('name\nJane Doe', max_split_input_bytes: 1) or { panic(err) }
-	splitter := textsplitter.new_recursive_character_text_splitter(.{
+	splitter := textsplitter.new_recursive_character_text_splitter(
 		chunk_size:     1
 		chunk_overlap:  0
 		separators:     ['']
 		keep_separator: false
-	}) or { panic(err) }
+	) or { panic(err) }
 	loader.load_and_split(mut ctx, splitter) or {
 		assert err.msg().contains('split input exceeds the 1-byte safety limit')
 		return

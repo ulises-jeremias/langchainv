@@ -17,12 +17,12 @@ const default_max_csv_columns = 1024
 @[params]
 pub struct CSVLoaderOptions {
 pub:
-	columns                 []string
-	max_bytes               i64 = default_max_csv_bytes
-	max_output_bytes        i64 = default_max_csv_output_bytes
-	max_documents           int = default_max_csv_documents
-	max_split_input_bytes   int = default_max_csv_split_input_bytes
-	max_columns             int = default_max_csv_columns
+	columns               []string
+	max_bytes             i64 = default_max_csv_bytes
+	max_output_bytes      i64 = default_max_csv_output_bytes
+	max_documents         int = default_max_csv_documents
+	max_split_input_bytes int = default_max_csv_split_input_bytes
+	max_columns           int = default_max_csv_columns
 }
 
 // CSVLoader converts CSV rows into one document per data row.

@@ -64,10 +64,9 @@ Pinecone, Qdrant, Redis, and Weaviate — all not started.
 
 ## Document loaders and tools
 
-- Loaders: AssemblyAI, CSV, directory, HTML, Notion, PDF, text.
-- Tools: calculator, DuckDuckGo, Metaphor, Perplexity, scraper, SerpAPI, SQL
-  database (MySQL/PostgreSQL/SQLite), Wikipedia, Zapier.
-- All are not started.
+- Loaders still outstanding: AssemblyAI, directory, HTML, Notion, and PDF.
+- Tools still outstanding: calculator, DuckDuckGo, Metaphor, Perplexity, scraper,
+  SerpAPI, SQL database (MySQL/PostgreSQL/SQLite), Wikipedia, and Zapier.
 
 ## Cross-cutting parity requirements
 
