@@ -439,8 +439,7 @@ struct ChatUsage {
 struct StreamState {
 mut:
 	ctx             context.Context
-	@[required]
-	callback        llms.StreamFunc
+	callback        llms.StreamFunc @[required]
 	pending         string
 	content         string
 	finish_reason   string
