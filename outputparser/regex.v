@@ -4,7 +4,7 @@ module outputparser
 import json2
 import regex
 
-const regex_dict_pattern = '(?:%s):\\s?(?P<value>(?:[^.\\n\\x27]*)\\.?)'
+const regex_dict_pattern = '(?:%s):\\s?(?P<value>(?:[^.\\x0a\\x27]*)\\.?)'
 
 // RegexParser extracts capture groups into a map. Named groups use their
 // names as keys; unnamed groups use an empty key, matching LangChainGo.

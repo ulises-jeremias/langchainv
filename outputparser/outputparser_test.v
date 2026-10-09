@@ -35,7 +35,8 @@ fn test_comma_separated_list() {
 }
 
 fn test_regex_parser_returns_named_capture_groups() {
-	parser := new_regex_parser(r'Question: (?P<question>.*)\nAnswer: (?P<answer>.*)') or {
+	pattern := 'Question: (?P<question>.*)' + '\n' + 'Answer: (?P<answer>.*)'
+	parser := new_regex_parser(pattern) or {
 		panic(err)
 	}
 	parsed := parser.parse('Question: why?\nAnswer: because') or { panic(err) }
