@@ -67,7 +67,7 @@ fn test_csv_loader_rejects_unclosed_and_misplaced_quotes() {
 	mut ctx := context.background()
 	for input, expected in {
 		'name,notes\nJane,"unclosed':    'inside a quoted field'
-		'name,notes\nJane,has"quote':    'quote in an unquoted field'
+		'name,notes\nJane,has"quote':    'unquoted CSV field'
 		'name,notes\nJane,"closed"tail': 'after a quoted CSV field'
 	} {
 		loader := new_csv_loader(input) or { panic(err) }
