@@ -15,7 +15,7 @@ pub interface Loader {
 
 // TextLoader loads one UTF-8 text file as a document.
 pub struct TextLoader {
-max_bytes i64 = default_max_text_bytes
+	max_bytes i64 = default_max_text_bytes
 pub:
 	path string
 }
@@ -37,7 +37,8 @@ pub fn new_text_loader(path string, max_bytes i64) !TextLoader {
 
 // load reads the file only after checking cancellation and its size.
 pub fn (loader TextLoader) load(mut ctx context.Context) ![]schema.Document {
-	if err := ctx.err() {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
 	if loader.max_bytes <= 0 {
