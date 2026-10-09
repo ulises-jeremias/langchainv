@@ -11,9 +11,9 @@ fn test_csv_loader_formats_each_row_and_keeps_one_based_row_metadata() {
 	documents := loader.load(mut ctx) or { panic(err) }
 	assert documents.len == 2
 	assert documents[0].page_content == 'name: Jane\nage: 32\ncity: London'
-	assert documents[0].metadata['row'].int() == 1
+	assert (documents[0].metadata['row'] or { panic('missing first row metadata') }).int() == 1
 	assert documents[1].page_content == 'name: John\nage: 25\ncity: New York'
-	assert documents[1].metadata['row'].int() == 2
+	assert (documents[1].metadata['row'] or { panic('missing second row metadata') }).int() == 2
 }
 
 fn test_csv_loader_filters_columns_and_preserves_quoted_values() {
@@ -171,7 +171,7 @@ fn test_csv_loader_can_split_documents_and_preserve_row_metadata() {
 	documents := loader.load_and_split(mut ctx, splitter) or { panic(err) }
 	assert documents.len >= 2
 	for document in documents {
-		assert document.metadata['row'].int() == 1
+		assert (document.metadata['row'] or { panic('missing row metadata') }).int() == 1
 	}
 }
 

@@ -116,9 +116,9 @@ pub fn (loader CSVLoader) load(mut ctx context.Context) ![]schema.Document {
 	mut row_number := 0
 	mut output_bytes := i64(0)
 	for {
-		ctx_error := ctx.err()
-		if ctx_error !is none {
-			return ctx_error
+		row_ctx_error := ctx.err()
+		if row_ctx_error !is none {
+			return row_ctx_error
 		}
 		row := reader.read() or {
 			if err.msg() == 'encoding.csv: end of file' {
@@ -127,7 +127,7 @@ pub fn (loader CSVLoader) load(mut ctx context.Context) ![]schema.Document {
 			return err
 		}
 		if header.len == 0 {
-			header = row
+			header = row.clone()
 			continue
 		}
 		if row.len != header.len {
