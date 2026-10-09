@@ -33,7 +33,7 @@ pub struct RecursiveCharacterTextSplitter {
 	chunk_overlap      int
 	separators         []string
 	keep_separator     bool
-	length_fn          fn (string) int
+	length_fn          fn (string) int = rune_count
 	max_fallback_runes int
 }
 
@@ -179,7 +179,7 @@ fn merge_splits(splits []string, separator string, chunk_size int, chunk_overlap
 	separator_length := length_fn(separator)
 	for split in splits {
 		split_length := length_fn(split)
-		total_with_split := total + split_length
+		mut total_with_split := total + split_length
 		if current.len > 0 {
 			total_with_split += separator_length
 		}

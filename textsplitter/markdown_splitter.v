@@ -26,7 +26,7 @@ pub struct MarkdownTextSplitter {
 	reference_links        bool
 	keep_heading_hierarchy bool
 	join_table_rows        bool
-	length_fn              fn (string) int
+	length_fn              fn (string) int = rune_count
 }
 
 // new_markdown_text_splitter creates a Markdown splitter with validated chunk
@@ -501,7 +501,7 @@ fn inline_reference_links(line string, references map[string]MarkdownLinkReferen
 			}
 		}
 		normalized_label := normalize_markdown_reference_label(label)
-		if reference, exists := references[normalized_label] {
+		if reference := references[normalized_label] {
 			output += line[index..close + 1] + markdown_inline_destination(reference)
 			index = final_close + 1
 		} else {
