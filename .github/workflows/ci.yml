@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -38,13 +37,7 @@ jobs:
       - name: Format and test implemented packages
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-          sudo systemd-run --scope --property=MemoryMax=4G \
-            --property=MemorySwapMax=0 --setenv=HOME="$HOME" \
-            --setenv=PATH="$PATH" --setenv=VJOBS=2 -- \
-            bash -euc '
-              cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-              v fmt -verify .
-              for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders jsonschema httputil; do
-                v test "./$package"
-              done
-            '
+          v fmt -verify .
+          for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders jsonschema httputil; do
+            v test "./$package"
+          done
