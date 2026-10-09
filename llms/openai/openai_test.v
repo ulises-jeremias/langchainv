@@ -100,7 +100,7 @@ fn json_value_string(value json2.Any) string {
 }
 
 fn json_value_int(value json2.Any) int {
-	return value as int
+	return int(value as f64)
 }
 
 fn json_value_array(value json2.Any) []json2.Any {
