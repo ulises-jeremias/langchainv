@@ -11,6 +11,12 @@ embedding endpoint defaults. The provider returns vectors in the response's
 original order; preprocessing and batching are provided by the core embedding
 helpers.
 
+Azure AI Foundry v1 is supported by setting `Config.base_url` to the resource's
+`/openai/v1` endpoint and `Config.azure_api_key_auth` to `true`. The client sends
+the key in the `api-key` header and uses the same chat and embedding paths as the
+OpenAI-compatible v1 API ([Microsoft reference](https://learn.microsoft.com/en-in/azure/foundry/openai/latest?view=foundry)).
+Legacy deployment URLs and dated `api-version` parameters are not implemented.
+
 ```v
 import context
 import ulises_jeremias.langchainv.llms
@@ -42,8 +48,8 @@ tool calls and audio output are not supported. Streaming text is available throu
 each incomplete event at 1 MiB, and returns the accumulated text and usage when
 the stream completes. The shared callback contract has no choice index, so
 streaming multiple alternatives is rejected. Legacy function calling options,
-the legacy completions endpoint, and Azure-specific authentication and URL
-behavior are not implemented. V's standard HTTP client does not expose
+the legacy completions endpoint, and legacy Azure deployment URLs are not
+implemented. V's standard HTTP client does not expose
 request-context cancellation while waiting for the next network chunk.
 Cancellation is checked as chunks arrive and before and after the request. The
 client also retains the complete raw SSE response until the request finishes,

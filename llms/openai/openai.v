@@ -3,6 +3,7 @@ module openai
 
 import json2
 import net.http
+import net.urllib
 import os
 import strings
 import context
@@ -24,6 +25,7 @@ pub:
 	model                string = default_model
 	base_url             string = default_base_url
 	organization         string
+	azure_api_key_auth    bool
 	embedding_model      string = default_embedding_model
 	embedding_dimensions int
 }
@@ -37,24 +39,38 @@ pub:
 // new creates a client using the key in config or OPENAI_API_KEY.
 pub fn new(config Config) !Client {
 	api_key := if config.api_key == '' { os.getenv('OPENAI_API_KEY') } else { config.api_key }
+	base_url := if config.base_url.trim_space() == '' {
+		default_base_url
+	} else {
+		config.base_url.trim_space().trim_right('/')
+	}
 	if api_key.trim_space() == '' {
 		return error('OpenAI API key is required; set Config.api_key or OPENAI_API_KEY')
 	}
 	if config.embedding_dimensions < 0 {
 		return error('embedding dimensions cannot be negative')
 	}
-	model := if config.model.trim_space() == '' { default_model } else { config.model }
-	base_url := if config.base_url.trim_space() == '' {
-		default_base_url
-	} else {
-		config.base_url.trim_right('/')
+	if config.azure_api_key_auth {
+		azure_url := urllib.parse(base_url) or {
+			return error('Azure AI Foundry API key auth requires a valid HTTPS `/openai/v1` base URL')
+		}
+		if azure_url.scheme != 'https' || azure_url.host == ''
+			|| azure_url.path != '/openai/v1' || azure_url.raw_query != '' || azure_url.force_query
+			|| azure_url.fragment != '' {
+			return error('Azure AI Foundry API key auth requires an HTTPS base URL ending in `/openai/v1`')
+		}
+		if config.organization != '' {
+			return error('OpenAI organization headers are not supported with Azure AI Foundry auth')
+		}
 	}
+	model := if config.model.trim_space() == '' { default_model } else { config.model }
 	return Client{
 		config: Config{
 			api_key:              api_key
 			model:                model
 			base_url:             base_url
 			organization:         config.organization
+			azure_api_key_auth:    config.azure_api_key_auth
 			embedding_model:      if config.embedding_model.trim_space() == '' {
 				default_embedding_model
 			} else {
@@ -63,6 +79,20 @@ pub fn new(config Config) !Client {
 			embedding_dimensions: config.embedding_dimensions
 		}
 	}
+}
+
+fn (client Client) request_header() !http.Header {
+	mut header := http.new_header()
+	header.set(.content_type, 'application/json')
+	if client.config.azure_api_key_auth {
+		header.set_custom('api-key', client.config.api_key)!
+	} else {
+		header.set(.authorization, 'Bearer ${client.config.api_key}')
+		if client.config.organization != '' {
+			header.set_custom('OpenAI-Organization', client.config.organization)!
+		}
+	}
+	return header
 }
 
 // generate_content sends messages to the OpenAI chat completions endpoint.
@@ -83,12 +113,7 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	options.validate()!
 	payload := chat_payload(client.config, messages, options)!
 	body := json2.encode(payload, json2.EncoderOptions{})
-	mut header := http.new_header()
-	header.set(.content_type, 'application/json')
-	header.set(.authorization, 'Bearer ${client.config.api_key}')
-	if client.config.organization != '' {
-		header.set_custom('OpenAI-Organization', client.config.organization)!
-	}
+	header := client.request_header()!
 	response := httputil.fetch(http.FetchConfig{
 		url:            '${client.config.base_url}/chat/completions'
 		method:         .post
@@ -165,13 +190,8 @@ fn (client Client) stream_content(mut ctx context.Context, messages []schema.Mes
 		'include_usage': true
 	})
 	body := json2.encode(json2.Any(request_payload), json2.EncoderOptions{})
-	mut header := http.new_header()
-	header.set(.content_type, 'application/json')
-	header.set(.authorization, 'Bearer ${client.config.api_key}')
+	mut header := client.request_header()!
 	header.set_custom('Accept', 'text/event-stream')!
-	if client.config.organization != '' {
-		header.set_custom('OpenAI-Organization', client.config.organization)!
-	}
 	mut state := StreamState{
 		ctx:      ctx
 		callback: callback
@@ -256,12 +276,7 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 		return context_error
 	}
 	body := json2.encode(embedding_payload(client.config, texts), json2.EncoderOptions{})
-	mut header := http.new_header()
-	header.set(.content_type, 'application/json')
-	header.set(.authorization, 'Bearer ${client.config.api_key}')
-	if client.config.organization != '' {
-		header.set_custom('OpenAI-Organization', client.config.organization)!
-	}
+	header := client.request_header()!
 	response := httputil.fetch(http.FetchConfig{
 		url:            '${client.config.base_url}/embeddings'
 		method:         .post

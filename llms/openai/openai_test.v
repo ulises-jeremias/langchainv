@@ -3,6 +3,7 @@ module openai
 import json2
 import context
 import encoding.base64
+import net.http
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
@@ -30,6 +31,68 @@ fn test_chat_payload_maps_text_roles_and_generation_options() {
 	assert messages.len == 2
 	assert json_value_string(json_value(messages[0] as map[string]json2.Any, 'role')) == 'system'
 	assert json_value_string(json_value(messages[1] as map[string]json2.Any, 'content')) == 'hello'
+}
+
+fn test_azure_foundry_api_key_auth_uses_api_key_header() {
+	client := new(Config{
+		api_key:           'unit-test-key'
+		base_url:          'https://example.test/openai/v1/'
+		azure_api_key_auth: true
+	}) or { panic(err) }
+	header := client.request_header() or { panic(err) }
+	assert header.get_custom('api-key', http.HeaderQueryConfig{}) or { '' } == 'unit-test-key'
+	assert header.get(.authorization) == none
+	assert client.config.base_url == 'https://example.test/openai/v1'
+}
+
+fn test_azure_foundry_api_key_auth_requires_v1_base_url() {
+	new(Config{
+		api_key:            'unit-test-key'
+		azure_api_key_auth: true
+	}) or {
+		assert err.msg().contains('base URL ending in `/openai/v1`')
+		return
+	}
+	assert false, 'expected Azure AI Foundry auth to require an explicit v1 base URL'
+}
+
+fn test_azure_foundry_api_key_auth_requires_https() {
+	new(Config{
+		api_key:            'unit-test-key'
+		base_url:           'http://example.test/openai/v1'
+		azure_api_key_auth: true
+	}) or {
+		assert err.msg().contains('HTTPS base URL')
+		return
+	}
+	assert false, 'expected Azure AI Foundry auth to require HTTPS'
+}
+
+fn test_azure_foundry_api_key_auth_rejects_query_and_fragment() {
+	for base_url in ['https://example.test/openai/v1?x=1', 'https://example.test/openai/v1#fragment'] {
+		new(Config{
+			api_key:            'unit-test-key'
+			base_url:           base_url
+			azure_api_key_auth: true
+		}) or {
+			assert err.msg().contains('HTTPS base URL')
+			continue
+		}
+		assert false, 'expected Azure AI Foundry auth to reject query and fragment components'
+	}
+}
+
+fn test_azure_foundry_api_key_auth_rejects_openai_organization() {
+	new(Config{
+		api_key:            'unit-test-key'
+		base_url:           'https://example.test/openai/v1'
+		organization:       'org-test'
+		azure_api_key_auth: true
+	}) or {
+		assert err.msg().contains('organization headers are not supported')
+		return
+	}
+	assert false, 'expected Azure AI Foundry auth to reject the OpenAI organization header'
 }
 
 fn test_chat_payload_rejects_unsupported_content_parts() {
