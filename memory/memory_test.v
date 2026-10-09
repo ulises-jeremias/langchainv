@@ -8,7 +8,7 @@ fn test_in_memory_history_snapshots_binary_content() {
 	mut ctx := context.background()
 	mut history := new_in_memory_chat_message_history()
 	mut message := schema.Message{
-		role: .human
+		role:  .human
 		parts: [
 			schema.ContentPart(schema.BinaryPart{
 				mime_type: 'image/png'

@@ -14,17 +14,17 @@ pub interface Parser {
 pub struct Simple {}
 
 // parse returns trimmed text.
-pub fn (Simple) parse(text string) !json2.Any {
+pub fn (_ Simple) parse(text string) !json2.Any {
 	return json2.Any(text.trim_space())
 }
 
 // format_instructions returns no additional formatting instructions.
-pub fn (Simple) format_instructions() string {
+pub fn (_ Simple) format_instructions() string {
 	return ''
 }
 
 // type_name identifies this parser.
-pub fn (Simple) type_name() string {
+pub fn (_ Simple) type_name() string {
 	return 'simple_parser'
 }
 
@@ -52,12 +52,12 @@ pub fn (parser BooleanParser) parse(text string) !json2.Any {
 }
 
 // format_instructions describes the expected boolean response.
-pub fn (BooleanParser) format_instructions() string {
+pub fn (_ BooleanParser) format_instructions() string {
 	return 'Your output should be a boolean, for example `true` or `false`.'
 }
 
 // type_name identifies this parser.
-pub fn (BooleanParser) type_name() string {
+pub fn (_ BooleanParser) type_name() string {
 	return 'boolean_parser'
 }
 
@@ -71,7 +71,7 @@ fn normalize_boolean(text string) string {
 pub struct CommaSeparatedList {}
 
 // parse splits the response on commas and trims surrounding whitespace.
-pub fn (CommaSeparatedList) parse(text string) !json2.Any {
+pub fn (_ CommaSeparatedList) parse(text string) !json2.Any {
 	values := text.trim_space().split(',')
 	mut result := []json2.Any{}
 	for value in values {
@@ -81,11 +81,11 @@ pub fn (CommaSeparatedList) parse(text string) !json2.Any {
 }
 
 // format_instructions describes the expected comma-delimited response.
-pub fn (CommaSeparatedList) format_instructions() string {
+pub fn (_ CommaSeparatedList) format_instructions() string {
 	return 'Your response should be a comma-separated list, for example `foo, bar, baz`.'
 }
 
 // type_name identifies this parser.
-pub fn (CommaSeparatedList) type_name() string {
+pub fn (_ CommaSeparatedList) type_name() string {
 	return 'comma_separated_list_parser'
 }
