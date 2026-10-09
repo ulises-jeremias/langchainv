@@ -97,8 +97,8 @@ pub fn request_summary(method string, raw_url string) string {
 
 fn is_sensitive_name(name string) bool {
 	lower := name.to_lower()
-	for marker in ['authorization', 'auth', 'api_key', 'apikey', 'key', 'token', 'secret',
-		'cookie', 'credential', 'password', 'signature'] {
+	for marker in ['authorization', 'auth', 'api_key', 'apikey', 'key', 'token', 'secret', 'cookie',
+		'credential', 'password', 'signature'] {
 		if lower.contains(marker) {
 			return true
 		}
