@@ -373,7 +373,8 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 				}
 			}
 		}
-		mut message_content := json2.Any(content.str())
+		content_text := content.str()
+		mut message_content := json2.Any(content_text)
 		if has_image {
 			if system_content != '' && !system_supported && message.role == .human {
 				mut with_system := []json2.Any{cap: content_parts.len + 1}
@@ -389,7 +390,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			}
 			message_content = json2.Any(content_parts)
 		} else if system_content != '' && !system_supported && message.role == .human {
-			message_content = json2.Any('${system_content}\n\n${content.str()}')
+			message_content = json2.Any('${system_content}\n\n${content_text}')
 			system_content = ''
 		}
 		item := map[string]json2.Any{
