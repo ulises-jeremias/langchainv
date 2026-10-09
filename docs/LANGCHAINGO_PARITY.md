@@ -49,7 +49,7 @@ The inventory is based on upstream commit
 | Maritaca | not started |
 | Mistral | not started |
 | Ollama | not started |
-| OpenAI | not started |
+| OpenAI | partial: text chat completions, text prompt adapter, common sampling/token options, JSON mode, usage, and redacted HTTP errors; streaming, multimodal content, tool calls, embeddings, legacy completions, Azure, and provider-specific options remain |
 | IBM watsonx | not started |
 
 ## Embedding providers

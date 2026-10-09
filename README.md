@@ -42,6 +42,10 @@ The current core packages include:
 Provider and component packages use nested import paths such as
 `ulises_jeremias.langchainv.llms.openai`.
 
+The initial OpenAI adapter provides text chat completions and prompt completion
+through `llms.openai`. Its unsupported capabilities are listed in the parity
+ledger.
+
 ## Compatibility
 
 - V 0.5.2 or newer, subject to compiler compatibility notes in the docs.
