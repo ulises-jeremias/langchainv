@@ -39,12 +39,11 @@ paragraphs, fenced code blocks, and GFM table rows as structural boundaries. It
 can prepend the current heading or the full heading hierarchy to content chunks,
 include fenced code blocks, and group table rows up to the configured limit.
 Fenced code blocks are omitted by default. Set `reference_links: true` to
-resolve recognized CommonMark reference links using V's `x/markdown` parser
-and render them as inline destinations, including titles. The package imports
-`x/markdown` at compile time even when this option is false, so consumers of
-`textsplitter` need a compiler that provides that experimental module. Code
-fences, indented code, and inline code are kept unchanged. It uses the same
-length callback and chunk overlap rules as the recursive splitter.
+resolve supported reference definitions from source lines and render matching
+links as inline destinations, including titles. This source-scanned subset
+does not require V's experimental `x/markdown` module. Code fences, indented
+code, and inline code are kept unchanged. It uses the same length callback and
+chunk overlap rules as the recursive splitter.
 
 The splitter still uses a line-oriented block pass and does not preserve every
 CommonMark AST construct; see the parity ledger for the remaining gaps.

@@ -38,13 +38,11 @@ fallback if callback streaming is unavailable.
 
 V 0.5.2's `x.markdown` includes a CommonMark/GFM block and inline parser, HTML
 and plaintext renderers, and an AST whose link nodes expose resolved reference
-destinations and titles. The Markdown splitter's `reference_links` option uses
-that AST to rewrite recognized reference links into inline Markdown while
-leaving fenced, indented, and inline code untouched. The import is a compile-
-time dependency of the `textsplitter` package even when the option is false.
-Because this lives under `x.*`, keep the dependency localized to the Markdown
-splitter and verify it against the pinned compiler before treating the path as
-supported.
+destinations and titles. The current Markdown splitter instead scans a
+supported subset of reference definitions in source lines; it does not import
+`x.markdown` or require that experimental module at compile time. Keep `x.*`
+optional for future full CommonMark block and inline fidelity, and verify its
+actual AST behavior against the pinned compiler before adopting it.
 
 ## Generic field inspection and typed JSON
 
