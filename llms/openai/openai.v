@@ -6,6 +6,7 @@ import net.http
 import os
 import strings
 import context
+import encoding.base64
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -397,7 +398,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 		mut content := strings.new_builder(64)
 		mut content_parts := []json2.Any{cap: message.parts.len}
 		mut tool_calls := []json2.Any{}
-		mut has_image := false
+		mut has_media := false
 		for part in message.parts {
 			match part {
 				schema.TextPart {
@@ -427,7 +428,31 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 						'type':      json2.Any('image_url')
 						'image_url': json2.Any(image_url)
 					})
-					has_image = true
+					has_media = true
+				}
+				schema.BinaryPart {
+					if message.role != .human && message.role != .generic {
+						return error('OpenAI audio inputs are only supported in user messages')
+					}
+					if part.data.len == 0 {
+						return error('OpenAI audio input cannot be empty')
+					}
+					audio_mime_type := part.mime_type.to_lower().split(';')[0].trim_space()
+					audio_format := match audio_mime_type {
+						'audio/wav', 'audio/wave', 'audio/x-wav' { 'wav' }
+						'audio/mpeg', 'audio/mp3' { 'mp3' }
+						else {
+							return error('OpenAI audio input must use WAV or MP3 format')
+						}
+					}
+					content_parts << json2.Any(map[string]json2.Any{
+						'type':        json2.Any('input_audio')
+						'input_audio': json2.Any(map[string]json2.Any{
+							'data':   json2.Any(base64.encode(part.data))
+							'format': json2.Any(audio_format)
+						})
+					})
+					has_media = true
 				}
 				schema.ToolCall {
 					if message.role != .ai {
@@ -455,7 +480,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 		}
 		content_text := content.str()
 		mut message_content := json2.Any(content_text)
-		if has_image {
+		if has_media {
 			if system_content != '' && !system_supported && message.role == .human {
 				mut with_system := []json2.Any{cap: content_parts.len + 1}
 				with_system << json2.Any(map[string]json2.Any{

@@ -2,6 +2,7 @@ module openai
 
 import json2
 import context
+import encoding.base64
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
@@ -89,6 +90,76 @@ fn test_chat_payload_encodes_mixed_text_and_image_parts() {
 	assert json_value_string(json_value(image_url, 'detail')) == 'high'
 	assert parts[2] is map[string]json2.Any, 'trailing text content part must encode as an object'
 	assert json_value_string(json_value(parts[2] as map[string]json2.Any, 'text')) == ' in one sentence'
+}
+
+fn test_chat_payload_encodes_mixed_text_and_audio_parts() {
+	message := schema.Message{
+		role: .human
+		parts: [
+			schema.ContentPart(schema.TextPart{
+				text: 'Transcribe this:'
+			}),
+			schema.ContentPart(schema.BinaryPart{
+				mime_type: 'audio/wav'
+				data:      'audio'.bytes()
+			}),
+			schema.ContentPart(schema.BinaryPart{
+				mime_type: 'audio/mpeg'
+				data:      'audio'.bytes()
+			}),
+		]
+	}
+	payload := chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [message], llms.CallOptions{}) or { panic(err) }
+	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
+		json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	messages := json_value_array(json_value(object, 'messages'))
+	parts := json_value_array(json_value(messages[0] as map[string]json2.Any, 'content'))
+	assert parts.len == 3
+	assert json_value_string(json_value(parts[0] as map[string]json2.Any, 'text')) == 'Transcribe this:'
+	audio_part := parts[1] as map[string]json2.Any
+	assert json_value_string(json_value(audio_part, 'type')) == 'input_audio'
+	input_audio := json_value(audio_part, 'input_audio') as map[string]json2.Any
+	assert json_value_string(json_value(input_audio, 'data')) == base64.encode('audio'.bytes())
+	assert json_value_string(json_value(input_audio, 'format')) == 'wav'
+	mp3_part := parts[2] as map[string]json2.Any
+	mp3_audio := json_value(mp3_part, 'input_audio') as map[string]json2.Any
+	assert json_value_string(json_value(mp3_audio, 'format')) == 'mp3'
+}
+
+fn test_chat_payload_rejects_unsupported_audio_input() {
+	invalid_audio := schema.Message{
+		role:  .human
+		parts: [schema.ContentPart(schema.BinaryPart{
+			mime_type: 'application/octet-stream'
+			data:      [u8(1)]
+		})]
+	}
+	chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [invalid_audio], llms.CallOptions{}) or {
+		assert err.msg().contains('must use WAV or MP3 format')
+		return
+	}
+	assert false, 'expected an unsupported audio format to fail'
+}
+
+fn test_chat_payload_rejects_empty_audio_input() {
+	empty_audio := schema.Message{
+		role:  .human
+		parts: [schema.ContentPart(schema.BinaryPart{
+			mime_type: 'audio/wav'
+		})]
+	}
+	chat_payload(Config{
+		api_key: 'unit-test-key'
+	}, [empty_audio], llms.CallOptions{}) or {
+		assert err.msg().contains('audio input cannot be empty')
+		return
+	}
+	assert false, 'expected empty audio input to fail'
 }
 
 fn test_chat_payload_rejects_invalid_image_detail() {

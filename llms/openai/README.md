@@ -26,17 +26,18 @@ println(response.choices[0].content)
 
 Chat requests support text parts and user image URL parts, including data URLs,
 with optional `auto`, `low`, or `high` detail, following the
-[Chat Completions message content format](https://platform.openai.com/docs/api-reference/chat/object).
+[Chat Completions API content format](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
 The adapter passes image URLs through to OpenAI and does not download or inspect
-the referenced images. Raw binary, audio, and reasoning content parts remain
-unsupported. Function tools can be declared with `CallOptions.tools`, including
-an optional JSON Schema parameter object, and selected with
-`CallOptions.tool_choice`, following the
-[Chat Completions API](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+the referenced images. `schema.BinaryPart` audio input accepts user data declared
+as WAV or MP3 and encodes the bytes as base64. It validates the MIME type but
+does not inspect the audio bytes. Other binary and reasoning content parts
+remain unsupported. Function tools can be declared with
+`CallOptions.tools`, including an optional JSON Schema parameter object, and
+selected with `CallOptions.tool_choice`.
 Returned calls are available through
 `llms.Choice.tool_calls` and can be replayed with `Response.assistant_message()`;
 tool results use a `.tool` message with one `schema.ToolResult` part. Streaming
-tool calls are not supported. Streaming text is available through
+tool calls and audio output are not supported. Streaming text is available through
 `CallOptions.streaming_func` for one choice; it parses SSE incrementally, caps
 each incomplete event at 1 MiB, and returns the accumulated text and usage when
 the stream completes. The shared callback contract has no choice index, so
