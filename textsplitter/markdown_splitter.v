@@ -395,6 +395,7 @@ struct MarkdownLinkReference {
 
 fn resolve_markdown_reference_links(source string, mut lines []string) {
 	mut parser := vmarkdown.Markdown.new(vmarkdown.Options{})
+	parser.parse(source)
 	document := parser.parse(source)
 	mut references := map[string]MarkdownLinkReference{}
 	mut definitions := map[string]bool{}

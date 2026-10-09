@@ -140,7 +140,7 @@ fn test_create_documents_copies_metadata_maps() {
 	metadata['origin'] = json2.Any('source')
 	mut documents := create_documents(splitter, ['text'], [metadata]) or { panic(err) }
 	documents[0].metadata['origin'] = json2.Any('changed')
-	assert metadata['origin'] == json2.Any('source')
+	assert (metadata['origin'] or { panic('missing origin') }) == json2.Any('source')
 }
 
 fn test_create_documents_rejects_metadata_count_mismatch() {
