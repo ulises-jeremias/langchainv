@@ -29,14 +29,25 @@ The current core packages include:
 - `tools`: agent tool contracts.
 - `memory`: in-memory chat history and conversation buffer.
 - `prompts`: validated string templates.
-- `outputparser`: simple, boolean, and comma-separated list parsers.
+- `outputparser`: string, boolean, list, regex, structured, combining, and
+  typed JSON parsers.
 - `chains`: chain contract, memory loading, and input/output validation.
-- `callbacks`: lifecycle event contract.
+- `callbacks`: lifecycle event contract, ordered dispatch, no-op handler, and
+  handler composition.
 - `vectorstores`: storage contract and retriever adapter.
 - `documentloaders`: size-bounded text-file loader.
+- `textsplitter`: recursive character and tokenizer-injected token chunks, plus
+  Markdown-aware heading, paragraph, fenced-code, table-row, and optional
+  reference-link splitting.
 
 Provider and component packages use nested import paths such as
 `ulises_jeremias.langchainv.llms.openai`.
+
+See [`textsplitter/README.md`](textsplitter/README.md) for chunking options and
+the tokenizer interface.
+
+See [`outputparser/README.md`](outputparser/README.md) for parser behavior and
+the current V regular-expression compatibility boundary.
 
 ## Compatibility
 

@@ -8,10 +8,10 @@ import ulises_jeremias.langchainv.schema
 // SearchOptions configures similarity queries.
 pub struct SearchOptions {
 pub mut:
-	filter           map[string]json2.Any
-	include_metadata bool = true
-	include_vectors  bool
-	min_score        ?f32
+	filter            map[string]json2.Any
+	include_metadata  bool = true
+	include_vectors   bool
+	min_score         ?f32
 	distance_strategy string
 }
 

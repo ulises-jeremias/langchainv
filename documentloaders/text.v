@@ -15,7 +15,7 @@ pub interface Loader {
 
 // TextLoader loads one UTF-8 text file as a document.
 pub struct TextLoader {
-max_bytes i64 = default_max_text_bytes
+	max_bytes i64 = default_max_text_bytes
 pub:
 	path string
 }
