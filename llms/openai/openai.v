@@ -68,10 +68,10 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		header.set_custom('OpenAI-Organization', client.config.organization)!
 	}
 	response := httputil.fetch(http.FetchConfig{
-		url:           '${client.config.base_url}/chat/completions'
-		method:        .post
-		header:        header
-		data:          body
+		url:            '${client.config.base_url}/chat/completions'
+		method:         .post
+		header:         header
+		data:           body
 		allow_redirect: false
 	})!
 	if err := ctx.err() {
@@ -198,8 +198,8 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 		return error('reasoning models require a user message to carry system instructions')
 	}
 	mut payload := map[string]json2.Any{
-		'model':       model_name
-		'messages':    request_messages
+		'model':    model_name
+		'messages': request_messages
 	}
 	if !omits_temperature(model_name) {
 		payload['temperature'] = options.temperature
