@@ -30,8 +30,6 @@ The current core packages include:
 - `memory`: in-memory chat history and conversation buffer.
 - `prompts`: validated string templates.
 - `outputparser`: simple, boolean, and comma-separated list parsers.
-- `jsonschema`: the JSON Schema definition model used for tool and function
-  parameters. See [`jsonschema/README.md`](jsonschema/README.md).
 - `chains`: chain contract, memory loading, and input/output validation.
 - `callbacks`: lifecycle event contract.
 - `vectorstores`: storage contract and retriever adapter.
