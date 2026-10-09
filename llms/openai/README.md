@@ -1,6 +1,6 @@
 # OpenAI chat completions
 
-This package currently implements text chat completions through the shared
+This package currently implements text and image chat completions through the shared
 `llms.Model` and `llms.CompletionModel` interfaces, plus `create_embedding`
 through the shared `embeddings.EmbedderClient` contract. It reads
 `OPENAI_API_KEY` when `Config.api_key` is empty and defaults to
@@ -24,7 +24,12 @@ response := client.generate_content(mut ctx, [schema.text_message(.human, 'Hello
 println(response.choices[0].content)
 ```
 
-Only text parts are supported in chat requests. Streaming is available through
+Chat requests support text parts and user image URL parts, including data URLs,
+with optional `auto`, `low`, or `high` detail, following the
+[Chat Completions message content format](https://platform.openai.com/docs/api-reference/chat/object).
+The adapter passes image URLs through to OpenAI and does not download or inspect
+the referenced images. Raw binary, audio, tool, and reasoning content parts
+remain unsupported. Streaming is available through
 `CallOptions.streaming_func` for one choice; it parses SSE incrementally, caps
 each incomplete event at 1 MiB, and returns the accumulated text and usage when
 the stream completes. The shared callback contract has no choice index, so

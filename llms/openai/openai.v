@@ -312,7 +312,7 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 					if part is schema.TextPart {
 						part_text.write_string(part.text)
 					} else {
-						return error('OpenAI text adapter does not support non-text message parts yet')
+						return error('OpenAI chat adapter requires text-only system messages for reasoning models')
 					}
 				}
 				if system_content != '' {
@@ -335,22 +335,60 @@ fn chat_payload(config Config, messages []schema.Message, options llms.CallOptio
 			.generic { 'user' }
 		}
 		mut content := strings.new_builder(64)
+		mut content_parts := []json2.Any{cap: message.parts.len}
+		mut has_image := false
 		for part in message.parts {
 			match part {
 				schema.TextPart {
 					content.write_string(part.text)
+					content_parts << json2.Any(map[string]json2.Any{
+						'type': 'text'
+						'text': part.text
+					})
+				}
+				schema.ImageURLPart {
+					if message.role != .human && message.role != .generic {
+						return error('OpenAI image inputs are only supported in user messages')
+					}
+					if part.url.trim_space() == '' {
+						return error('OpenAI image URL cannot be empty')
+					}
+					if part.detail != '' && part.detail !in ['auto', 'low', 'high'] {
+						return error('OpenAI image detail must be auto, low, or high')
+					}
+					mut image_url := map[string]json2.Any{
+						'url': part.url
+					}
+					if part.detail != '' {
+						image_url['detail'] = part.detail
+					}
+					content_parts << json2.Any(map[string]json2.Any{
+						'type':      'image_url'
+						'image_url': json2.Any(image_url)
+					})
+					has_image = true
 				}
 				else {
-					return error('OpenAI text adapter does not support non-text message parts yet')
+					return error('OpenAI chat adapter does not support this message content part yet')
 				}
 			}
 		}
-		message_content := if system_content != '' && !system_supported && message.role == .human {
-			combined := '${system_content}\n\n${content.str()}'
+		mut message_content := json2.Any(content.str())
+		if has_image {
+			if system_content != '' && !system_supported && message.role == .human {
+				mut with_system := []json2.Any{cap: content_parts.len + 1}
+				with_system << json2.Any(map[string]json2.Any{
+					'type': 'text'
+					'text': '${system_content}\n\n'
+				})
+				with_system << content_parts
+				content_parts = with_system
+				system_content = ''
+			}
+			message_content = json2.Any(content_parts)
+		} else if system_content != '' && !system_supported && message.role == .human {
+			message_content = json2.Any('${system_content}\n\n${content.str()}')
 			system_content = ''
-			combined
-		} else {
-			content.str()
 		}
 		item := map[string]json2.Any{
 			'role':    role

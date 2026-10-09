@@ -31,21 +31,118 @@ fn test_chat_payload_maps_text_roles_and_generation_options() {
 	assert json_value_string(json_value(messages[1] as map[string]json2.Any, 'content')) == 'hello'
 }
 
-fn test_chat_payload_rejects_unsupported_multimodal_parts() {
+fn test_chat_payload_rejects_unsupported_content_parts() {
 	client := Config{
 		api_key: 'unit-test-key'
 	}
 	message := schema.Message{
 		role:  .human
+		parts: [schema.ContentPart(schema.ThinkingPart{
+			text: 'private reasoning'
+		})]
+	}
+	chat_payload(client, [message], llms.CallOptions{}) or {
+		assert err.msg().contains('does not support this message content part')
+		return
+	}
+	assert false
+}
+
+fn test_chat_payload_encodes_mixed_text_and_image_parts() {
+	client := Config{
+		api_key: 'unit-test-key'
+		model:   'gpt-4o'
+	}
+	message := schema.Message{
+		role:  .human
+		parts: [
+			schema.ContentPart(schema.TextPart{
+				text: 'Describe this'
+			}),
+			schema.ContentPart(schema.ImageURLPart{
+				url:    'https://example.test/image.png'
+				detail: 'high'
+			}),
+			schema.ContentPart(schema.TextPart{
+				text: ' in one sentence'
+			}),
+		]
+	}
+	payload := chat_payload(client, [message], llms.CallOptions{}) or { panic(err) }
+	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
+		json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	messages := json_value_array(json_value(object, 'messages'))
+	parts := json_value_array(json_value(messages[0] as map[string]json2.Any, 'content'))
+	assert parts.len == 3
+	assert json_value_string(json_value(parts[0] as map[string]json2.Any, 'text')) == 'Describe this'
+	image_part := parts[1] as map[string]json2.Any
+	assert json_value_string(json_value(image_part, 'type')) == 'image_url'
+	image_url := json_value(image_part, 'image_url') as map[string]json2.Any
+	assert json_value_string(json_value(image_url, 'url')) == 'https://example.test/image.png'
+	assert json_value_string(json_value(image_url, 'detail')) == 'high'
+	assert json_value_string(json_value(parts[2] as map[string]json2.Any, 'text')) == ' in one sentence'
+}
+
+fn test_chat_payload_rejects_invalid_image_detail() {
+	client := Config{
+		api_key: 'unit-test-key'
+	}
+	invalid_detail := schema.Message{
+		role:  .human
+		parts: [schema.ContentPart(schema.ImageURLPart{
+			url:    'https://example.test/image.png'
+			detail: 'medium'
+		})]
+	}
+	chat_payload(client, [invalid_detail], llms.CallOptions{}) or {
+		assert err.msg().contains('detail must be auto, low, or high')
+		return
+	}
+	assert false, 'expected invalid image detail to fail'
+}
+
+fn test_chat_payload_rejects_image_in_assistant_message() {
+	client := Config{
+		api_key: 'unit-test-key'
+	}
+	assistant_image := schema.Message{
+		role:  .ai
 		parts: [schema.ContentPart(schema.ImageURLPart{
 			url: 'https://example.test/image.png'
 		})]
 	}
-	chat_payload(client, [message], llms.CallOptions{}) or {
-		assert err.msg().contains('does not support non-text')
+	chat_payload(client, [assistant_image], llms.CallOptions{}) or {
+		assert err.msg().contains('only supported in user messages')
 		return
 	}
-	assert false
+	assert false, 'expected assistant image input to fail'
+}
+
+fn test_reasoning_model_keeps_image_after_system_prefix() {
+	client := Config{
+		api_key: 'unit-test-key'
+		model:   'o1-mini'
+	}
+	image_message := schema.Message{
+		role:  .human
+		parts: [schema.ContentPart(schema.ImageURLPart{
+			url: 'https://example.test/image.png'
+		})]
+	}
+	payload := chat_payload(client, [
+		schema.text_message(.system, 'inspect carefully'),
+		image_message,
+	],
+		llms.CallOptions{}) or { panic(err) }
+	decoded := json2.decode[json2.Any](json2.encode(payload, json2.EncoderOptions{}),
+		json2.DecoderOptions{}) or { panic(err) }
+	object := decoded as map[string]json2.Any
+	messages := json_value_array(json_value(object, 'messages'))
+	parts := json_value_array(json_value(messages[0] as map[string]json2.Any, 'content'))
+	assert parts.len == 2
+	assert json_value_string(json_value(parts[0] as map[string]json2.Any, 'text')) == 'inspect carefully\n\n'
+	assert json_value_string(json_value(parts[1] as map[string]json2.Any, 'type')) == 'image_url'
 }
 
 fn test_reasoning_model_payload_merges_system_prompt_and_omits_temperature() {
