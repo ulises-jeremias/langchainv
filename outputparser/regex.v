@@ -93,7 +93,10 @@ pub fn (parser RegexDict) parse(text string) !json2.Any {
 				continue
 			}
 			found = true
-			value := expression.get_group_by_name(line, 'value')
+			mut value := expression.get_group_by_name(line, 'value')
+			if value.starts_with(' ') || value.starts_with('\t') {
+				value = value[1..]
+			}
 			if value != parser.no_update_value {
 				result[key] = json2.Any(value)
 			}
