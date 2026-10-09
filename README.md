@@ -36,6 +36,8 @@ The current core packages include:
 - `callbacks`: lifecycle event contract.
 - `vectorstores`: storage contract and retriever adapter.
 - `documentloaders`: size-bounded text-file loader.
+- `httputil`: outbound user-agent defaults, API-key query handling, and
+  credential-redacted diagnostics. See [`httputil/README.md`](httputil/README.md).
 
 Provider and component packages use nested import paths such as
 `ulises_jeremias.langchainv.llms.openai`.
