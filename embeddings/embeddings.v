@@ -46,15 +46,15 @@ pub fn (embedder BatchedEmbedder) embed_query(mut ctx context.Context, text stri
 		return err
 	}
 	input := remove_newlines([text], embedder.options.strip_newlines)
-	embeddings := embedder.client.create_embedding(mut ctx, input)!
+	vectors := embedder.client.create_embedding(mut ctx, input)!
 	request_error := ctx.err()
 	if request_error !is none {
 		return request_error
 	}
-	if embeddings.len != 1 {
-		return error('embedding client returned ${embeddings.len} vectors for one query')
+	if vectors.len != 1 {
+		return error('embedding client returned ${vectors.len} vectors for one query')
 	}
-	return embeddings[0]
+	return vectors[0]
 }
 
 // embed_documents preprocesses and embeds documents in bounded batches.

@@ -5,12 +5,15 @@ import context
 struct LengthEmbedderClient {}
 
 fn (client LengthEmbedderClient) create_embedding(mut ctx context.Context, texts []string) ![][]f32 {
+	_ = ctx
 	return texts.map([f32(it.len)])
 }
 
 struct EmptyEmbedderClient {}
 
 fn (client EmptyEmbedderClient) create_embedding(mut ctx context.Context, texts []string) ![][]f32 {
+	_ = ctx
+	_ = texts
 	return []
 }
 
