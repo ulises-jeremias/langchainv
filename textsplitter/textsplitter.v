@@ -14,6 +14,52 @@ pub interface TextSplitter {
 	split_text(text string) ![]string
 }
 
+// BoundedTextSplitter chunks text under explicit output limits. Implementations
+// must enforce both limits while producing chunks, before retaining an
+// unbounded result list.
+pub interface BoundedTextSplitter {
+	split_text_bounded(text string, max_chunks int, max_input_bytes int, max_output_bytes i64) ![]string
+}
+
+fn validate_bounded_chunks(chunks []string, max_chunks int, max_output_bytes i64) ![]string {
+	if max_chunks < 0 || max_output_bytes < 0 {
+		return error('split limits cannot be negative')
+	}
+	if chunks.len > max_chunks {
+		return error('split result exceeds the ${max_chunks}-chunk limit')
+	}
+	mut total_bytes := i64(0)
+	for chunk in chunks {
+		total_bytes += i64(chunk.len)
+		if total_bytes > max_output_bytes {
+			return error('split result exceeds the ${max_output_bytes}-byte limit')
+		}
+	}
+	return chunks
+}
+
+fn estimate_chunk_count(length int, chunk_size int, chunk_overlap int) int {
+	if length <= 0 {
+		return 0
+	}
+	if length <= chunk_size {
+		return 1
+	}
+	step := chunk_size - chunk_overlap
+	return 1 + (length - chunk_size + step - 1) / step
+}
+
+fn product_exceeds_limit(a int, b int, multiplier i64, limit i64) bool {
+	if a <= 0 || b <= 0 || multiplier <= 0 {
+		return false
+	}
+	if i64(a) > limit / i64(b) {
+		return true
+	}
+	product := i64(a) * i64(b)
+	return product > limit / multiplier
+}
+
 // RecursiveCharacterOptions configures recursive separator selection.
 @[params]
 pub struct RecursiveCharacterOptions {
@@ -35,6 +81,27 @@ pub struct RecursiveCharacterTextSplitter {
 	keep_separator     bool
 	length_fn          fn (string) int = rune_count
 	max_fallback_runes int
+}
+
+// split_text_bounded rejects inputs that could emit more chunks than the
+// caller's bound before invoking the list-producing splitter.
+pub fn (splitter RecursiveCharacterTextSplitter) split_text_bounded(text string, max_chunks int, max_input_bytes int, max_output_bytes i64) ![]string {
+	if max_chunks < 0 || max_input_bytes < 0 || max_output_bytes < 0 {
+		return error('split limits cannot be negative')
+	}
+	if text.len > max_input_bytes {
+		return error('split input exceeds the ${max_input_bytes}-byte safety limit')
+	}
+	count_bound := estimate_chunk_count(splitter.length_fn(text), splitter.chunk_size,
+		splitter.chunk_overlap)
+	if count_bound > max_chunks {
+		return error('split output could exceed the ${max_chunks}-chunk limit')
+	}
+	if product_exceeds_limit(count_bound, text.len, 1, max_output_bytes) {
+		return error('split output could exceed the ${max_output_bytes}-byte limit')
+	}
+	chunks := splitter.split_text(text)!
+	return validate_bounded_chunks(chunks, max_chunks, max_output_bytes)
 }
 
 // new_recursive_character_text_splitter constructs a validated splitter.

@@ -27,6 +27,29 @@ pub struct MarkdownTextSplitter {
 	length_fn              fn (string) int = rune_count
 }
 
+// split_text_bounded rejects inputs whose chunks could exceed the caller's
+// limits before processing lines, then validates emitted chunk bytes.
+pub fn (splitter MarkdownTextSplitter) split_text_bounded(text string, max_chunks int, max_input_bytes int, max_output_bytes i64) ![]string {
+	if max_chunks < 0 || max_input_bytes < 0 || max_output_bytes < 0 {
+		return error('split limits cannot be negative')
+	}
+	if text.len > max_input_bytes {
+		return error('split input exceeds the ${max_input_bytes}-byte safety limit')
+	}
+	content_bound := estimate_chunk_count(splitter.length_fn(text), splitter.chunk_size,
+		splitter.chunk_overlap)
+	line_bound := text.count('\n') + if text.ends_with('\n') { 0 } else { 1 }
+	count_bound := content_bound + line_bound
+	if count_bound > max_chunks {
+		return error('split output could exceed the ${max_chunks}-chunk limit')
+	}
+	if product_exceeds_limit(count_bound, text.len, 2, max_output_bytes) {
+		return error('split output could exceed the ${max_output_bytes}-byte limit')
+	}
+	chunks := splitter.split_text(text)!
+	return validate_bounded_chunks(chunks, max_chunks, max_output_bytes)
+}
+
 // new_markdown_text_splitter creates a Markdown splitter with validated chunk
 // limits. Fenced code blocks are omitted by default, matching LangChainGo.
 pub fn new_markdown_text_splitter(options MarkdownTextSplitterOptions) !MarkdownTextSplitter {

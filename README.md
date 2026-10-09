@@ -35,7 +35,8 @@ The current core packages include:
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op handler, and
   handler composition.
 - `vectorstores`: storage contract and retriever adapter.
-- `documentloaders`: size-bounded text-file loader.
+- `documentloaders`: size-bounded text-file and CSV content loaders, with row
+  filtering and document splitting.
 - `textsplitter`: recursive character and tokenizer-injected token chunks, plus
   Markdown-aware heading, paragraph, fenced-code, table-row, and optional
   reference-link splitting.

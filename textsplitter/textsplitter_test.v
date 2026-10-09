@@ -266,3 +266,54 @@ fn test_markdown_splitter_does_not_treat_indented_fence_as_fence() {
 	chunks := splitter.split_text('    ```\n    keep this\n    ```\nafter') or { panic(err) }
 	assert chunks.join('\n').contains('keep this')
 }
+
+fn test_markdown_splitter_preflights_table_row_count() {
+	splitter := new_markdown_text_splitter(.{
+		chunk_size:    512
+		chunk_overlap: 0
+	}) or { panic(err) }
+	text := '| name |\n| --- |\n| one |\n| two |'
+	splitter.split_text_bounded(text, 2, 128, 1024) or {
+		assert err.msg().contains('could exceed the 2-chunk limit')
+		return
+	}
+	assert false, 'expected Markdown table row count to be checked before splitting'
+}
+
+fn test_recursive_splitter_enforces_bounded_chunk_count() {
+	splitter := new_recursive_character_text_splitter(.{
+		chunk_size:     2
+		chunk_overlap:  0
+		separators:     ['']
+		keep_separator: false
+	}) or { panic(err) }
+	splitter.split_text_bounded('abcdef', 2, 6, 16) or {
+		assert err.msg().contains('could exceed the 2-chunk limit')
+		return
+	}
+	assert false, 'expected recursive splitter chunk count to be checked'
+}
+
+fn test_token_splitter_enforces_bounded_chunk_and_output_limits() {
+	splitter := new_token_splitter(RuneTokenizer{}, chunk_size: 3, chunk_overlap: 1) or {
+		panic(err)
+	}
+	chunks := splitter.split_text_bounded('abcdefg', 3, 7, 9) or { panic(err) }
+	assert chunks == ['abc', 'cde', 'efg']
+	splitter.split_text_bounded('abcdefg', 2, 7, 64) or {
+		assert err.msg().contains('exceeds the 2-chunk limit')
+		return
+	}
+	assert false, 'expected token splitter chunk count to be checked'
+}
+
+fn test_token_splitter_enforces_bounded_output_bytes() {
+	splitter := new_token_splitter(RuneTokenizer{}, chunk_size: 3, chunk_overlap: 1) or {
+		panic(err)
+	}
+	splitter.split_text_bounded('abcdefg', 3, 7, 8) or {
+		assert err.msg().contains('8-byte limit')
+		return
+	}
+	assert false, 'expected token splitter output bytes to be checked'
+}
