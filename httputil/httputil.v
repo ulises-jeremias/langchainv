@@ -31,10 +31,10 @@ pub:
 // DefaultClient sends HTTP requests with explicit timeouts and byte limits.
 pub struct DefaultClient {
 pub:
-	timeout_ms          int  = 30000
-	max_request_bytes   i64  = 8 * 1024 * 1024
-	max_response_bytes  i64  = 16 * 1024 * 1024
-	user_agent          string = 'langchainv/0.1.0'
+	timeout_ms         int    = 30000
+	max_request_bytes  i64    = 8 * 1024 * 1024
+	max_response_bytes i64    = 16 * 1024 * 1024
+	user_agent         string = 'langchainv/0.1.0'
 }
 
 // new_default_client returns the safe defaults for provider HTTP calls.
@@ -83,17 +83,17 @@ pub fn (client DefaultClient) do(mut ctx context.Context, request Request) !Resp
 	timeout := i64(client.timeout_ms) * time.millisecond
 	read_limit := client.max_response_bytes + 1
 	response := http.fetch(
-		method:              request.method
-		url:                 request.url
-		header:              headers
-		data:                request.body
-		user_agent:          user_agent
-		validate:            true
-		allow_redirect:      false
-		max_retries:         0
-		read_timeout:        timeout
-		write_timeout:       timeout
-		stop_copying_limit:  read_limit
+		method:               request.method
+		url:                  request.url
+		header:               headers
+		data:                 request.body
+		user_agent:           user_agent
+		validate:             true
+		allow_redirect:       false
+		max_retries:          0
+		read_timeout:         timeout
+		write_timeout:        timeout
+		stop_copying_limit:   read_limit
 		stop_receiving_limit: read_limit
 	)!
 	if i64(response.body.len) > client.max_response_bytes {

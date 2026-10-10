@@ -31,13 +31,13 @@ fn test_http_client_contract_is_fakeable_without_network() {
 		state: state
 	})
 	response := client.do(mut ctx, Request{
-		method: .post
-		url:    'https://example.invalid/v1/embeddings'
+		method:  .post
+		url:     'https://example.invalid/v1/embeddings'
 		headers: {
 			'Authorization': 'Bearer test-token'
 			'Content-Type':  'application/json'
 		}
-		body:   '{"input":["safe"]}'
+		body:    '{"input":["safe"]}'
 	}) or { panic(err) }
 	assert response.status_code == 200
 	assert response.body == '{"ok":true}'
