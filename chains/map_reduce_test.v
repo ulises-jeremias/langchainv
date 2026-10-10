@@ -44,15 +44,15 @@ fn (chain MapReduceCaptureReducer) call(mut _ctx context.Context, inputs map[str
 	}
 }
 
-fn (MapReduceCaptureReducer) memory() ?schema.Memory {
+fn (_ MapReduceCaptureReducer) memory() ?schema.Memory {
 	return none
 }
 
-fn (MapReduceCaptureReducer) input_keys() []string {
+fn (_ MapReduceCaptureReducer) input_keys() []string {
 	return ['input_documents']
 }
 
-fn (MapReduceCaptureReducer) output_keys() []string {
+fn (_ MapReduceCaptureReducer) output_keys() []string {
 	return ['answer']
 }
 
