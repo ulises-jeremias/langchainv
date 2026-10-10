@@ -134,19 +134,19 @@ fn test_simple_memory_implements_no_op_memory_contract() {
 
 fn test_token_buffer_memory_evicts_oldest_complete_turns() {
 	mut ctx := context.background()
-	memory := new_token_buffer_memory(CharacterTokenCounter{}, 'fake', 12, 'history', 'question',
+	token_memory := new_token_buffer_memory(CharacterTokenCounter{}, 'fake', 12, 'history', 'question',
 		'answer') or { panic(err) }
 	for turn in [['one', 'first'], ['two', 'second'], ['three', 'third']] {
-		memory.save_context(mut ctx, {
+		token_memory.save_context(mut ctx, {
 			'question': json2.Any(turn[0])
 		}, {
 			'answer': json2.Any(turn[1])
 		}) or { panic(err) }
 	}
-	loaded := memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	loaded := token_memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
 	history := loaded['history'] or { panic('missing token buffer history') }
 	assert history.str() == 'Human: three\nAI: third'
-	mut memory_contract := schema.Memory(memory)
+	mut memory_contract := schema.Memory(token_memory)
 	assert memory_contract.memory_keys() == ['history']
 	memory_contract.clear(mut ctx) or { panic(err) }
 	cleared := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
@@ -157,22 +157,22 @@ fn test_token_buffer_memory_evicts_oldest_complete_turns() {
 
 fn test_token_buffer_memory_keeps_history_when_counter_fails() {
 	mut ctx := context.background()
-	memory := new_token_buffer_memory(FailingTokenCounter{
+	token_memory := new_token_buffer_memory(FailingTokenCounter{
 		state: &FailingTokenCounterState{}
 	}, 'fake', 100, 'history', 'question',
 		'answer') or { panic(err) }
-	memory.save_context(mut ctx, {
+	token_memory.save_context(mut ctx, {
 		'question': json2.Any('old question')
 	}, {
 		'answer': json2.Any('old answer')
 	}) or { panic(err) }
-	memory.save_context(mut ctx, {
+	token_memory.save_context(mut ctx, {
 		'question': json2.Any('new question')
 	}, {
 		'answer': json2.Any('new answer')
 	}) or {
 		assert err.msg().contains('counting failed')
-		loaded := memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+		loaded := token_memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
 		assert (loaded['history'] or { panic('missing history') }).str() == 'Human: old question\nAI: old answer'
 		return
 	}
