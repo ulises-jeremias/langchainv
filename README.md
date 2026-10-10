@@ -32,8 +32,8 @@ The current core packages include:
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
 - `chains`: chain contract, memory loading, and input/output validation.
-- `callbacks`: lifecycle event contract, ordered dispatch, no-op handler, and
-  handler composition.
+- `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
+  output logging handlers, and handler composition.
 - `vectorstores`: storage contract and retriever adapter.
 - `documentloaders`: size-bounded text-file and CSV content loaders plus a
   bounded recursive directory loader for text, Markdown, and CSV files.
