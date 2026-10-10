@@ -39,9 +39,11 @@ are rejected. See the [parity ledger](../docs/LANGCHAINGO_PARITY.md) for
 loaders that remain to be implemented.
 
 `RecursiveDirectoryLoader` walks the root and, by default, its immediate
-subdirectories in sorted order. It reads `.txt`, `.md`, and `.csv` files,
+subdirectories in sorted order. It reads `.txt`, `.md`, `.csv`, `.html`, and
+`.htm` files,
 skips symlinks and unsupported extensions, and adds each file path as
-`metadata['source']`. `allowed_extensions` can narrow that set. Traversal is
+`metadata['source']`. HTML files use `HTMLLoader`; `allowed_extensions` can
+narrow that set. Traversal is
 bounded by 10,000 entries and documents, 16 MiB per file, and 64 MiB total
 input and document output by default. Raise `max_depth`, `max_entries`,
 `max_documents`, `max_file_bytes`, `max_input_bytes`, or `max_output_bytes` to

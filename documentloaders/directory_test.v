@@ -54,6 +54,27 @@ fn test_recursive_directory_loader_filters_extensions_case_insensitively() {
 	assert (documents[0].metadata['source'] or { panic('missing source metadata') }).str().ends_with('only.CsV')
 }
 
+fn test_recursive_directory_loader_loads_html_and_htm_with_source_metadata() {
+	root := create_directory_loader_fixture() or { panic(err) }
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	os.write_file(os.join_path(root, 'page.HTML'), '<html><body><p>HTML page</p></body></html>') or {
+		panic(err)
+	}
+	os.write_file(os.join_path(root, 'compact.htm'), '<p>Compact page</p>') or { panic(err) }
+	loader := new_recursive_directory_loader(root: root, allowed_extensions: ['html', 'htm']) or {
+		panic(err)
+	}
+	mut ctx := context.background()
+	documents := loader.load(mut ctx) or { panic(err) }
+	assert documents.len == 2
+	assert documents.map(it.page_content) == ['Compact page', 'HTML page']
+	for document in documents {
+		assert (document.metadata['source'] or { panic('missing source metadata') }).str().starts_with(root)
+	}
+}
+
 fn test_recursive_directory_loader_enforces_entry_limit() {
 	root := create_directory_loader_fixture() or { panic(err) }
 	defer {

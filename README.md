@@ -40,7 +40,7 @@ The current core packages include:
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, and bounded in-memory cosine store.
 - `documentloaders`: size-bounded HTML, text-file, and CSV content loaders plus a
-  bounded recursive directory loader for text, Markdown, and CSV files.
+  bounded recursive directory loader for text, Markdown, CSV, and HTML files.
 - `textsplitter`: recursive character and tokenizer-injected token chunks, plus
   Markdown-aware heading, paragraph, fenced-code, table-row, and optional
   reference-link splitting.

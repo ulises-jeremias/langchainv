@@ -14,7 +14,7 @@ const default_directory_max_file_bytes = i64(16 * 1024 * 1024)
 const default_directory_max_split_input_bytes = 16 * 1024
 const default_directory_max_input_bytes = i64(64 * 1024 * 1024)
 const default_directory_max_output_bytes = i64(64 * 1024 * 1024)
-const supported_directory_extensions = ['.txt', '.md', '.csv']
+const supported_directory_extensions = ['.txt', '.md', '.csv', '.html', '.htm']
 
 // RecursiveDirectoryLoaderOptions configures traversal and aggregate bounds.
 @[params]
@@ -156,13 +156,22 @@ fn (loader RecursiveDirectoryLoader) load_supported_file(path string, extension 
 	if file_size > u64(max_output_bytes) {
 		return error('file `${path}` exceeds the remaining directory output-byte budget')
 	}
+	if extension in ['.html', '.htm'] {
+		html_text := os.read_file(path) or {
+			return error('failed to read `${path}`: ${err}')
+		}
+		html_loader := new_html_loader(html_text, loader.max_file_bytes) or {
+			return error('failed to load `${path}`: ${err}')
+		}
+		return html_loader.load(mut ctx) or { return error('failed to load `${path}`: ${err}') }
+	}
 	text_loader := new_text_loader(path, loader.max_file_bytes) or {
 		return error('failed to load `${path}`: ${err}')
 	}
 	return text_loader.load(mut ctx) or { return error('failed to load `${path}`: ${err}') }
 }
 
-// load walks supported text and CSV files, attaching their paths as source
+// load walks supported text, CSV, and HTML files, attaching paths as source
 // metadata. Symlinks and unsupported file types are skipped.
 pub fn (loader RecursiveDirectoryLoader) load(mut ctx context.Context) ![]schema.Document {
 	ctx_error := ctx.err()
