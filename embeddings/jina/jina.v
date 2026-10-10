@@ -89,9 +89,13 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 	if ctx_error !is none {
 		return ctx_error
 	}
+	mut input := []json2.Any{cap: texts.len}
+	for text in texts {
+		input << json2.Any(text)
+	}
 	body := json2.encode({
 		'model':          json2.Any(client.model)
-		'input':          json2.Any(texts.clone())
+		'input':          json2.Any(input)
 		'embedding_type': json2.Any('float')
 	}, json2.EncoderOptions{})
 	if body.len > max_request_bytes {
