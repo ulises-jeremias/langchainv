@@ -141,9 +141,13 @@ fn test_map_reduce_preserves_document_metadata() {
 
 fn test_map_reduce_rejects_document_count_limit_before_mapping() {
 	fixture := map_reduce_fixture() or { panic(err) }
+	mut too_many_documents := []schema.Document{cap: 17}
+	for _ in 0 .. 17 {
+		too_many_documents << schema.new_document('one')
+	}
 	mut ctx := context.background()
 	call(mut ctx, fixture.chain, {
-		'input_documents': documents_value([schema.new_document('one'), schema.new_document('two')])
+		'input_documents': documents_value(too_many_documents)
 		'question':        json2.Any('q')
 	}) or {
 		assert err.msg().contains('document count')
