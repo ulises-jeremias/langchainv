@@ -42,7 +42,7 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	mut options := SearchOptions{
 		namespace: 'docs'
 	}
-	results := store.similarity_search(mut ctx, 'alpha query', 2, options) or { panic(err) }
+	mut results := store.similarity_search(mut ctx, 'alpha query', 2, options) or { panic(err) }
 	assert results.len == 2
 	assert results[0].page_content == 'alpha document'
 	assert results[0].score > results[1].score
