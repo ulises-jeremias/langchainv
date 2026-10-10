@@ -19,7 +19,7 @@ The inventory is based on upstream commit
 | `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file and CSV text loaders; bounded recursive directory traversal for `.txt`, `.md`, and `.csv` files with extension filters, CSV columns, source metadata, and bounded splitting; HTML, PDF, Notion, and AssemblyAI remain outstanding |
 | `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, and OpenAI `/v1/embeddings` client with injectable transport; remaining providers outstanding |
 | `jsonschema` | schema generation and validation helpers | not started |
-| `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract |
+| `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract, and non-streaming OpenAI Chat Completions with text/image messages, tool calls and offline transport tests |
 | `memory` | buffer, window buffer, token buffer, simple/chat memory, message history, AlloyDB, Cloud SQL, MongoDB, SQLite, Zep | partial: no-op memory, in-memory chat history, conversation buffer, and bounded conversation window buffer; token buffer, other memory forms, and persistent backends remain outstanding |
 | `outputparser` | simple, boolean, comma-separated list, regex, regex dictionary, defined/structured, combining | partial: simple, boolean, comma-separated list, regex, regex dictionary, structured string fields, combining string maps, and typed `Defined[T]` for strings, booleans, numbers, primitive options, scalar slices/string-key maps, enums, and nested structs; package compilation/tests pass in PR #1 CI (2026-10-09); fixed arrays, containers of nested structs, and other field types still need coverage |
 | `prompts` | prompt values, string/chat/message templates, template formats/rendering, validation, example selectors, few-shot | partial: validated string placeholders and escaping |
@@ -49,7 +49,7 @@ The inventory is based on upstream commit
 | Maritaca | not started |
 | Mistral | not started |
 | Ollama | not started |
-| OpenAI | not started |
+| OpenAI | partial: non-streaming Chat Completions, completion adapter, text and image messages, function tools, usage, reasoning fields; streaming, richer reasoning replay, response APIs and broader option parity outstanding |
 | IBM watsonx | not started |
 
 ## Embedding providers
