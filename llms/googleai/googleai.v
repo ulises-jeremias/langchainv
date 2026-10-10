@@ -11,6 +11,7 @@ import ulises_jeremias.langchainv.schema
 const default_base_url = 'https://generativelanguage.googleapis.com/v1beta'
 const default_model = 'gemini-3.6-flash'
 const max_messages = 1024
+const max_candidates = 8
 const max_request_bytes = 8 * 1024 * 1024
 const max_response_bytes = 16 * 1024 * 1024
 const max_inline_image_bytes = 5 * 1024 * 1024
@@ -199,18 +200,23 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 }
 
 fn validate_options(options llms.CallOptions) ! {
-	if options.candidate_count > 1 || options.n > 1 {
-		return error('Google AI returns exactly one candidate in this client')
+	if options.candidate_count > max_candidates || options.n > max_candidates {
+		return error('Google AI candidate count must not exceed 8')
+	}
+	if options.candidate_count > 0 && options.n > 0 && options.candidate_count != options.n {
+		return error('Google AI candidate_count and n must agree when both are set')
 	}
 	if options.top_p < 0 || options.top_p > 1 || options.temperature < 0 || options.temperature > 2 {
 		return error('Google AI top_p must be between zero and one and temperature between zero and two')
 	}
 	if options.top_k < 0 || options.min_length > 0 || options.max_length > 0
 		|| options.repetition_penalty != 0 || options.frequency_penalty != 0
-		|| options.presence_penalty != 0 || options.seed != none || options.json_mode
-		|| options.response_mime_type != '' || options.functions.len > 0 || options.function_call_behavior != ''
+		|| options.presence_penalty != 0 || options.functions.len > 0 || options.function_call_behavior != ''
 		|| options.web_search_options != none || options.provider_options.len > 0 {
 		return error('Google AI requested option is unsupported by this client')
+	}
+	if options.response_mime_type !in ['', 'application/json'] {
+		return error('Google AI response_mime_type only supports application/json')
 	}
 	for tool in options.tools {
 		if tool.strict {
@@ -344,6 +350,23 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 			stop_sequences << json2.Any(stop_word)
 		}
 		generation['stopSequences'] = json2.Any(stop_sequences)
+	}
+	candidate_count := if options.candidate_count > 0 {
+		options.candidate_count
+	} else {
+		options.n
+	}
+	if candidate_count > 0 {
+		generation['candidateCount'] = json2.Any(candidate_count)
+	}
+	if seed := options.seed {
+		if seed < 0 {
+			return error('Google AI seed must be non-negative')
+		}
+		generation['seed'] = json2.Any(seed)
+	}
+	if options.json_mode || options.response_mime_type == 'application/json' {
+		generation['responseMimeType'] = json2.Any('application/json')
 	}
 	if generation.len > 0 {
 		request['generationConfig'] = json2.Any(generation)

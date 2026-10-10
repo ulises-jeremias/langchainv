@@ -74,13 +74,27 @@ fn test_generate_content_rejects_unsupported_forms_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
 	client.generate_content(mut ctx, [schema.text_message(.human, 'Hi')], llms.CallOptions{
-		json_mode: true
+		min_length: 1
 	}) or {
 		assert err.msg().contains('unsupported')
 		assert state.requests.len == 0
 		return
 	}
 	assert false, 'expected unsupported JSON mode to fail'
+}
+
+fn test_generate_content_supports_json_seed_and_multiple_candidates() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"{\\"ok\\":true}"}]},"finishReason":"STOP"},{"content":{"parts":[{"text":"{\\"ok\\":false}"}]},"finishReason":"STOP"}]}', 200)
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'Return JSON')], llms.CallOptions{
+		json_mode:       true
+		candidate_count: 2
+		seed:            9
+	}) or { panic(err) }
+	assert response.choices.len == 2
+	assert state.requests[0].body.contains('"responseMimeType":"application/json"')
+	assert state.requests[0].body.contains('"candidateCount":2')
+	assert state.requests[0].body.contains('"seed":9')
 }
 
 fn test_generate_content_requires_candidate_response() {
