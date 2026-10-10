@@ -7,6 +7,22 @@ import ulises_jeremias.langchainv.memory as chat_memory
 import ulises_jeremias.langchainv.prompts
 import ulises_jeremias.langchainv.schema
 
+struct ConversationalRetrieverState {
+mut:
+	queries   []string
+	documents []schema.Document
+}
+
+struct ConversationalRetrieverFixture {
+	state &ConversationalRetrieverState
+}
+
+fn (retriever ConversationalRetrieverFixture) get_relevant_documents(mut _ctx context.Context, query string, _options schema.RetrievalOptions) ![]schema.Document {
+	mut state := retriever.state
+	state.queries << query
+	return state.documents.clone()
+}
+
 struct ConversationalCompletionState {
 mut:
 	prompts   []string
@@ -29,7 +45,7 @@ fn (model ConversationalCompletionFixture) complete(mut _ctx context.Context, pr
 }
 
 fn test_conversational_retrieval_qa_condenses_and_saves_original_turns() {
-	mut retriever_state := &RetrievalFixtureState{
+	mut retriever_state := &ConversationalRetrieverState{
 		documents: [schema.new_document('The city is Paris.')]
 	}
 	mut model_state := &ConversationalCompletionState{
@@ -39,7 +55,7 @@ fn test_conversational_retrieval_qa_condenses_and_saves_original_turns() {
 	conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
 		panic(err)
 	}
-	chain := new_conversational_retrieval_qa_chain(RetrievalFixture{
+	chain := new_conversational_retrieval_qa_chain(ConversationalRetrieverFixture{
 		state: retriever_state
 	}, ConversationalCompletionFixture{
 		state: model_state
@@ -71,11 +87,11 @@ fn test_conversational_retrieval_qa_condenses_and_saves_original_turns() {
 }
 
 fn test_conversational_retrieval_qa_requires_memory() {
-	model := RetrievalCompletionFixture{
-		state: &RetrievalCompletionState{}
+	model := ConversationalCompletionFixture{
+		state: &ConversationalCompletionState{}
 	}
-	new_conversational_retrieval_qa_chain(RetrievalFixture{
-		state: &RetrievalFixtureState{}
+	new_conversational_retrieval_qa_chain(ConversationalRetrieverFixture{
+		state: &ConversationalRetrieverState{}
 	}, model, prompts.StringTemplate{
 		template: '{history} {question}'
 	}, prompts.StringTemplate{
@@ -88,7 +104,7 @@ fn test_conversational_retrieval_qa_requires_memory() {
 }
 
 fn test_conversational_retrieval_qa_rejects_oversized_condensed_question_before_retrieval() {
-	mut retriever_state := &RetrievalFixtureState{}
+	mut retriever_state := &ConversationalRetrieverState{}
 	model := ConversationalCompletionFixture{
 		state: &ConversationalCompletionState{
 			responses: ['rewritten question is too long']
@@ -97,7 +113,7 @@ fn test_conversational_retrieval_qa_rejects_oversized_condensed_question_before_
 	conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
 		panic(err)
 	}
-	chain := new_conversational_retrieval_qa_chain(RetrievalFixture{
+	chain := new_conversational_retrieval_qa_chain(ConversationalRetrieverFixture{
 		state: retriever_state
 	}, model, prompts.StringTemplate{
 		template: '{history} {question}'
