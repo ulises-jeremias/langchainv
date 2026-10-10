@@ -41,7 +41,7 @@ The inventory is based on upstream commit
 | Cloudflare | not started |
 | Cohere | not started |
 | ERNIE | not started |
-| Google AI / Gemini | not started |
+| Google AI / Gemini | partial: bounded non-streaming `generateContent` for text messages, system instructions, generation controls, finish reasons, usage mapping, and injectable HTTPS transport; multimodal input, function calling, streaming, embeddings, and token counting remain outstanding |
 | Google Vertex AI | not started |
 | Hugging Face | not started |
 | llamafile | not started |
