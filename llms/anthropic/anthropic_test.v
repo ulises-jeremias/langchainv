@@ -122,6 +122,25 @@ fn test_generate_content_rejects_unsafe_image_urls() {
 	assert false, 'expected non-HTTPS image URL to fail'
 }
 
+fn test_generate_content_rejects_image_url_credentials() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	message := schema.Message{
+		role:  .human
+		parts: [
+			schema.ContentPart(schema.ImageURLPart{
+				url: 'https://user:secret@example.test/image.png'
+			}),
+		]
+	}
+	client.generate_content(mut ctx, [message], llms.CallOptions{}) or {
+		assert err.msg().contains('user information')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected image URL credentials to fail'
+}
+
 fn test_generate_content_encodes_tools_and_choice() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"content":[{"type":"text","text":"ready"}],"stop_reason":"end_turn"}', 200)

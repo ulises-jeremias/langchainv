@@ -302,8 +302,10 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 				if parsed_url.scheme.to_lower() != 'https' || parsed_url.host == '' || part.url.len > 8192 {
 					return error('Anthropic image URL must be HTTPS, include a host, and be at most 8192 bytes')
 				}
-				if _ := parsed_url.user {
-					return error('Anthropic image URL user information is not allowed')
+				if parsed_user := parsed_url.user {
+					if parsed_user != '' {
+						return error('Anthropic image URL user information is not allowed')
+					}
 				}
 				content << json2.Any({
 					'type':   json2.Any('image')
