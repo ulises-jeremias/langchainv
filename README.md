@@ -32,7 +32,7 @@ The current core packages include:
 - `prompts`: validated string templates, role-tagged chat templates, and fixed- or selector-backed few-shot prompts.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
-- `chains`: prompt-backed completion and chat-model chains, sequential composition, memory
+- `chains`: prompt-backed completion and chat-model chains, retrieval QA, sequential composition, memory
   loading, and input/output validation.
 - `agents`: tool-calling agent and bounded executor with tool dispatch,
   callbacks, memory integration, and optional intermediate-step output.

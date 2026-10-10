@@ -1,5 +1,10 @@
 # Chains
 
+The retrieval QA variant queries an injected retriever, joins page content into
+the prompt context, and returns a completion. Document count, context bytes,
+and formatted prompt bytes have validated caps. Its prompt must include the
+configured question and context variables.
+
 The chat-model variant accepts a role-tagged prompt, sends its rendered
 messages to an llms.Model, and returns the first choice's content. It shares
 provider-neutral call options and the chain memory lifecycle.
