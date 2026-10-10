@@ -15,33 +15,37 @@ const max_retrieval_prompt_bytes = 2097152
 // RetrievalQAOptions configures retrieval, prompt keys, context limits, and memory.
 pub struct RetrievalQAOptions {
 pub:
-	question_key       string = 'question'
-	document_key       string = 'context'
-	output_key         string = 'answer'
-	document_separator string = '\n\n'
-	retrieval          schema.RetrievalOptions
-	max_documents      int = 16
-	max_context_bytes  int = 65536
-	max_prompt_bytes   int = 131072
-	call_options       llms.CallOptions
-	memory             ?schema.Memory
+	question_key            string = 'question'
+	document_key            string = 'context'
+	output_key              string = 'answer'
+	source_documents_key    string = 'source_documents'
+	return_source_documents bool
+	document_separator      string = '\n\n'
+	retrieval               schema.RetrievalOptions
+	max_documents           int = 16
+	max_context_bytes       int = 65536
+	max_prompt_bytes        int = 131072
+	call_options            llms.CallOptions
+	memory                  ?schema.Memory
 }
 
 // RetrievalQAChain retrieves documents, combines their content, and answers with a completion model.
 pub struct RetrievalQAChain {
-	retriever          schema.Retriever
-	model              llms.CompletionModel
-	prompt             prompts.StringTemplate
-	question_key       string
-	document_key       string
-	output_key         string
-	document_separator string
-	retrieval          schema.RetrievalOptions
-	max_documents      int
-	max_context_bytes  int
-	max_prompt_bytes   int
-	call_options       llms.CallOptions
-	memory_store       ?schema.Memory
+	retriever               schema.Retriever
+	model                   llms.CompletionModel
+	prompt                  prompts.StringTemplate
+	question_key            string
+	document_key            string
+	output_key              string
+	source_documents_key    string
+	return_source_documents bool
+	document_separator      string
+	retrieval               schema.RetrievalOptions
+	max_documents           int
+	max_context_bytes       int
+	max_prompt_bytes        int
+	call_options            llms.CallOptions
+	memory_store            ?schema.Memory
 mut:
 	keys []string
 }
@@ -49,8 +53,14 @@ mut:
 // new_retrieval_qa_chain constructs a bounded retriever-to-completion chain.
 pub fn new_retrieval_qa_chain(retriever schema.Retriever, model llms.CompletionModel, prompt prompts.StringTemplate, options RetrievalQAOptions) !RetrievalQAChain {
 	if options.question_key.trim_space() == '' || options.document_key.trim_space() == ''
-		|| options.output_key.trim_space() == '' || options.question_key == options.document_key {
+		|| options.output_key.trim_space() == '' || options.question_key == options.document_key
+		|| options.question_key == options.output_key || options.document_key == options.output_key {
 		return error('retrieval QA question, document, and output keys must be non-empty and distinct')
+	}
+	if options.return_source_documents && (options.source_documents_key.trim_space() == ''
+		|| options.source_documents_key in [options.question_key, options.document_key,
+			options.output_key]) {
+		return error('retrieval QA source document key must be non-empty and distinct')
 	}
 	if options.max_documents <= 0 || options.max_documents > max_retrieval_documents {
 		return error('retrieval QA max_documents is outside the supported range 1..128')
@@ -77,20 +87,22 @@ pub fn new_retrieval_qa_chain(retriever schema.Retriever, model llms.CompletionM
 		return error('retrieval QA k cannot exceed max_documents')
 	}
 	return RetrievalQAChain{
-		retriever:          retriever
-		model:              model
-		prompt:             prompt
-		question_key:       options.question_key
-		document_key:       options.document_key
-		output_key:         options.output_key
-		document_separator: options.document_separator
-		retrieval:          retrieval
-		max_documents:      options.max_documents
-		max_context_bytes:  options.max_context_bytes
-		max_prompt_bytes:   options.max_prompt_bytes
-		call_options:       options.call_options
-		memory_store:       options.memory
-		keys:               keys
+		retriever:               retriever
+		model:                   model
+		prompt:                  prompt
+		question_key:            options.question_key
+		document_key:            options.document_key
+		output_key:              options.output_key
+		source_documents_key:    options.source_documents_key
+		return_source_documents: options.return_source_documents
+		document_separator:      options.document_separator
+		retrieval:               retrieval
+		max_documents:           options.max_documents
+		max_context_bytes:       options.max_context_bytes
+		max_prompt_bytes:        options.max_prompt_bytes
+		call_options:            options.call_options
+		memory_store:            options.memory
+		keys:                    keys
 	}
 }
 
@@ -129,9 +141,21 @@ pub fn (chain RetrievalQAChain) call(mut ctx context.Context, inputs map[string]
 		return error('formatted retrieval QA prompt exceeds the configured byte limit')
 	}
 	answer := chain.model.complete(mut ctx, formatted_prompt, chain.call_options)!
-	return {
+	mut outputs := {
 		chain.output_key: json2.Any(answer)
 	}
+	if chain.return_source_documents {
+		mut source_documents := []json2.Any{cap: documents.len}
+		for document in documents {
+			source_documents << json2.Any({
+				'page_content': json2.Any(document.page_content)
+				'metadata':     json2.Any(document.metadata.clone())
+				'score':        json2.Any(document.score)
+			})
+		}
+		outputs[chain.source_documents_key] = json2.Any(source_documents)
+	}
+	return outputs
 }
 
 // memory returns the optional memory configured on this chain.
@@ -146,5 +170,8 @@ pub fn (chain RetrievalQAChain) input_keys() []string {
 
 // output_keys returns the answer key.
 pub fn (chain RetrievalQAChain) output_keys() []string {
+	if chain.return_source_documents {
+		return [chain.output_key, chain.source_documents_key]
+	}
 	return [chain.output_key]
 }

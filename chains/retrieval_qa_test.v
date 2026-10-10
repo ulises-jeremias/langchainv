@@ -120,3 +120,26 @@ fn test_retrieval_qa_rejects_too_many_documents() {
 	}
 	assert false, 'expected too many retrieved documents to fail'
 }
+
+fn test_retrieval_qa_can_return_source_documents() {
+	mut retriever_state := &RetrievalFixtureState{
+		documents: [schema.new_document('source')]
+	}
+	chain := new_retrieval_qa_chain(RetrievalFixture{
+		state: retriever_state
+	}, RetrievalCompletionFixture{
+		state: &RetrievalCompletionState{}
+	}, prompts.StringTemplate{
+		template: '{context} {question}'
+	}, RetrievalQAOptions{
+		return_source_documents: true
+	}) or { panic(err) }
+	mut ctx := context.background()
+	outputs := call(mut ctx, chain, {
+		'question': json2.Any('q')
+	}) or { panic(err) }
+	assert chain.output_keys() == ['answer', 'source_documents']
+	returned_documents := (outputs['source_documents'] or { panic('missing source documents') }).arr()
+	assert returned_documents.len == 1
+	assert returned_documents[0].as_map()['page_content'].str() == 'source'
+}
