@@ -31,7 +31,8 @@ The current core packages include:
 - `prompts`: validated string templates.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
-- `chains`: chain contract, memory loading, and input/output validation.
+- `chains`: prompt-backed completion chains, sequential composition, memory
+  loading, and input/output validation.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract and retriever adapter.
