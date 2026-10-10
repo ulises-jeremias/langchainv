@@ -51,3 +51,39 @@ fn test_conversation_buffer_load_save_and_clear() {
 	cleared_history := cleared['history'] or { panic('missing cleared history') }
 	assert cleared_history.str() == ''
 }
+
+fn test_conversation_window_buffer_keeps_only_recent_turns() {
+	mut ctx := context.background()
+	mut window := new_conversation_window_buffer(2, 'history', 'question', 'answer') or {
+		panic(err)
+	}
+	for index in 1 .. 4 {
+		mut inputs := map[string]json2.Any{}
+		inputs['question'] = json2.Any('question ${index}')
+		mut outputs := map[string]json2.Any{}
+		outputs['answer'] = json2.Any('answer ${index}')
+		window.save_context(mut ctx, inputs, outputs) or { panic(err) }
+	}
+	loaded := window.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	history := loaded['history'] or { panic('missing history') }
+	assert history.str() == 'Human: question 2\nAI: answer 2\nHuman: question 3\nAI: answer 3'
+	assert window.window_size == 2
+	assert window.memory_keys() == ['history']
+	mut memory_contract := schema.Memory(window)
+	assert memory_contract.memory_keys() == ['history']
+	window.clear(mut ctx) or { panic(err) }
+	cleared := window.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	assert (cleared['history'] or { panic('missing cleared history') }).str() == ''
+}
+
+fn test_conversation_window_buffer_defaults_and_limits_window_size() {
+	default_window := new_conversation_window_buffer(0, 'history', 'question', 'answer') or {
+		panic(err)
+	}
+	assert default_window.window_size == 5
+	new_conversation_window_buffer(10001, 'history', 'question', 'answer') or {
+		assert err.msg().contains('at most 10000')
+		return
+	}
+	assert false, 'expected oversized window to fail'
+}

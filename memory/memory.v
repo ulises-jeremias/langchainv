@@ -13,14 +13,21 @@ pub struct InMemoryChatMessageHistory {
 
 struct InMemoryChatMessageHistoryState {
 mut:
-	mutex    sync.Mutex
-	messages []schema.Message
+	mutex        sync.Mutex
+	messages     []schema.Message
+	max_messages int
 }
 
 // new_in_memory_chat_message_history creates an empty history.
 pub fn new_in_memory_chat_message_history() &InMemoryChatMessageHistory {
+	return new_in_memory_chat_message_history_with_limit(0)
+}
+
+fn new_in_memory_chat_message_history_with_limit(max_messages int) &InMemoryChatMessageHistory {
 	return &InMemoryChatMessageHistory{
-		state: &InMemoryChatMessageHistoryState{}
+		state: &InMemoryChatMessageHistoryState{
+			max_messages: max_messages
+		}
 	}
 }
 
@@ -48,6 +55,9 @@ pub fn (history InMemoryChatMessageHistory) add_message(mut ctx context.Context,
 	}
 	mut state := history.state
 	state.mutex.lock()
+	if state.max_messages > 0 && state.messages.len >= state.max_messages {
+		state.messages = state.messages[1..].clone()
+	}
 	state.messages << clone_message(message)
 	state.mutex.unlock()
 }
@@ -175,4 +185,51 @@ pub fn (buffer ConversationBuffer) save_context(mut ctx context.Context, inputs 
 // clear removes all conversation history.
 pub fn (buffer ConversationBuffer) clear(mut ctx context.Context) ! {
 	buffer.history.clear(mut ctx)!
+}
+
+// ConversationWindowBuffer stores only a bounded number of recent turns.
+pub struct ConversationWindowBuffer {
+pub:
+	buffer      ConversationBuffer
+	window_size int
+}
+
+// new_conversation_window_buffer creates a memory that retains the latest turns.
+// Non-positive sizes use the default of five turns. Sizes above 10,000 are rejected.
+pub fn new_conversation_window_buffer(window_size int, memory_key string, input_key string, output_key string) !ConversationWindowBuffer {
+	actual_window_size := if window_size <= 0 { 5 } else { window_size }
+	if actual_window_size > 10000 {
+		return error('conversation window size must be at most 10000 turns')
+	}
+	base := new_conversation_buffer(memory_key, input_key, output_key)!
+	buffer := ConversationBuffer{
+		history:    new_in_memory_chat_message_history_with_limit(actual_window_size * 2)
+		memory_key: base.memory_key
+		input_key:  base.input_key
+		output_key: base.output_key
+	}
+	return ConversationWindowBuffer{
+		buffer:      buffer
+		window_size: actual_window_size
+	}
+}
+
+// memory_keys returns the key populated by this window memory.
+pub fn (window ConversationWindowBuffer) memory_keys() []string {
+	return window.buffer.memory_keys()
+}
+
+// load_memory_variables returns the retained turns as a role-labeled transcript.
+pub fn (window ConversationWindowBuffer) load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	return window.buffer.load_memory_variables(mut ctx, inputs)
+}
+
+// save_context appends one turn and discards the oldest messages past the window.
+pub fn (window ConversationWindowBuffer) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
+	window.buffer.save_context(mut ctx, inputs, outputs)!
+}
+
+// clear removes all retained turns.
+pub fn (window ConversationWindowBuffer) clear(mut ctx context.Context) ! {
+	window.buffer.clear(mut ctx)!
 }

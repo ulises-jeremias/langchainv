@@ -27,7 +27,7 @@ The current core packages include:
 - `llms`: model contracts and provider-neutral generation results.
 - `embeddings`: embedding contracts, batching, and vector math.
 - `tools`: agent tool contract and bounded arithmetic calculator.
-- `memory`: in-memory chat history and conversation buffer.
+- `memory`: in-memory chat history, conversation buffer, and bounded window buffer.
 - `prompts`: validated string templates.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
@@ -52,6 +52,8 @@ the current V regular-expression compatibility boundary.
 
 See [`callbacks/README.md`](callbacks/README.md) for lifecycle logging and
 bounded final-answer streaming.
+
+See [`memory/README.md`](memory/README.md) for full and windowed conversation memory.
 
 ## Compatibility
 
