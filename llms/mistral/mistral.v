@@ -54,7 +54,7 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 		model:    model
 	})!
 	return Client{
-		inner:   inner
+		inner:    inner
 		base_url: base_url
 		model:    model
 	}
