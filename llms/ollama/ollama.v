@@ -161,24 +161,26 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 			}
 		}
 	}
-	mut choice := llms.Choice{
-		content:     decoded.message.content
-		stop_reason: decoded.done_reason
-		tool_calls:  tool_calls
-		reasoning:   decoded.message.thinking
-	}
+	mut choice_parts := []schema.ContentPart{}
 	if decoded.message.thinking != '' {
-		choice.parts << schema.ContentPart(schema.ThinkingPart{
+		choice_parts << schema.ContentPart(schema.ThinkingPart{
 			text: decoded.message.thinking
 		})
 	}
 	if decoded.message.content != '' {
-		choice.parts << schema.ContentPart(schema.TextPart{
+		choice_parts << schema.ContentPart(schema.TextPart{
 			text: decoded.message.content
 		})
 	}
 	for tool_call in tool_calls {
-		choice.parts << schema.ContentPart(tool_call)
+		choice_parts << schema.ContentPart(tool_call)
+	}
+	choice := llms.Choice{
+		content:     decoded.message.content
+		stop_reason: decoded.done_reason
+		tool_calls:  tool_calls
+		reasoning:   decoded.message.thinking
+		parts:       choice_parts
 	}
 	return llms.Response{
 		choices: [choice]
@@ -200,13 +202,16 @@ fn validate_call_options(options llms.CallOptions) ! {
 	if options.provider_options.len > 0 {
 		return error('Ollama provider_options are not supported; use typed call options')
 	}
-	if options.web_search_options !is none {
+	if _ := options.web_search_options {
 		return error('Ollama web search options are not supported')
 	}
 	if options.candidate_count > 1 || options.n > 1 || options.min_length > 0 || options.max_length > 0 {
 		return error('Ollama does not support one or more requested generation options')
 	}
-	if options.tool_choice !is none || options.functions.len > 0 || options.function_call_behavior != '' {
+	if _ := options.tool_choice {
+		return error('Ollama supports tools but not tool choice or legacy function options')
+	}
+	if options.functions.len > 0 || options.function_call_behavior != '' {
 		return error('Ollama supports tools but not tool choice or legacy function options')
 	}
 	if options.response_mime_type !in ['', 'application/json'] {
@@ -285,7 +290,11 @@ fn make_request(client Client, model string, messages []schema.Message, options 
 		generation_options['presence_penalty'] = json2.Any(options.presence_penalty)
 	}
 	if options.stop_words.len > 0 {
-		generation_options['stop'] = json2.Any(options.stop_words)
+		mut stop_words := []json2.Any{cap: options.stop_words.len}
+		for stop_word in options.stop_words {
+			stop_words << json2.Any(stop_word)
+		}
+		generation_options['stop'] = json2.Any(stop_words)
 	}
 	if generation_options.len > 0 {
 		request['options'] = json2.Any(generation_options)
@@ -340,14 +349,14 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 				if part.function_call.name.trim_space() == '' {
 					return error('Ollama tool call function name must not be empty')
 				}
-				arguments := json2.decode[map[string]json2.Any](part.function_call.arguments,
+				tool_arguments := json2.decode[map[string]json2.Any](part.function_call.arguments,
 					json2.DecoderOptions{}) or {
 					return error('Ollama tool call arguments must be a JSON object')
 				}
 				tool_calls << json2.Any({
 					'function': json2.Any({
 						'name':      json2.Any(part.function_call.name)
-						'arguments': json2.Any(arguments)
+						'arguments': json2.Any(tool_arguments)
 					})
 				})
 			}
@@ -371,7 +380,11 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 		'content': json2.Any(content.join(''))
 	}
 	if images.len > 0 {
-		result['images'] = json2.Any(images)
+		mut wire_images := []json2.Any{cap: images.len}
+		for image in images {
+			wire_images << json2.Any(image)
+		}
+		result['images'] = json2.Any(wire_images)
 	}
 	if tool_calls.len > 0 {
 		result['tool_calls'] = json2.Any(tool_calls)
