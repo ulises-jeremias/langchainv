@@ -244,13 +244,21 @@ pub fn (loader RecursiveDirectoryLoader) load(mut ctx context.Context) ![]schema
 		if loaded.len > loader.max_documents - documents.len {
 			return error('directory document count exceeds the ${loader.max_documents}-document limit')
 		}
-		for mut document in loaded {
+		for document in loaded {
 			if output_bytes + i64(document.page_content.len) > loader.max_output_bytes {
 				return error('directory output exceeds the ${loader.max_output_bytes}-byte limit')
 			}
 			output_bytes += i64(document.page_content.len)
-			document.metadata['source'] = json2.Any(path)
-			documents << document
+			mut metadata := map[string]json2.Any{}
+			for key, value in document.metadata {
+				metadata[key] = value
+			}
+			metadata['source'] = json2.Any(path)
+			documents << schema.Document{
+				page_content: document.page_content
+				metadata:     metadata
+				score:        document.score
+			}
 		}
 	}
 	return documents
