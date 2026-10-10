@@ -46,6 +46,7 @@ fn test_generate_content_sends_text_messages_and_maps_usage() {
 	], llms.CallOptions{
 		model:      'claude-test'
 		max_tokens: 32
+		stop_words: ['STOP']
 	}) or { panic(err) }
 	assert response.choices.len == 1
 	assert response.choices[0].content == 'hello'
@@ -60,6 +61,7 @@ fn test_generate_content_sends_text_messages_and_maps_usage() {
 	assert state.requests[0].body.contains('"model":"claude-test"')
 	assert state.requests[0].body.contains('"max_tokens":32')
 	assert state.requests[0].body.contains('"system":"Be concise."')
+	assert state.requests[0].body.contains('"stop_sequences":["STOP"]')
 	assert state.requests[0].body.contains('"role":"user"')
 }
 

@@ -194,7 +194,11 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 		request['top_k'] = json2.Any(options.top_k)
 	}
 	if options.stop_words.len > 0 {
-		request['stop_sequences'] = json2.Any(options.stop_words.clone())
+		mut stop_sequences := []json2.Any{cap: options.stop_words.len}
+		for stop_word in options.stop_words {
+			stop_sequences << json2.Any(stop_word)
+		}
+		request['stop_sequences'] = json2.Any(stop_sequences)
 	}
 	if options.tools.len > 0 {
 		mut tools := []json2.Any{cap: options.tools.len}
@@ -265,14 +269,14 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 				if message.role != .ai {
 					return error('Anthropic tool calls require an assistant-role message')
 				}
-				arguments := json2.decode[json2.Any](part.function_call.arguments, json2.DecoderOptions{}) or {
+				tool_arguments := json2.decode[json2.Any](part.function_call.arguments, json2.DecoderOptions{}) or {
 					return error('Anthropic tool call arguments must be valid JSON: ${err.msg()}')
 				}
 				content << json2.Any({
 					'type':  json2.Any('tool_use')
 					'id':    json2.Any(part.id)
 					'name':  json2.Any(part.function_call.name)
-					'input': arguments
+					'input': tool_arguments
 				})
 			}
 			schema.ToolResult {
