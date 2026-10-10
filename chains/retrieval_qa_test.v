@@ -43,7 +43,7 @@ fn test_retrieval_qa_formats_bounded_context_and_returns_answer() {
 	mut retriever_state := &RetrievalFixtureState{
 		documents: [
 			schema.new_document('first source')
-			schema.new_document('second source')
+			schema.new_document('second source'),
 		]
 	}
 	mut model_state := &RetrievalCompletionState{}
@@ -99,7 +99,7 @@ fn test_retrieval_qa_rejects_too_many_documents() {
 	mut retriever_state := &RetrievalFixtureState{
 		documents: [
 			schema.new_document('one')
-			schema.new_document('two')
+			schema.new_document('two'),
 		]
 	}
 	chain := new_retrieval_qa_chain(RetrievalFixture{
