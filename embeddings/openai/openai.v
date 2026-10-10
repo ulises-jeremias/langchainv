@@ -9,24 +9,24 @@ import ulises_jeremias.langchainv.httputil
 const default_base_url = 'https://api.openai.com/v1'
 const default_model = 'text-embedding-3-small'
 
-struct embedding_request {
+struct EmbeddingRequest {
 	model           string
 	input           []string
 	encoding_format string = 'float'
 }
 
-struct embedding_request_with_dimensions {
+struct EmbeddingRequestWithDimensions {
 	model           string
 	input           []string
 	encoding_format string = 'float'
 	dimensions      int
 }
 
-struct embedding_response {
-	data []embedding_item
+struct EmbeddingResponse {
+	data []EmbeddingItem
 }
 
-struct embedding_item {
+struct EmbeddingItem {
 	index     int
 	embedding []f32
 }
@@ -94,13 +94,13 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 	}
 	mut payload := ''
 	if dimensions := client.dimensions {
-		payload = json2.encode(embedding_request_with_dimensions{
+		payload = json2.encode(EmbeddingRequestWithDimensions{
 			model:      client.model
 			input:      texts.clone()
 			dimensions: dimensions
 		})
 	} else {
-		payload = json2.encode(embedding_request{
+		payload = json2.encode(EmbeddingRequest{
 			model: client.model
 			input: texts.clone()
 		})
@@ -123,7 +123,7 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 	if response.body.len > 16 * 1024 * 1024 {
 		return error('OpenAI embeddings response exceeds 16 MiB')
 	}
-	decoded := json2.decode[embedding_response](response.body, json2.DecoderOptions{}) or {
+	decoded := json2.decode[EmbeddingResponse](response.body, json2.DecoderOptions{}) or {
 		return error('could not decode OpenAI embeddings response: ${err.msg()}')
 	}
 	if decoded.data.len != texts.len {
