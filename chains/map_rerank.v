@@ -18,13 +18,13 @@ const map_rerank_max_document_bytes = 1048576
 // MapRerankDocumentsOptions configures prompt variables, ranked outputs, and limits.
 pub struct MapRerankDocumentsOptions {
 pub:
-	input_key                string = default_map_rerank_input_key
-	document_variable        string = default_map_rerank_document_variable
-	rank_key                 string = default_map_rerank_rank_key
-	answer_key               string = default_map_rerank_answer_key
+	input_key                 string = default_map_rerank_input_key
+	document_variable         string = default_map_rerank_document_variable
+	rank_key                  string = default_map_rerank_rank_key
+	answer_key                string = default_map_rerank_answer_key
 	return_intermediate_steps bool
-	max_documents            int    = 16
-	max_document_bytes       int    = 65536
+	max_documents             int = 16
+	max_document_bytes        int = 65536
 }
 
 // MapRerankDocumentsChain ranks each document independently with an LLMChain.
