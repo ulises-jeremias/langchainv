@@ -75,3 +75,48 @@ fn test_chat_prompt_template_formats_messages_and_collects_variables() {
 	assert messages[1].role == schema.Role.human
 	assert messages[1].text() == 'Question: How? (V)'
 }
+
+fn test_few_shot_prompt_formats_fixed_examples_and_caller_values() {
+	prompt := new_few_shot_prompt(StringTemplate{
+		template: '{word} -> {translation}'
+	}, [
+		{
+			'word':        'hola'
+			'translation': 'hello'
+		},
+		{
+			'word':        'adios'
+			'translation': 'goodbye'
+		},
+	], 'Translate these words:', 'Translate {word}:', '') or { panic(err) }
+	variables := prompt.input_variables() or { panic(err) }
+	assert variables == ['word']
+	formatted := prompt.format({
+		'word': json2.Any('gracias')
+	}) or { panic(err) }
+	assert formatted == 'Translate these words:\n\nhola -> hello\n\nadios -> goodbye\n\nTranslate gracias:'
+}
+
+fn test_few_shot_prompt_rejects_missing_example_variables() {
+	new_few_shot_prompt(StringTemplate{
+		template: '{word} -> {translation}'
+	}, [
+		{
+			'word': 'hola'
+		},
+	], '', '{word}', '') or {
+		assert err.msg().contains('missing variable')
+		return
+	}
+	assert false, 'expected incomplete example to fail'
+}
+
+fn test_few_shot_prompt_requires_at_least_one_example() {
+	new_few_shot_prompt(StringTemplate{
+		template: '{word}'
+	}, []map[string]string{}, '', '{word}', '') or {
+		assert err.msg().contains('at least one example')
+		return
+	}
+	assert false, 'expected empty examples to fail'
+}
