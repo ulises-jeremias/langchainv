@@ -6,7 +6,7 @@ import ulises_jeremias.langchainv.schema
 
 struct FixtureEmbedder {}
 
-fn (embedder FixtureEmbedder) embed_documents(mut ctx context.Context, texts []string) ![][]f32 {
+fn (embedder FixtureEmbedder) embed_documents(mut _ctx context.Context, texts []string) ![][]f32 {
 	mut vectors := [][]f32{cap: texts.len}
 	for text in texts {
 		vectors << embed_fixture_text(text)
@@ -14,7 +14,7 @@ fn (embedder FixtureEmbedder) embed_documents(mut ctx context.Context, texts []s
 	return vectors
 }
 
-fn (embedder FixtureEmbedder) embed_query(mut ctx context.Context, text string) ![]f32 {
+fn (embedder FixtureEmbedder) embed_query(mut _ctx context.Context, text string) ![]f32 {
 	return embed_fixture_text(text)
 }
 

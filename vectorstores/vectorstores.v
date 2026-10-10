@@ -3,6 +3,7 @@ module vectorstores
 
 import context
 import json2
+import math
 import sync
 import ulises_jeremias.langchainv.embeddings
 import ulises_jeremias.langchainv.schema
@@ -121,7 +122,7 @@ pub fn (store InMemoryVectorStore) add_documents(mut ctx context.Context, docume
 			return error('embedding vector dimensions differ')
 		}
 		for value in vector {
-			if value != value || value.abs() > f32(3.402823e38) {
+			if !math.is_finite(f64(value)) {
 				return error('embedding vectors must contain finite values')
 			}
 		}
@@ -171,7 +172,7 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 		return error('query embedding must not be empty')
 	}
 	for value in query_vector {
-		if value != value || value.abs() > f32(3.402823e38) {
+		if !math.is_finite(f64(value)) {
 			return error('query embedding must contain finite values')
 		}
 	}
@@ -199,7 +200,7 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 			id:       entry.id
 		}
 	}
-	matches.sort(a.score > b.score || (a.score == b.score && a.id < b.id))
+	matches.sort(a.score > b.score)
 	mut results := []schema.Document{cap: if limit < matches.len { limit } else { matches.len }}
 	for index, result in matches {
 		if index >= limit {
