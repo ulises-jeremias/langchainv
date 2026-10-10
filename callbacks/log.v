@@ -24,7 +24,7 @@ pub fn (handler LogHandler) llm_generate_content_start(mut ctx context.Context, 
 	println('Entering LLM with messages:')
 	for message in messages {
 		println('Role: ${message.role}')
-		println('Text: ${message.text()}')
+		println('Text: ${message_text(message)}')
 	}
 }
 
@@ -40,9 +40,6 @@ pub fn (handler LogHandler) llm_generate_content_end(mut ctx context.Context, re
 		}
 		if choice.generation_info.len > 0 {
 			println('GenerationInfo: ${choice.generation_info}')
-		}
-		if choice.reasoning != '' {
-			println('Reasoning: ${choice.reasoning}')
 		}
 		for call in choice.tool_calls {
 			println('ToolCall: ${call}')
@@ -108,6 +105,19 @@ pub fn (handler LogHandler) retriever_end(mut ctx context.Context, query string,
 // streaming_chunk prints a streaming payload as text.
 pub fn (handler LogHandler) streaming_chunk(mut ctx context.Context, chunk []u8) {
 	println(chunk.bytestr())
+}
+
+fn message_text(message schema.Message) string {
+	mut parts := []string{}
+	for part in message.parts {
+		match part {
+			schema.TextPart {
+				parts << part.text
+			}
+			else {}
+		}
+	}
+	return parts.join('')
 }
 
 fn format_values(values map[string]json2.Any) string {

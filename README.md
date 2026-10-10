@@ -33,7 +33,7 @@ The current core packages include:
   typed JSON parsers.
 - `chains`: chain contract, memory loading, and input/output validation.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
-  output logging handlers, and handler composition.
+  output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract and retriever adapter.
 - `documentloaders`: size-bounded text-file and CSV content loaders plus a
   bounded recursive directory loader for text, Markdown, and CSV files.
@@ -49,6 +49,9 @@ the tokenizer interface.
 
 See [`outputparser/README.md`](outputparser/README.md) for parser behavior and
 the current V regular-expression compatibility boundary.
+
+See [`callbacks/README.md`](callbacks/README.md) for lifecycle logging and
+bounded final-answer streaming.
 
 ## Compatibility
 

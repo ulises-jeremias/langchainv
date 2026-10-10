@@ -14,7 +14,7 @@ The inventory is based on upstream commit
 | Upstream package | Scope to account for | Status |
 |---|---|---|
 | `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | not started |
-| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered dispatch, fan-out composition, standard-output event logging, and raw streaming log handler; agent-final stream adapter remains outstanding |
+| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; see V-native queue behavior in package docs |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract and input/output validation |
 | `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file and CSV text loaders; bounded recursive directory traversal for `.txt`, `.md`, and `.csv` files with extension filters, CSV columns, source metadata, and bounded splitting; HTML, PDF, Notion, and AssemblyAI remain outstanding |
 | `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, newline preprocessing, batching, dot product, cosine similarity |
