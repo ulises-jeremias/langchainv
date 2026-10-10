@@ -1,8 +1,8 @@
 # Document loaders
 
-The package currently provides a bounded text-file loader and a CSV content
-loader. Both return `schema.Document` values and check request cancellation
-while loading.
+The package currently provides bounded text-file, CSV content, and recursive
+directory loaders. They return `schema.Document` values and check request
+cancellation while loading.
 
 `CSVLoader` creates one document per data row. It reads the first record as
 column names, formats selected values as `column: value` lines, and stores the
@@ -31,3 +31,30 @@ before retaining their result lists. Raise `max_split_input_bytes` and
 string, which matches V's current `encoding.csv` reader API. Uneven row widths
 are rejected. See the [parity ledger](../docs/LANGCHAINGO_PARITY.md) for
 loaders that remain to be implemented.
+
+`RecursiveDirectoryLoader` walks the root and, by default, its immediate
+subdirectories in sorted order. It reads `.txt`, `.md`, and `.csv` files,
+skips symlinks and unsupported extensions, and adds each file path as
+`metadata['source']`. `allowed_extensions` can narrow that set. Traversal is
+bounded by 10,000 entries and documents, 16 MiB per file, and 64 MiB total
+input and document output by default. Raise `max_depth`, `max_entries`,
+`max_documents`, `max_file_bytes`, `max_input_bytes`, or `max_output_bytes` to
+change those limits. `csv_columns` selects CSV columns. Errors reading or listing a selected path are returned to
+the caller. `max_split_input_bytes` bounds each input passed to
+`load_and_split`, which requires a `textsplitter.BoundedTextSplitter`.
+
+```v
+import context
+import ulises_jeremias.langchainv.documentloaders
+
+mut ctx := context.background()
+loader := documentloaders.new_recursive_directory_loader(
+    root: 'docs'
+    allowed_extensions: ['md', 'txt']
+)!
+documents := loader.load(mut ctx)!
+```
+
+V 0.5.2's `os.ls` returns each directory's full entry list before the loader
+can apply `max_entries`; the limit caps accepted traversal work and retained
+file paths, not that one standard-library listing allocation.

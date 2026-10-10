@@ -29,6 +29,16 @@ contract. V's `json2` has typed encoding/decoding, reusable decode buffers, and
 explicit legacy-compatibility differences; use it directly and test wire
 compatibility instead of assuming it matches another language's JSON output.
 
+For filesystem ingestion, `os.ls` returns a complete `[]string` for one
+directory before callers can enforce an entry-count limit; `os.walk` is
+iterative but still lists one directory at a time. V 0.5.2 exposes no
+cross-platform streaming directory iterator in `os`. Bound depth, file count,
+file bytes, and aggregate bytes, skip symlinks and non-regular files, and be
+clear that the entry limit cannot prevent the initial allocation for one very
+large directory. `os.file_size` before `os.read_file` also has a filesystem
+race window, so keep per-file caps small and treat the size check as a bound
+for ordinary files rather than a race-proof sandbox.
+
 `net.http` has progress callbacks that receive response chunks, which can feed
 an incremental SSE parser. Do not assume those callbacks imply uniform
 time-to-first-token behavior on every platform: the V source documents a

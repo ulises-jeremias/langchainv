@@ -16,7 +16,7 @@ The inventory is based on upstream commit
 | `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | not started |
 | `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered dispatch, and fan-out composition for every declared event; logging, streaming, and agent-final stream adapters remain outstanding |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract and input/output validation |
-| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file loader and bounded CSV text loader (16 MiB input/output, 10,000 documents, 1,024 columns by default) with column filtering, one-based row metadata, quote validation, cancellation checks, and bounded splitter integration; directory, HTML, PDF, Notion, and AssemblyAI remain outstanding |
+| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file and CSV text loaders; bounded recursive directory traversal for `.txt`, `.md`, and `.csv` files with extension filters, CSV columns, source metadata, and bounded splitting; HTML, PDF, Notion, and AssemblyAI remain outstanding |
 | `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, newline preprocessing, batching, dot product, cosine similarity |
 | `jsonschema` | schema generation and validation helpers | not started |
 | `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract |
@@ -64,7 +64,7 @@ Pinecone, Qdrant, Redis, and Weaviate — all not started.
 
 ## Document loaders and tools
 
-- Loaders still outstanding: AssemblyAI, directory, HTML, Notion, and PDF.
+- Loaders still outstanding: AssemblyAI, HTML, Notion, and PDF.
 - Tools still outstanding: calculator, DuckDuckGo, Metaphor, Perplexity, scraper,
   SerpAPI, SQL database (MySQL/PostgreSQL/SQLite), Wikipedia, and Zapier.
 
