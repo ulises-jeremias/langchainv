@@ -1,6 +1,8 @@
 # Memory
 
 `new_simple_memory()` implements the memory interface without storing values.
+`new_simple_memory_with_values(values)` snapshots fixed key/value pairs and
+provides a fresh snapshot on every load; saved outputs do not change them.
 `new_conversation_buffer(memory_key, input_key, output_key)` stores the full
 conversation in process memory. `new_conversation_window_buffer(window_size,
 memory_key, input_key, output_key)` stores only the latest `window_size` turns.

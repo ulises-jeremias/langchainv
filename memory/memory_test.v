@@ -132,6 +132,42 @@ fn test_simple_memory_implements_no_op_memory_contract() {
 	memory_contract.clear(mut ctx) or { panic(err) }
 }
 
+fn test_simple_memory_loads_snapshots_of_fixed_values() {
+	mut ctx := context.background()
+	mut initial := map[string]json2.Any{}
+	initial['zeta'] = json2.Any('original')
+	initial['alpha'] = json2.Any(42)
+	static_memory := new_simple_memory_with_values(initial) or { panic(err) }
+	initial['zeta'] = json2.Any('changed after construction')
+	mut memory_contract := schema.Memory(static_memory)
+	assert memory_contract.memory_keys() == ['alpha', 'zeta']
+	first_load := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
+		panic(err)
+	}
+	assert (first_load['zeta'] or { panic('missing zeta') }).str() == 'original'
+	first_load['zeta'] = json2.Any('changed after load')
+	second_load := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
+		panic(err)
+	}
+	assert (second_load['zeta'] or { panic('missing zeta') }).str() == 'original'
+	mut inputs := map[string]json2.Any{}
+	inputs['input'] = json2.Any('ignored')
+	memory_contract.save_context(mut ctx, inputs, map[string]json2.Any{}) or { panic(err) }
+	final_load := memory_contract.load_memory_variables(mut ctx, inputs) or { panic(err) }
+	final_alpha := final_load['alpha'] or { panic('missing alpha') }
+	assert final_alpha == json2.Any(42)
+}
+
+fn test_simple_memory_rejects_empty_value_keys() {
+	new_simple_memory_with_values({
+		' ': json2.Any('invalid')
+	}) or {
+		assert err.msg().contains('non-empty')
+		return
+	}
+	assert false, 'expected empty memory key to fail'
+}
+
 fn test_token_buffer_memory_evicts_oldest_complete_turns() {
 	mut ctx := context.background()
 	token_memory := new_token_buffer_memory(CharacterTokenCounter{}, 'fake', 12, 'history', 'question',
