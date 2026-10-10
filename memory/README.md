@@ -7,3 +7,7 @@ memory_key, input_key, output_key)` stores only the latest `window_size` turns.
 Each turn is one human and one assistant message. A non-positive window size
 uses the default of five turns; sizes above 10,000 return an error. This window
 limits message count, not tokens.
+
+All memory implementations expose `clear(mut ctx)` through the `schema.Memory`
+interface; it removes stored state or succeeds without changing state for
+no-op memory.

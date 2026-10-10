@@ -186,6 +186,7 @@ pub interface Memory {
 	load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any
 	save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) !
 	memory_keys() []string
+	clear(mut ctx context.Context) !
 }
 
 // ChatMessageHistory stores and retrieves an ordered conversation.
