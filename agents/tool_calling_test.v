@@ -4,6 +4,21 @@ import context
 import json2
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
+import ulises_jeremias.langchainv.tools
+
+struct ToolCallingEchoTool {}
+
+fn (_tool ToolCallingEchoTool) spec() tools.ToolSpec {
+	return tools.ToolSpec{
+		name:        'echo'
+		description: 'Returns the provided text'
+		parameters:  json2.Any(map[string]json2.Any{})
+	}
+}
+
+fn (_tool ToolCallingEchoTool) call(mut _ctx context.Context, input string) !string {
+	return 'echo:${input}'
+}
 
 struct FixtureModel {
 	state &FixtureModelState
@@ -47,7 +62,7 @@ fn test_tool_calling_agent_maps_model_tool_requests_to_actions() {
 	}
 	agent := new_tool_calling_agent(FixtureModel{
 		state: state
-	}, [EchoTool{}], ToolCallingAgentOptions{
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
 		input_keys:    ['question']
 		system_prompt: 'Use tools when useful.'
 		call_options:  llms.CallOptions{
@@ -79,7 +94,7 @@ fn test_tool_calling_agent_maps_text_to_finish() {
 	}
 	agent := new_tool_calling_agent(FixtureModel{
 		state: state
-	}, [EchoTool{}], ToolCallingAgentOptions{
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
 		input_keys: ['question']
 	}) or { panic(err) }
 	mut ctx := context.background()
@@ -107,7 +122,7 @@ fn test_tool_calling_agent_replays_tool_history_through_executor() {
 	}
 	agent := new_tool_calling_agent(FixtureModel{
 		state: state
-	}, [EchoTool{}], ToolCallingAgentOptions{
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
 		input_keys: ['question']
 	}) or { panic(err) }
 	executor := new_executor(agent, ExecutorOptions{
@@ -128,7 +143,7 @@ fn test_tool_calling_agent_rejects_duplicate_tools() {
 	mut state := &FixtureModelState{}
 	new_tool_calling_agent(FixtureModel{
 		state: state
-	}, [EchoTool{}, EchoTool{}], ToolCallingAgentOptions{
+	}, [ToolCallingEchoTool{}, ToolCallingEchoTool{}], ToolCallingAgentOptions{
 		input_keys: ['question']
 	}) or {
 		assert err.msg().contains('unique')
@@ -141,7 +156,7 @@ fn test_tool_calling_agent_executor_rejects_missing_inputs_without_model_call() 
 	mut state := &FixtureModelState{}
 	agent := new_tool_calling_agent(FixtureModel{
 		state: state
-	}, [EchoTool{}], ToolCallingAgentOptions{
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
 		input_keys: ['question']
 	}) or { panic(err) }
 	executor := new_default_executor(agent) or { panic(err) }
