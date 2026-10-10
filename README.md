@@ -24,7 +24,7 @@ import ulises_jeremias.langchainv
 The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
-- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, Anthropic Messages, Cohere Chat, Mistral Chat Completions, Ollama chat, and Gemini text/image/function-tool generation.
+- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, Anthropic Messages, Cohere Chat, Mistral Chat Completions, Hugging Face Inference Providers chat, Ollama chat, and Gemini text/image/function-tool generation.
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
@@ -94,6 +94,9 @@ function tools, and its supported options.
 
 See [`llms/mistral/README.md`](llms/mistral/README.md) for Mistral's
 OpenAI-compatible Chat Completions adapter.
+
+See [`llms/huggingface/README.md`](llms/huggingface/README.md) for Hugging Face
+Inference Providers chat via its OpenAI-compatible router.
 
 See [`llms/ollama/README.md`](llms/ollama/README.md) for local Ollama chat,
 multimodal inputs, and its supported options.
