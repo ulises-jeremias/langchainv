@@ -55,6 +55,8 @@ bounded final-answer streaming.
 
 See [`memory/README.md`](memory/README.md) for full and windowed conversation memory.
 
+See [`chains/README.md`](chains/README.md) for the completion-model chain API.
+
 ## Compatibility
 
 - V 0.5.2 or newer, subject to compiler compatibility notes in the docs.
