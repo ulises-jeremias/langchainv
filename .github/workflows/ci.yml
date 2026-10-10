@@ -27,7 +27,7 @@ jobs:
       - name: Set up V
         uses: vlang/setup-v@v1.7
         with:
-          check-latest: true
+          version: '0.5.2'
 
       - name: Install under the V module path
         run: |
