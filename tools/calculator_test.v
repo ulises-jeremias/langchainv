@@ -11,6 +11,7 @@ fn test_calculator_evaluates_bounded_arithmetic() {
 	assert calculator.call(mut ctx, '-2 ** 2') or { panic(err) } == '-4'
 	assert calculator.call(mut ctx, '-7 % 3') or { panic(err) } == '2'
 	assert calculator.call(mut ctx, '3.5 / 2') or { panic(err) } == '1.75'
+	assert calculator.call(mut ctx, '{"expression":"6 * 7"}') or { panic(err) } == '42'
 }
 
 fn test_calculator_reports_invalid_and_non_finite_expressions() {
@@ -19,6 +20,8 @@ fn test_calculator_reports_invalid_and_non_finite_expressions() {
 	assert (calculator.call(mut ctx, '1 / 0') or { panic(err) }).contains('division by zero')
 	assert (calculator.call(mut ctx, '1 +') or { panic(err) }).contains('expected a number')
 	assert (calculator.call(mut ctx, '2 ** 1024') or { panic(err) }).contains('not finite')
+	assert (calculator.call(mut ctx, '{"other":"2 + 2"}') or { panic(err) }).contains('missing')
+	assert (calculator.call(mut ctx, '{"expression":4}') or { panic(err) }).contains('must be a string')
 }
 
 fn test_calculator_enforces_input_and_operation_limits() {

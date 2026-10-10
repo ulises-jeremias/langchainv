@@ -42,8 +42,11 @@ pub fn (calculator Calculator) call(mut ctx context.Context, input string) !stri
 	if input.len > calculator_max_input_bytes {
 		return 'error from evaluator: expression exceeds ${calculator_max_input_bytes} bytes'
 	}
+	expression := calculator_expression(input) or {
+		return 'error from evaluator: ${err.msg()}'
+	}
 	mut parser := ArithmeticParser{
-		source: input
+		source: expression
 	}
 	value := parser.parse() or {
 		return 'error from evaluator: ${err.msg()}'
@@ -55,6 +58,21 @@ pub fn (calculator Calculator) call(mut ctx context.Context, input string) !stri
 		return i64(value).str()
 	}
 	return value.str()
+}
+
+fn calculator_expression(input string) !string {
+	trimmed := input.trim_space()
+	if !trimmed.starts_with('{') {
+		return input
+	}
+	values := json2.decode[map[string]json2.Any](input) or {
+		return error('invalid JSON tool input')
+	}
+	expression := values['expression'] or { return error('missing `expression` input') }
+	if expression is string {
+		return expression
+	}
+	return error('`expression` input must be a string')
 }
 
 struct ArithmeticParser {

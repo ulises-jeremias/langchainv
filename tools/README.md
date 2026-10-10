@@ -3,7 +3,8 @@
 `Tool` defines the shared agent-tool contract. `new_calculator()` returns an
 offline calculator that supports numeric literals, parentheses, unary signs,
 addition, subtraction, multiplication, division, modulo, and right-associative
-exponentiation with `**`.
+exponentiation with `**`. It accepts either an expression string or a JSON
+object with a string-valued `expression` field.
 
 The calculator does not execute source code. It caps expressions at 4,096
 bytes, 512 parsed values/operators, and 64 levels of nesting. Invalid
