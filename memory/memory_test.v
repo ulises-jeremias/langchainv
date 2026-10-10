@@ -141,7 +141,7 @@ fn test_simple_memory_loads_snapshots_of_fixed_values() {
 	initial['zeta'] = json2.Any('changed after construction')
 	mut memory_contract := schema.Memory(static_memory)
 	assert memory_contract.memory_keys() == ['alpha', 'zeta']
-	first_load := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
+	mut first_load := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
 		panic(err)
 	}
 	assert (first_load['zeta'] or { panic('missing zeta') }).str() == 'original'
