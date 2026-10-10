@@ -163,8 +163,9 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 }
 
 struct ChatRequest {
-	model                 string
-	messages              []map[string]json2.Any
+	model    string
+	messages []map[string]json2.Any
+mut:
 	max_completion_tokens ?int
 	n                     ?int
 	stop                  ?[]string
@@ -389,7 +390,7 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 	if message.role == .tool && !has_tool_result {
 		return error('OpenAI tool-role messages require a tool result part')
 	}
-	if content.len == 0 && tool_calls.len == 0 && !result.exists('content') {
+	if content.len == 0 && tool_calls.len == 0 && !has_tool_result {
 		return error('OpenAI chat message has no supported content')
 	}
 	if text_only && plain_text.len > 0 {
