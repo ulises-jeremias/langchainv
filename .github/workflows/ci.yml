@@ -24,10 +24,18 @@ jobs:
         with:
           path: langchainv
 
-      - name: Set up V
-        uses: vlang/setup-v@v1.7
+      - name: Check out pinned V compiler
+        uses: actions/checkout@v7
         with:
-          version: '0.5.2'
+          repository: vlang/v
+          ref: 03e12f368ad5061756d523891e12cd759053f486
+          path: vlang
+
+      - name: Build V compiler
+        run: |
+          make -C vlang
+          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
+          v version
 
       - name: Install under the V module path
         run: |
