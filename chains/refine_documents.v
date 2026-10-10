@@ -20,9 +20,10 @@ pub:
 	output_key            string = default_refine_output_key
 	document_variable     string = default_refine_document_variable
 	initial_response_name string = default_refine_initial_response_name
-	document_prompt       prompts.StringTemplate
 	max_documents         int = 16
 	max_document_bytes    int = 65536
+pub mut:
+	document_prompt       prompts.StringTemplate
 }
 
 // RefineDocumentsChain starts with the first document, then revises the answer.
@@ -140,7 +141,7 @@ pub fn (chain RefineDocumentsChain) call(mut ctx context.Context, inputs map[str
 		total_bytes += text.len
 		document_texts << text
 	}
-	ctx_error := ctx.err()
+	mut ctx_error := ctx.err()
 	if ctx_error !is none {
 		return ctx_error
 	}
@@ -155,7 +156,7 @@ pub fn (chain RefineDocumentsChain) call(mut ctx context.Context, inputs map[str
 	}
 	mut response := response_value as string
 	for index in 1 .. document_texts.len {
-		ctx_error := ctx.err()
+		ctx_error = ctx.err()
 		if ctx_error !is none {
 			return ctx_error
 		}
