@@ -96,7 +96,7 @@ fn test_map_reduce_maps_in_order_then_reduces_bounded_documents() {
 		])
 		'question':        json2.Any('why?')
 	}) or { panic(err) }
-	assert (outputs['answer'] or { panic('missing answer') }).str() == 'reduced'
+	assert (outputs['answer'] or { panic('missing answer') }).str() == 'REDUCE MAP FIRST FOR WHY?\n\nMAP SECOND FOR WHY? FOR WHY?'
 	assert fixture.map_state.prompts == ['Map first for why?', 'Map second for why?']
 	assert fixture.reduce_state.prompts == ['Reduce MAP FIRST FOR WHY?\n\nMAP SECOND FOR WHY? for why?']
 	assert fixture.chain.input_keys() == ['input_documents', 'question']
@@ -164,11 +164,13 @@ fn test_map_reduce_rejects_input_key_collisions() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	reducer := MapReduceCaptureReducer{
-		state: &MapReduceCaptureState{}
-	}
-	new_map_reduce_documents_chain(map_chain, reducer, MapReduceDocumentsOptions{
-		input_key: 'context'
+	reduce_chain := new_stuff_documents_chain(new_llm_chain(MapReduceFixtureModel{
+		state: &MapReduceFixtureState{}
+	}, prompts.StringTemplate{
+		template: '{context} {question}'
+	}, 'answer') or { panic(err) }, StuffDocumentsOptions{}) or { panic(err) }
+	new_map_reduce_documents_chain(map_chain, reduce_chain, MapReduceDocumentsOptions{
+		input_key: 'question'
 	}) or {
 		assert err.msg().contains('conflicts')
 		return
