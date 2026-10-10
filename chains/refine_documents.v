@@ -21,8 +21,8 @@ pub:
 	document_variable     string = default_refine_document_variable
 	initial_response_name string = default_refine_initial_response_name
 	document_prompt       prompts.StringTemplate
-	max_documents      int = 16
-	max_document_bytes int = 65536
+	max_documents         int = 16
+	max_document_bytes    int = 65536
 }
 
 // RefineDocumentsChain starts with the first document, then revises the answer.

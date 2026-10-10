@@ -24,9 +24,9 @@ fn (model RefineFixtureModel) complete(mut _ctx context.Context, prompt string, 
 }
 
 struct RefineFixture {
-	chain          RefineDocumentsChain
-	initial_state  &RefineFixtureState
-	refine_state   &RefineFixtureState
+	chain         RefineDocumentsChain
+	initial_state &RefineFixtureState
+	refine_state  &RefineFixtureState
 }
 
 fn refine_fixture(options RefineDocumentsOptions) !RefineFixture {
