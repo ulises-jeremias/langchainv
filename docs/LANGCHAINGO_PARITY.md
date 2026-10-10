@@ -16,7 +16,7 @@ The inventory is based on upstream commit
 | `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | partial: Plan/Finish contract, generic model tool-calling agent, and bounded iterative executor with typed string inputs, case-insensitive tool dispatch, cancellation checks, callbacks, chain memory integration, and optional intermediate-step output; MRKL/conversational variants, specialized OpenAI-functions agent, parser recovery, and full initialization remain outstanding |
 | `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; see V-native queue behavior in package docs |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract, input/output validation, prompt-backed completion and chat-model chains, a fixed-prompt completion conversation chain with history memory, bounded retriever-to-completion retrieval QA with optional source-document return, validated sequential composition, simple sequential key adaptation, and function-backed transform chain; other chain types remain outstanding |
-| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file and CSV text loaders; bounded recursive directory traversal for `.txt`, `.md`, and `.csv` files with extension filters, CSV columns, source metadata, and bounded splitting; HTML, PDF, Notion, and AssemblyAI remain outstanding |
+| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded HTML text, text-file, and CSV loaders; bounded recursive directory traversal for `.txt`, `.md`, and `.csv` files with extension filters, CSV columns, source metadata, and bounded splitting; PDF, Notion, and AssemblyAI remain outstanding |
 | `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, and OpenAI `/v1/embeddings` client with injectable transport; remaining providers outstanding |
 | `jsonschema` | schema generation and validation helpers | not started |
 | `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract, non-streaming OpenAI Chat Completions and Anthropic Messages with text, client tool calls, usage accounting, and offline transport tests |
@@ -66,7 +66,7 @@ Pinecone, Qdrant, Redis, and Weaviate — all not started.
 
 ## Document loaders and tools
 
-- Loaders still outstanding: AssemblyAI, HTML, Notion, and PDF.
+- Loaders still outstanding: AssemblyAI, Notion, and PDF. HTML uses V's standard-library parser; full browser-style parsing and network fetching are outside its scope.
 - Tools still outstanding: DuckDuckGo, Metaphor, Perplexity, scraper,
   SerpAPI, SQL database (MySQL/PostgreSQL/SQLite), Wikipedia, and Zapier.
 

@@ -1,8 +1,14 @@
 # Document loaders
 
-The package currently provides bounded text-file, CSV content, and recursive
-directory loaders. They return `schema.Document` values and check request
-cancellation while loading.
+The package provides bounded HTML, text-file, and CSV content loaders plus a
+recursive directory loader. They return `schema.Document` values and check
+request cancellation while loading.
+
+`new_html_loader` accepts an HTML string up to 16 MiB by default and returns
+one document containing parsed body text, or document text when no body exists.
+`load_and_split` uses a bounded splitter and caps output at 10,000 documents
+and the input byte limit. It uses V's standard-library HTML parser; network
+fetching and full browser-style DOM behavior are outside this loader.
 
 `CSVLoader` creates one document per data row. It reads the first record as
 column names, formats selected values as `column: value` lines, and stores the
