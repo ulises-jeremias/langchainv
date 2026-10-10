@@ -59,7 +59,8 @@ pub fn (template StringTemplate) format(values map[string]json2.Any) !string {
 			if name !in values {
 				return error('missing prompt value `${name}`')
 			}
-			out.write_string(values[name].str())
+			value := values[name] or { return error('missing prompt value `${name}`') }
+			out.write_string(value.str())
 			i = end + 1
 			continue
 		}
