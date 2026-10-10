@@ -303,7 +303,7 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 					return error('Anthropic image URL must be HTTPS, include a host, and be at most 8192 bytes')
 				}
 				if parsed_user := parsed_url.user {
-					if parsed_user != '' {
+					if parsed_user.username != '' || parsed_user.password_set {
 						return error('Anthropic image URL user information is not allowed')
 					}
 				}
