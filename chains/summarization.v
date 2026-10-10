@@ -5,7 +5,7 @@ import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.prompts
 
 const default_stuff_summarization_template = 'Write a concise summary of the following:\n\n\n"{context}"\n\n\nCONCISE SUMMARY:'
-const default_refine_summarization_template = 'Your job is to produce a final concise summary\nWe have provided an existing summary up to a certain point: "{existing_answer}"\nWe have the opportunity to refine the existing summary\n(only if needed) with some more context below.\n------------\n"{context}"\n------------\n\nGiven the new context, refine the original summary\nIf the context isn\'t useful, return the original summary.\n\nREFINED SUMMARY:'
+const default_refine_summarization_template = "Your job is to produce a final concise summary\nWe have provided an existing summary up to a certain point: \"{existing_answer}\"\nWe have the opportunity to refine the existing summary\n(only if needed) with some more context below.\n------------\n\"{context}\"\n------------\n\nGiven the new context, refine the original summary\nIf the context isn't useful, return the original summary.\n\nREFINED SUMMARY:"
 
 // load_stuff_summarization creates a bounded chain that summarizes combined documents.
 pub fn load_stuff_summarization(model llms.CompletionModel) !StuffDocumentsChain {
