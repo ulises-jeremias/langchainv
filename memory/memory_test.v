@@ -4,6 +4,38 @@ import context
 import json2
 import ulises_jeremias.langchainv.schema
 
+struct CharacterTokenCounter {}
+
+fn (_counter CharacterTokenCounter) count_tokens(mut _ctx context.Context, messages []schema.Message, _model string) !int {
+	mut count := 0
+	for message in messages {
+		count += message.text().len
+	}
+	return count
+}
+
+struct FailingTokenCounterState {
+mut:
+	calls int
+}
+
+struct FailingTokenCounter {
+	state &FailingTokenCounterState
+}
+
+fn (counter FailingTokenCounter) count_tokens(mut _ctx context.Context, messages []schema.Message, _model string) !int {
+	mut state := counter.state
+	state.calls++
+	if state.calls > 1 {
+		return error('count unavailable')
+	}
+	mut count := 0
+	for message in messages {
+		count += message.text().len
+	}
+	return count
+}
+
 fn test_in_memory_history_snapshots_binary_content() {
 	mut ctx := context.background()
 	mut history := new_in_memory_chat_message_history()
@@ -98,4 +130,51 @@ fn test_simple_memory_implements_no_op_memory_contract() {
 		panic(err)
 	}
 	memory_contract.clear(mut ctx) or { panic(err) }
+}
+
+fn test_token_buffer_memory_evicts_oldest_complete_turns() {
+	mut ctx := context.background()
+	memory := new_token_buffer_memory(CharacterTokenCounter{}, 'fake', 12, 'history', 'question',
+		'answer') or { panic(err) }
+	for turn in [['one', 'first'], ['two', 'second'], ['three', 'third']] {
+		memory.save_context(mut ctx, {
+			'question': json2.Any(turn[0])
+		}, {
+			'answer': json2.Any(turn[1])
+		}) or { panic(err) }
+	}
+	loaded := memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	history := loaded['history'] or { panic('missing token buffer history') }
+	assert history.str() == 'Human: three\nAI: third'
+	mut memory_contract := schema.Memory(memory)
+	assert memory_contract.memory_keys() == ['history']
+	memory_contract.clear(mut ctx) or { panic(err) }
+	cleared := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or {
+		panic(err)
+	}
+	assert (cleared['history'] or { panic('missing cleared history') }).str() == ''
+}
+
+fn test_token_buffer_memory_keeps_history_when_counter_fails() {
+	mut ctx := context.background()
+	memory := new_token_buffer_memory(FailingTokenCounter{
+		state: &FailingTokenCounterState{}
+	}, 'fake', 100, 'history', 'question',
+		'answer') or { panic(err) }
+	memory.save_context(mut ctx, {
+		'question': json2.Any('old question')
+	}, {
+		'answer': json2.Any('old answer')
+	}) or { panic(err) }
+	memory.save_context(mut ctx, {
+		'question': json2.Any('new question')
+	}, {
+		'answer': json2.Any('new answer')
+	}) or {
+		assert err.msg().contains('counting failed')
+		loaded := memory.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+		assert (loaded['history'] or { panic('missing history') }).str() == 'Human: old question\nAI: old answer'
+		return
+	}
+	assert false, 'expected token counting to fail'
 }
