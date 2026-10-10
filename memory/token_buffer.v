@@ -46,16 +46,17 @@ pub fn new_token_buffer_memory(counter llms.TokenCounter, model string, token_li
 }
 
 // memory_keys returns the key populated by this memory.
-pub fn (memory TokenBufferMemory) memory_keys() []string {
-	return [memory.memory_key]
+pub fn (buffer TokenBufferMemory) memory_keys() []string {
+	return [buffer.memory_key]
 }
 
 // load_memory_variables returns the retained token-bounded transcript.
-pub fn (memory TokenBufferMemory) load_memory_variables(mut ctx context.Context, _inputs map[string]json2.Any) !map[string]json2.Any {
-	if ctx_error := ctx.err() {
+pub fn (buffer TokenBufferMemory) load_memory_variables(mut ctx context.Context, _inputs map[string]json2.Any) !map[string]json2.Any {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
 		return ctx_error
 	}
-	mut state := memory.state
+	mut state := buffer.state
 	state.mutex.lock()
 	messages := state.messages.clone()
 	state.mutex.unlock()
@@ -71,43 +72,45 @@ pub fn (memory TokenBufferMemory) load_memory_variables(mut ctx context.Context,
 		lines << '${role}: ${message.text()}'
 	}
 	return {
-		memory.memory_key: json2.Any(lines.join('\n'))
+		buffer.memory_key: json2.Any(lines.join('\n'))
 	}
 }
 
 // save_context appends a turn and evicts oldest turns until within the token limit.
 // If counting fails, the existing history remains unchanged.
-pub fn (memory TokenBufferMemory) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
-	if memory.input_key !in inputs {
-		return error('missing memory input ${memory.input_key}')
+pub fn (buffer TokenBufferMemory) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
+	if buffer.input_key !in inputs {
+		return error('missing memory input ${buffer.input_key}')
 	}
-	if memory.output_key !in outputs {
-		return error('missing memory output ${memory.output_key}')
+	if buffer.output_key !in outputs {
+		return error('missing memory output ${buffer.output_key}')
 	}
-	input := inputs[memory.input_key] or { return error('missing memory input ${memory.input_key}') }
-	output := outputs[memory.output_key] or { return error('missing memory output ${memory.output_key}') }
-	if ctx_error := ctx.err() {
+	input := inputs[buffer.input_key] or { return error('missing memory input ${buffer.input_key}') }
+	output := outputs[buffer.output_key] or { return error('missing memory output ${buffer.output_key}') }
+	ctx_error := ctx.err()
+	if ctx_error !is none {
 		return ctx_error
 	}
-	mut state := memory.state
+	mut state := buffer.state
 	state.mutex.lock()
 	mut candidate := state.messages.clone()
 	candidate << schema.text_message(.human, input.str())
 	candidate << schema.text_message(.ai, output.str())
 	for candidate.len > 0 {
-		token_count := memory.counter.count_tokens(mut ctx, candidate, memory.model) or {
+		token_count := buffer.counter.count_tokens(mut ctx, candidate, buffer.model) or {
 			state.mutex.unlock()
 			return error('token buffer counting failed: ${err.msg()}')
 		}
-		if ctx_error := ctx.err() {
+		ctx_error_after_count := ctx.err()
+		if ctx_error_after_count !is none {
 			state.mutex.unlock()
-			return ctx_error
+			return ctx_error_after_count
 		}
 		if token_count < 0 {
 			state.mutex.unlock()
 			return error('token counter returned a negative count')
 		}
-		if token_count <= memory.token_limit {
+		if token_count <= buffer.token_limit {
 			break
 		}
 		if candidate.len <= 2 {
@@ -121,11 +124,12 @@ pub fn (memory TokenBufferMemory) save_context(mut ctx context.Context, inputs m
 }
 
 // clear removes all retained turns.
-pub fn (memory TokenBufferMemory) clear(mut ctx context.Context) ! {
-	if ctx_error := ctx.err() {
+pub fn (buffer TokenBufferMemory) clear(mut ctx context.Context) ! {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
 		return ctx_error
 	}
-	mut state := memory.state
+	mut state := buffer.state
 	state.mutex.lock()
 	state.messages.clear()
 	state.mutex.unlock()
