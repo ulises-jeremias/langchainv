@@ -8,6 +8,15 @@ inner `LLMChain`. Configure the separator, input/variable names, and document
 count and byte limits with `StuffDocumentsOptions`. Invalid document objects
 and oversized contexts fail before the model call.
 
+`new_map_reduce_documents_chain` maps each bounded input document through an
+`LLMChain`, retains its metadata, and passes the mapped documents to a reducer
+chain. It runs maps sequentially, checks cancellation between documents, and
+can return each map result as `intermediate_steps`. `MapReduceDocumentsOptions`
+sets the document key, map and reduce prompt variables, document count and byte
+caps, optional memory, and intermediate-step output. The default caps are 16
+documents and 64 KiB of source and combined mapped text; configured caps are
+limited to 128 documents and 1 MiB. The reducer determines the final outputs.
+
 The retrieval QA variant queries an injected retriever, joins page content into
 the prompt context, and returns a completion. Document count, context bytes,
 and formatted prompt bytes have validated caps. Its prompt must include the
