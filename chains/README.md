@@ -32,6 +32,16 @@ Caller-supplied inputs needed by either prompt pass through to both chains. It
 requires at least one document and bounds document count, source
 bytes, and formatted document bytes before calling either model.
 
+Question answering presets are available through `load_stuff_qa`,
+`load_refine_qa`, `load_map_reduce_qa`, and `load_map_rerank_qa`. Each takes a
+completion model and returns the corresponding bounded document chain.
+`load_condense_question_generator` creates a prompt chain for rewriting a
+follow-up question using `chat_history` and `question`.
+
+Summarization presets are available through `load_stuff_summarization`,
+`load_refine_summarization`, and `load_map_reduce_summarization`. They use the
+same document-count and byte bounds as the underlying document chains.
+
 The retrieval QA variant queries an injected retriever, joins page content into
 the prompt context, and returns a completion. Document count, context bytes,
 and formatted prompt bytes have validated caps. Its prompt must include the
