@@ -57,8 +57,8 @@ fn (MapReduceCaptureReducer) output_keys() []string {
 }
 
 struct MapReduceFixture {
-	chain       MapReduceDocumentsChain
-	map_state   &MapReduceFixtureState
+	chain        MapReduceDocumentsChain
+	map_state    &MapReduceFixtureState
 	reduce_state &MapReduceFixtureState
 }
 
@@ -80,8 +80,8 @@ fn map_reduce_fixture() !MapReduceFixture {
 		return_intermediate_steps: true
 	})!
 	return MapReduceFixture{
-		chain:       chain
-		map_state:   map_state
+		chain:        chain
+		map_state:    map_state
 		reduce_state: reduce_state
 	}
 }

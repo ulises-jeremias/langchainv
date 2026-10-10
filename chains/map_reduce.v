@@ -15,13 +15,13 @@ const map_reduce_intermediate_steps_key = 'intermediate_steps'
 // MapReduceDocumentsOptions configures the inputs, limits, memory and outputs.
 pub struct MapReduceDocumentsOptions {
 pub:
-	input_key                   string = default_map_reduce_documents_key
-	map_document_variable       string = default_map_reduce_map_variable
-	reduce_document_variable    string = default_map_reduce_reduce_variable
-	max_documents               int    = 16
-	max_document_bytes          int    = 65536
-	return_intermediate_steps   bool
-	memory                      ?schema.Memory
+	input_key                 string = default_map_reduce_documents_key
+	map_document_variable     string = default_map_reduce_map_variable
+	reduce_document_variable  string = default_map_reduce_reduce_variable
+	max_documents             int    = 16
+	max_document_bytes        int    = 65536
+	return_intermediate_steps bool
+	memory                    ?schema.Memory
 }
 
 // MapReduceDocumentsChain applies an LLMChain to each document, then reduces.
@@ -31,7 +31,7 @@ pub struct MapReduceDocumentsChain {
 pub:
 	options MapReduceDocumentsOptions
 mut:
-	map_variable   string
+	map_variable    string
 	reduce_variable string
 	keys            []string
 	outputs         []string
@@ -84,14 +84,14 @@ pub fn new_map_reduce_documents_chain(map_chain LLMChain, reduce_chain Chain, op
 		reduce_chain.memory()
 	}
 	return MapReduceDocumentsChain{
-		map_chain:      map_chain
-		reduce_chain:   reduce_chain
-		options:        options
-		map_variable:   map_variable
+		map_chain:       map_chain
+		reduce_chain:    reduce_chain
+		options:         options
+		map_variable:    map_variable
 		reduce_variable: reduce_variable
-		keys:           keys
-		outputs:        outputs
-		memory_store:   memory_store
+		keys:            keys
+		outputs:         outputs
+		memory_store:    memory_store
 	}
 }
 
