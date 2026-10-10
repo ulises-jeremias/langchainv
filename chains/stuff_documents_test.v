@@ -75,7 +75,9 @@ fn test_stuff_documents_rejects_invalid_document_items_before_model_call() {
 	chain := new_stuff_fixture(model_state) or { panic(err) }
 	mut ctx := context.background()
 	call(mut ctx, chain, {
-		'input_documents': json2.Any([json2.Any({'content': json2.Any('missing page_content')})])
+		'input_documents': json2.Any([json2.Any({
+			'content': json2.Any('missing page_content')
+		})])
 		'question':        json2.Any('q')
 	}) or {
 		assert err.msg().contains('page_content')

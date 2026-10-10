@@ -14,11 +14,11 @@ const max_stuff_document_bytes = 1048576
 // StuffDocumentsOptions controls document inputs, prompt variable, and limits.
 pub struct StuffDocumentsOptions {
 pub:
-	input_key            string = default_stuff_documents_key
-	document_variable    string = default_stuff_document_variable
-	separator            string = default_stuff_separator
-	max_documents        int    = 16
-	max_document_bytes   int    = 65536
+	input_key          string = default_stuff_documents_key
+	document_variable  string = default_stuff_document_variable
+	separator          string = default_stuff_separator
+	max_documents      int    = 16
+	max_document_bytes int    = 65536
 }
 
 // StuffDocumentsChain joins bounded documents and calls an LLMChain.
