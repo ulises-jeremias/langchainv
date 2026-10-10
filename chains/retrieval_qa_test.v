@@ -139,7 +139,9 @@ fn test_retrieval_qa_can_return_source_documents() {
 		'question': json2.Any('q')
 	}) or { panic(err) }
 	assert chain.output_keys() == ['answer', 'source_documents']
-	returned_documents := (outputs['source_documents'] or { panic('missing source documents') }).arr()
+	returned_documents := (outputs['source_documents'] or { panic('missing source documents') }).as_array()
 	assert returned_documents.len == 1
-	assert returned_documents[0].as_map()['page_content'].str() == 'source'
+	returned_document := returned_documents[0].as_map()
+	page_content := returned_document['page_content'] or { panic('missing page content') }
+	assert page_content.str() == 'source'
 }
