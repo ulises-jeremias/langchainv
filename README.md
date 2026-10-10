@@ -24,7 +24,7 @@ import ulises_jeremias.langchainv
 The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
-- `llms`: model contracts, provider-neutral generation results, and OpenAI Chat Completions.
+- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, and Anthropic Messages.
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
@@ -66,6 +66,9 @@ OpenAI embeddings client and its injectable HTTP transport.
 
 See [`llms/openai/README.md`](llms/openai/README.md) for OpenAI chat generation,
 tool calls, and multimodal image inputs.
+
+See [`llms/anthropic/README.md`](llms/anthropic/README.md) for Anthropic
+Messages, tool use, and its supported options.
 
 ## Compatibility
 
