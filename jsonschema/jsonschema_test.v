@@ -10,7 +10,7 @@ fn test_definition_encodes_nested_properties_and_items() {
 			}
 			'scores': Definition{
 				type_: .array
-				items: Definition{
+				items: &Definition{
 					type_: .number
 				}
 			}
@@ -61,7 +61,7 @@ fn test_definition_rejects_duplicate_enum_values() {
 fn test_definition_rejects_misplaced_array_items() {
 	Definition{
 		type_: .string
-		items: Definition{
+		items: &Definition{
 			type_: .string
 		}
 	}.validate() or {
@@ -77,8 +77,10 @@ fn test_definition_rejects_excessive_nesting() {
 	}
 	for _ in 0 .. 66 {
 		definition = Definition{
-			type_: .array
-			items: definition
+			type_:      .object
+			properties: {
+				'nested': definition
+			}
 		}
 	}
 	definition.validate() or {

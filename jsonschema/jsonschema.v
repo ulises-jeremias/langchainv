@@ -37,7 +37,7 @@ pub:
 	enum_values []string
 	properties  map[string]Definition
 	required    []string
-	items       ?Definition
+	items       ?&Definition
 }
 
 // to_any validates the definition and converts it to a JSON value.
