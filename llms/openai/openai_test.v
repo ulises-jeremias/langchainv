@@ -2,6 +2,7 @@ module openai
 
 import context
 import net.http
+import json2
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -65,6 +66,24 @@ fn test_generate_content_maps_tool_calls() {
 	assert response.choices[0].tool_calls.len == 1
 	assert response.choices[0].tool_calls[0].id == 'call-1'
 	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+}
+
+fn test_generate_content_encodes_function_tools_and_tool_choice() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"choices":[{"index":0,"message":{"role":"assistant","content":"ready"},"finish_reason":"stop"}]}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'use lookup')], llms.CallOptions{
+		tools:       [schema.ToolDefinition{
+			name:        'lookup'
+			description: 'Look up a value'
+			parameters:  json2.Any(map[string]json2.Any{})
+		}]
+		tool_choice: schema.ToolChoice{
+			mode: 'required'
+		}
+	}) or { panic(err) }
+	assert state.requests[0].body.contains('"type":"function"')
+	assert state.requests[0].body.contains('"name":"lookup"')
+	assert state.requests[0].body.contains('"tool_choice":"required"')
 }
 
 fn test_generate_content_does_not_return_provider_error_body() {

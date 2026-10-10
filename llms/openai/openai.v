@@ -162,97 +162,76 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	}
 }
 
-struct ChatRequest {
-	model    string
-	messages []map[string]json2.Any
-mut:
-	max_completion_tokens ?int
-	n                     ?int
-	stop                  ?[]string
-	temperature           ?f64
-	top_p                 ?f64
-	presence_penalty      ?f64
-	frequency_penalty     ?f64
-	seed                  ?int
-	tools                 ?[]map[string]json2.Any
-	tool_choice           ?json2.Any
-	function_call         ?json2.Any
-	response_format       ?map[string]json2.Any
-	metadata              ?map[string]json2.Any
-}
-
-fn make_request(model string, messages []schema.Message, options llms.CallOptions) !ChatRequest {
-	mut wire_messages := []map[string]json2.Any{cap: messages.len}
+fn make_request(model string, messages []schema.Message, options llms.CallOptions) !map[string]json2.Any {
+	mut wire_messages := []json2.Any{cap: messages.len}
 	for message in messages {
-		wire_messages << convert_message(message)!
+		wire_messages << json2.Any(convert_message(message)!)
 	}
-	mut tools := []map[string]json2.Any{}
+	mut tools := []json2.Any{}
 	for definition in options.tools {
 		if definition.name.trim_space() == '' {
 			return error('OpenAI tool name must not be empty')
 		}
-		mut function := map[string]json2.Any{
-			'name':       json2.Any(definition.name)
-			'parameters': definition.parameters
-		}
+		mut function := map[string]json2.Any{}
+		function['name'] = json2.Any(definition.name)
+		function['parameters'] = definition.parameters
 		if definition.description != '' {
 			function['description'] = json2.Any(definition.description)
 		}
 		if definition.strict {
 			function['strict'] = json2.Any(true)
 		}
-		tools << {
+		tools << json2.Any({
 			'type':     json2.Any('function')
 			'function': json2.Any(function)
-		}
+		})
 	}
 	for definition in options.functions {
 		if definition.name.trim_space() == '' {
 			return error('OpenAI function name must not be empty')
 		}
-		mut function := map[string]json2.Any{
-			'name':       json2.Any(definition.name)
-			'parameters': definition.parameters
-		}
+		mut function := map[string]json2.Any{}
+		function['name'] = json2.Any(definition.name)
+		function['parameters'] = definition.parameters
 		if definition.description != '' {
 			function['description'] = json2.Any(definition.description)
 		}
 		if definition.strict {
 			function['strict'] = json2.Any(true)
 		}
-		tools << {
+		tools << json2.Any({
 			'type':     json2.Any('function')
 			'function': json2.Any(function)
-		}
+		})
 	}
-	mut tool_choice := ?json2.Any(none)
+	mut tool_choice := json2.Any(json2.null)
+	mut has_tool_choice := false
 	if choice := options.tool_choice {
 		if choice.name != '' {
-			tool_choice = json2.Any({
-				'type':     json2.Any('function')
-				'function': json2.Any({
-					'name': json2.Any(choice.name)
-				})
-			})
+			mut function_choice := map[string]json2.Any{}
+			function_choice['name'] = json2.Any(choice.name)
+			mut named_choice := map[string]json2.Any{}
+			named_choice['type'] = json2.Any('function')
+			named_choice['function'] = json2.Any(function_choice)
+			tool_choice = json2.Any(named_choice)
+			has_tool_choice = true
 		} else if choice.mode in ['none', 'auto', 'required'] {
 			tool_choice = json2.Any(choice.mode)
+			has_tool_choice = true
 		} else {
 			return error('unsupported OpenAI tool choice mode `${choice.mode}`')
 		}
 	}
-	mut legacy_function_call := ?json2.Any(none)
+	mut legacy_function_call := json2.Any(json2.null)
+	mut has_legacy_function_call := false
 	if options.function_call_behavior != '' {
 		if options.function_call_behavior !in ['none', 'auto'] {
 			return error('unsupported legacy OpenAI function call behavior')
 		}
 		legacy_function_call = json2.Any(options.function_call_behavior)
+		has_legacy_function_call = true
 	}
-	mut response_format := ?map[string]json2.Any(none)
-	if options.json_mode || options.response_mime_type == 'application/json' {
-		response_format = map[string]json2.Any{
-			'type': json2.Any('json_object')
-		}
-	} else if options.response_mime_type != '' {
+	if !options.json_mode && options.response_mime_type != '' && options.response_mime_type != 'application/json' {
 		return error('unsupported OpenAI response MIME type `${options.response_mime_type}`')
 	}
 	mut metadata := map[string]json2.Any{}
@@ -261,38 +240,53 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 			metadata[key] = value
 		}
 	}
-	mut result := ChatRequest{
-		model:           model
-		messages:        wire_messages
-		metadata:        if metadata.len == 0 { none } else { metadata }
-		tools:           if tools.len == 0 { none } else { tools }
-		tool_choice:     tool_choice
-		function_call:   legacy_function_call
-		response_format: response_format
+	mut result := map[string]json2.Any{}
+	result['model'] = json2.Any(model)
+	result['messages'] = json2.Any(wire_messages)
+	if metadata.len > 0 {
+		result['metadata'] = json2.Any(metadata)
+	}
+	if tools.len > 0 {
+		result['tools'] = json2.Any(tools)
+	}
+	if has_tool_choice {
+		result['tool_choice'] = tool_choice
+	}
+	if has_legacy_function_call {
+		result['function_call'] = legacy_function_call
+	}
+	if options.json_mode || options.response_mime_type == 'application/json' {
+		result['response_format'] = json2.Any({
+			'type': json2.Any('json_object')
+		})
 	}
 	if options.max_tokens > 0 {
-		result.max_completion_tokens = options.max_tokens
+		result['max_completion_tokens'] = json2.Any(options.max_tokens)
 	}
 	requested_n := if options.n > 0 { options.n } else { options.candidate_count }
 	if requested_n > 0 {
-		result.n = requested_n
+		result['n'] = json2.Any(requested_n)
 	}
 	if options.stop_words.len > 0 {
-		result.stop = options.stop_words.clone()
+		mut stop_values := []json2.Any{cap: options.stop_words.len}
+		for stop_word in options.stop_words {
+			stop_values << json2.Any(stop_word)
+		}
+		result['stop'] = json2.Any(stop_values)
 	}
 	if !is_reasoning_model(model) {
-		result.temperature = options.temperature
+		result['temperature'] = json2.Any(options.temperature)
 		if options.top_p != 0 {
-			result.top_p = options.top_p
+			result['top_p'] = json2.Any(options.top_p)
 		}
 		if options.presence_penalty != 0 {
-			result.presence_penalty = options.presence_penalty
+			result['presence_penalty'] = json2.Any(options.presence_penalty)
 		}
 		if options.frequency_penalty != 0 {
-			result.frequency_penalty = options.frequency_penalty
+			result['frequency_penalty'] = json2.Any(options.frequency_penalty)
 		}
 		if seed := options.seed {
-			result.seed = seed
+			result['seed'] = json2.Any(seed)
 		}
 	} else if options.temperature != 0 || options.top_p != 0 || options.presence_penalty != 0
 		|| options.frequency_penalty != 0 || options.seed != none {
