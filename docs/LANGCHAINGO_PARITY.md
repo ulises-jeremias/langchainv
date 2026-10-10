@@ -69,7 +69,13 @@ feature-extraction requests through the current inference router with
 configurable model/task/base URL and injected transport. Bedrock — partial:
 Titan V1/V2 and Cohere V3 requests via bearer-key Runtime API, including Cohere
 query/document modes and injected transport; AWS credential-chain signing and
-broader model support remain outstanding. Cybertron remains not started.
+broader model support remain outstanding. Cybertron remains not started: its
+upstream contract runs pretrained Transformer embedding models locally, while
+the available VTL model checkpoint format targets VTL `Sequential` networks
+and does not provide a compatible pretrained-model loader. VSL's tokenizer is
+not a substitute for that inference runtime. Revisit this adapter when a
+compatible V-native pretrained encoder/runtime exists; do not imply parity by
+wrapping training layers or downloading weights during ordinary checks.
 
 ## Vector stores
 
