@@ -102,7 +102,11 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		return error('Google AI request exceeds the 1024-message limit')
 	}
 	validate_options(options)!
-	model := if options.model.trim_space() == '' { client.model } else { options.model.trim_space() }
+	model := if options.model.trim_space() == '' {
+		client.model
+	} else {
+		options.model.trim_space()
+	}
 	validate_model(model)!
 	request := make_request(messages, options)!
 	body := json2.encode(request, json2.EncoderOptions{})
@@ -118,8 +122,8 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		url:     '${client.base_url}/models/${model}:generateContent'
 		headers: {
 			'x-goog-api-key': client.api_key
-			'Content-Type':  'application/json'
-			'Accept':        'application/json'
+			'Content-Type':   'application/json'
+			'Accept':         'application/json'
 		}
 		body:    body
 	}) or {
@@ -149,9 +153,13 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		choices << llms.Choice{
 			content:     content
 			stop_reason: candidate.finish_reason
-			parts:       if content == '' { []schema.ContentPart{} } else { [schema.ContentPart(schema.TextPart{
-				text: content
-			})] }
+			parts:       if content == '' {
+				[]schema.ContentPart{}
+			} else {
+				[schema.ContentPart(schema.TextPart{
+					text: content
+				})]
+			}
 		}
 	}
 	return llms.Response{
@@ -203,13 +211,17 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 		role := match message.role {
 			.human { 'user' }
 			.ai { 'model' }
-			else { return error('Google AI currently supports user, model, and system text messages only') }
+			else {
+				return error('Google AI currently supports user, model, and system text messages only')
+			}
 		}
 		mut parts := []json2.Any{}
 		for part in message.parts {
 			match part {
 				schema.TextPart {
-					parts << json2.Any({'text': json2.Any(part.text)})
+					parts << json2.Any({
+						'text': json2.Any(part.text)
+					})
 				}
 				else { return error('Google AI currently supports text message parts only') }
 			}
@@ -223,11 +235,13 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 		return error('Google AI requires at least one non-system message')
 	}
 	mut request := map[string]json2.Any{
-			'contents': json2.Any(contents)
+		'contents': json2.Any(contents)
 	}
 	if system_text.len > 0 {
 		request['systemInstruction'] = json2.Any({
-			'parts': json2.Any([json2.Any({'text': json2.Any(system_text.join('\n\n'))})])
+			'parts': json2.Any([json2.Any({
+				'text': json2.Any(system_text.join('\n\n'))
+			})])
 		})
 	}
 	mut generation := map[string]json2.Any{}
