@@ -42,6 +42,24 @@ pub fn new_default_client() DefaultClient {
 	return DefaultClient{}
 }
 
+// validate_url accepts HTTP(S) URLs, optionally requiring one exact scheme,
+// and rejects URL user information before credentials can enter a request.
+pub fn validate_url(raw_url string, required_scheme string) ! {
+	parsed_url := urllib.parse(raw_url) or { return error('invalid HTTP URL') }
+	scheme := parsed_url.scheme.to_lower()
+	if scheme !in ['http', 'https'] || parsed_url.host == '' {
+		return error('HTTP URL must use http or https and include a host')
+	}
+	if required_scheme != '' && scheme != required_scheme.to_lower() {
+		return error('HTTP URL must use ${required_scheme}')
+	}
+	scheme_end := raw_url.index('://') or { return error('invalid HTTP URL') }
+	authority := raw_url[scheme_end + 3..].split('/')[0].split('?')[0].split('#')[0]
+	if authority.contains('@') {
+		return error('HTTP URL user information is not allowed')
+	}
+}
+
 // do executes one request. Context cancellation is checked before and after
 // net.http.fetch; an in-flight request is bounded by timeout_ms.
 pub fn (client DefaultClient) do(mut ctx context.Context, request Request) !Response {
@@ -64,13 +82,7 @@ pub fn (client DefaultClient) do(mut ctx context.Context, request Request) !Resp
 	if request.headers.len > 32 {
 		return error('HTTP request has more than 32 custom headers')
 	}
-	parsed_url := urllib.parse(request.url) or { return error('invalid HTTP URL') }
-	if parsed_url.scheme.to_lower() !in ['http', 'https'] || parsed_url.host == '' {
-		return error('HTTP URL must use http or https and include a host')
-	}
-	if _ := parsed_url.user {
-		return error('HTTP URL user information is not allowed')
-	}
+	validate_url(request.url, '')!
 	mut headers := http.Header{}
 	mut user_agent := client.user_agent
 	for key, value in request.headers {

@@ -71,6 +71,22 @@ fn test_default_client_rejects_urls_with_user_information() {
 	assert false, 'expected URL user information to fail'
 }
 
+fn test_url_validation_accepts_http_and_https_without_userinfo() {
+	validate_url('http://localhost:11434/api/chat', '') or { panic(err) }
+	validate_url('https://api.example.test/v1/chat', '') or { panic(err) }
+	validate_url('https://api.example.test/v1/chat', 'https') or { panic(err) }
+	validate_url('https://@api.example.test/v1/chat', '') or {
+		assert err.msg().contains('user information')
+		return
+	}
+	assert false, 'expected even empty URL user information to fail'
+	validate_url('http://localhost:11434/api/chat', 'https') or {
+		assert err.msg().contains('must use https')
+		return
+	}
+	assert false, 'expected the required scheme to be enforced'
+}
+
 fn test_default_client_enforces_request_size_before_network() {
 	mut ctx := context.background()
 	client := DefaultClient{

@@ -4,7 +4,6 @@ module anthropic
 import context
 import encoding.base64
 import json2
-import net.urllib
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -296,16 +295,11 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 				if part.detail != '' {
 					return error('Anthropic image detail hints are not supported')
 				}
-				parsed_url := urllib.parse(part.url) or {
-					return error('Anthropic image URL is invalid')
+				if part.url.len > 8192 {
+					return error('Anthropic image URL must be at most 8192 bytes')
 				}
-				if parsed_url.scheme.to_lower() != 'https' || parsed_url.host == '' || part.url.len > 8192 {
-					return error('Anthropic image URL must be HTTPS, include a host, and be at most 8192 bytes')
-				}
-				if parsed_user := parsed_url.user {
-					if parsed_user.username != '' || parsed_user.password_set {
-						return error('Anthropic image URL user information is not allowed')
-					}
+				httputil.validate_url(part.url, 'https') or {
+					return error('Anthropic image URL must use HTTPS, include a host, and omit user information')
 				}
 				content << json2.Any({
 					'type':   json2.Any('image')
