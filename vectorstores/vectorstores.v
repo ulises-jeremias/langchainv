@@ -66,15 +66,15 @@ pub fn to_retriever(store VectorStore, num_documents int, options SearchOptions)
 // InMemoryVectorStore is a bounded process-local vector store for tests and
 // small workloads. It uses cosine similarity and a caller-provided embedder.
 pub struct InMemoryVectorStore {
-	state   &InMemoryVectorStoreState
+	state    &InMemoryVectorStoreState
 	embedder embeddings.Embedder
 }
 
 struct InMemoryVectorStoreState {
 mut:
-	mutex        sync.Mutex
-	entries      []VectorEntry
-	next_id      u64
+	mutex         sync.Mutex
+	entries       []VectorEntry
+	next_id       u64
 	max_documents int
 }
 
@@ -93,7 +93,7 @@ pub fn new_in_memory_vector_store(embedder embeddings.Embedder, max_documents in
 		return error('maximum document count must be greater than zero')
 	}
 	return InMemoryVectorStore{
-		state: &InMemoryVectorStoreState{
+		state:    &InMemoryVectorStoreState{
 			max_documents: max_documents
 		}
 		embedder: embedder
