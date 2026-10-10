@@ -17,6 +17,14 @@ caps, optional memory, and intermediate-step output. The default caps are 16
 documents and 64 KiB of source and combined mapped text; configured caps are
 limited to 128 documents and 1 MiB. The reducer determines the final outputs.
 
+`new_map_rerank_documents_chain` runs an `LLMChain` once per document and
+expects each completion to contain an answer followed by `Score: <integer>`.
+It sorts results by descending score, returns the best answer under the LLM
+chain's output key, and can include sorted `{answer, score}` intermediate
+steps. It runs sequentially and uses the same default and maximum document
+count and byte caps as map-reduce. Invalid output or non-integer scores fail the
+call.
+
 The retrieval QA variant queries an injected retriever, joins page content into
 the prompt context, and returns a completion. Document count, context bytes,
 and formatted prompt bytes have validated caps. Its prompt must include the
