@@ -254,8 +254,8 @@ fn valid_region(region string) bool {
 	if region == '' || region.contains('.') || region.contains('/') || region.contains(':') {
 		return false
 	}
-	for char in region {
-		if !(char.is_alnum() || char == `-`) {
+	for ch in region {
+		if !(ch.is_alnum() || ch == `-`) {
 			return false
 		}
 	}
