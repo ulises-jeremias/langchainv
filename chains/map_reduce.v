@@ -78,10 +78,9 @@ pub fn new_map_reduce_documents_chain(map_chain LLMChain, reduce_chain Chain, op
 		}
 		outputs << map_reduce_intermediate_steps_key
 	}
-	memory_store := if memory := options.memory {
-		memory
-	} else {
-		reduce_chain.memory()
+	mut memory_store := reduce_chain.memory()
+	if memory := options.memory {
+		memory_store = memory
 	}
 	return MapReduceDocumentsChain{
 		map_chain:       map_chain
