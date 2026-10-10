@@ -29,7 +29,7 @@ The current core packages include:
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, and bounded window buffer.
-- `prompts`: validated string templates.
+- `prompts`: validated string templates and role-tagged chat templates.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
 - `chains`: prompt-backed completion chains, sequential composition, memory
