@@ -137,7 +137,7 @@ pub fn (executor Executor) call(mut ctx context.Context, values map[string]json2
 			if mut active_handler := executor.callbacks_handler {
 				active_handler.tool_start(mut ctx, action.tool_input)
 			}
-			tool_input := action.tool_input.trim_string_right('\nObservation:')
+			tool_input := strip_observation_suffix(action.tool_input)
 			observation := tool.call(mut ctx, tool_input) or {
 				if mut active_handler := executor.callbacks_handler {
 					active_handler.tool_error(mut ctx, err)
@@ -154,6 +154,14 @@ pub fn (executor Executor) call(mut ctx context.Context, values map[string]json2
 		}
 	}
 	return error('agent did not finish within ${executor.max_iterations} iterations')
+}
+
+fn strip_observation_suffix(input string) string {
+	marker := '\nObservation:'
+	if input.ends_with(marker) {
+		return input[..input.len - marker.len]
+	}
+	return input
 }
 
 fn (executor Executor) finish(mut ctx context.Context, finish schema.AgentFinish, steps []schema.AgentStep) !map[string]json2.Any {

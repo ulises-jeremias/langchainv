@@ -188,3 +188,9 @@ fn test_executor_stops_when_iteration_limit_is_reached() {
 	}
 	assert false, 'expected iteration limit error'
 }
+
+fn test_strip_observation_suffix_removes_only_the_exact_suffix() {
+	assert strip_observation_suffix('hello\nObservation:') == 'hello'
+	assert strip_observation_suffix('addition') == 'addition'
+	assert strip_observation_suffix('hello\nObservation: extra') == 'hello\nObservation: extra'
+}
