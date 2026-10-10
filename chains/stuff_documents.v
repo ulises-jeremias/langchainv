@@ -105,10 +105,13 @@ pub fn (chain StuffDocumentsChain) call(mut ctx context.Context, inputs map[stri
 		combined_bytes += page_content.len + separator_bytes
 		contents << page_content
 	}
-	mut values := inputs.clone()
-	values[chain.options.document_variable] = json2.Any(contents.join(chain.options.separator))
-	values.delete(chain.options.input_key)
-	return chain.llm_chain.call(mut ctx, values)
+	mut llm_inputs := map[string]json2.Any{}
+	for key, value in inputs {
+		llm_inputs[key] = value
+	}
+	llm_inputs[chain.options.document_variable] = json2.Any(contents.join(chain.options.separator))
+	llm_inputs.delete(chain.options.input_key)
+	return chain.llm_chain.call(mut ctx, llm_inputs)
 }
 
 // memory returns the inner LLM chain's optional memory.
