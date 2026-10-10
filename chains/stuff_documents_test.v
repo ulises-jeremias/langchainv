@@ -6,6 +6,7 @@ import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.prompts
 import ulises_jeremias.langchainv.schema
 
+@[heap]
 struct StuffCompletionState {
 mut:
 	prompts []string
