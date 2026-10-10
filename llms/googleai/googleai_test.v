@@ -1,6 +1,7 @@
 module googleai
 
 import context
+import json2
 import net.http
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
@@ -101,6 +102,67 @@ fn test_generate_content_hides_http_error_body() {
 		return
 	}
 	assert false, 'expected HTTP error to fail'
+}
+
+fn test_generate_content_sends_tools_and_maps_function_calls() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"functionCall":{"name":"lookup","args":{"q":"v"}}}]},"finishReason":"STOP"}]}', 200)
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'look this up')], llms.CallOptions{
+		tools:       [schema.ToolDefinition{
+			name:        'lookup'
+			description: 'Find a value'
+			parameters:  json2.Any({
+				'type': json2.Any('object')
+			})
+		}]
+		tool_choice: schema.ToolChoice{
+			mode: 'function'
+			name: 'lookup'
+		}
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments.contains('"q":"v"')
+	assert response.assistant_message().parts.len == 1
+	assert state.requests[0].body.contains('"functionDeclarations"')
+	assert state.requests[0].body.contains('"allowedFunctionNames":["lookup"]')
+}
+
+fn test_generate_content_replays_tool_history_and_encodes_inline_image() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"done"}]}}]}', 200)
+	client.generate_content(mut ctx, [
+		schema.Message{
+			role:  .ai
+			parts: [schema.ContentPart(schema.ToolCall{
+				id:            'call-1'
+				call_type:     'function'
+				function_call: schema.FunctionCall{
+					name:      'lookup'
+					arguments: '{"q":"v"}'
+				}
+			})]
+		},
+		schema.Message{
+			role:  .tool
+			parts: [schema.ContentPart(schema.ToolResult{
+				call_id: 'call-1'
+				name:    'lookup'
+				content: 'found'
+			})]
+		},
+		schema.Message{
+			role:  .human
+			parts: [schema.ContentPart(schema.BinaryPart{
+				mime_type: 'image/png'
+				data:      [u8(1), 2]
+			})]
+		},
+	], llms.CallOptions{}) or { panic(err) }
+	assert state.requests[0].body.contains('"functionCall"')
+	assert state.requests[0].body.contains('"functionResponse"')
+	assert state.requests[0].body.contains('"inlineData"')
+	assert state.requests[0].body.contains('"data":"AQI="')
 }
 
 fn test_new_client_rejects_non_https_and_invalid_model() {

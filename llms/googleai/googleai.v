@@ -2,6 +2,7 @@
 module googleai
 
 import context
+import encoding.base64
 import json2
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
@@ -12,6 +13,7 @@ const default_model = 'gemini-3.6-flash'
 const max_messages = 1024
 const max_request_bytes = 8 * 1024 * 1024
 const max_response_bytes = 16 * 1024 * 1024
+const max_inline_image_bytes = 5 * 1024 * 1024
 
 struct CandidateResponse {
 	content       CandidateContent
@@ -23,7 +25,13 @@ struct CandidateContent {
 }
 
 struct CandidatePart {
-	text string
+	text          string
+	function_call ?GoogleFunctionCall @[json: 'functionCall']
+}
+
+struct GoogleFunctionCall {
+	name string
+	args map[string]json2.Any
 }
 
 struct GenerateResponse {
@@ -145,24 +153,39 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		return error('Google AI returned no candidates')
 	}
 	mut choices := []llms.Choice{cap: decoded.candidates.len}
-	for candidate in decoded.candidates {
+	for candidate_index, candidate in decoded.candidates {
 		mut text := []string{}
-		for part in candidate.content.parts {
+		mut choice_parts := []schema.ContentPart{}
+		mut tool_calls := []schema.ToolCall{}
+		for part_index, part in candidate.content.parts {
 			if part.text != '' {
 				text << part.text
+				choice_parts << schema.ContentPart(schema.TextPart{
+					text: part.text
+				})
+			}
+			if function_call := part.function_call {
+				if function_call.name.trim_space() == '' {
+					return error('Google AI returned a function call with an empty name')
+				}
+				arguments := json2.encode(function_call.args, json2.EncoderOptions{})
+				tool_call := schema.ToolCall{
+					id:            'gemini-${candidate_index}-${part_index}'
+					call_type:     'function'
+					function_call: schema.FunctionCall{
+						name:      function_call.name
+						arguments: arguments
+					}
+				}
+				tool_calls << tool_call
+				choice_parts << schema.ContentPart(tool_call)
 			}
 		}
-		content := text.join('')
 		choices << llms.Choice{
-			content:     content
+			content:     text.join('')
 			stop_reason: candidate.finish_reason
-			parts:       if content == '' {
-				[]schema.ContentPart{}
-			} else {
-				[schema.ContentPart(schema.TextPart{
-					text: content
-				})]
-			}
+			tool_calls:  tool_calls
+			parts:       choice_parts
 		}
 	}
 	return llms.Response{
@@ -185,10 +208,25 @@ fn validate_options(options llms.CallOptions) ! {
 	if options.top_k < 0 || options.min_length > 0 || options.max_length > 0
 		|| options.repetition_penalty != 0 || options.frequency_penalty != 0
 		|| options.presence_penalty != 0 || options.seed != none || options.json_mode
-		|| options.response_mime_type != '' || options.tools.len > 0 || options.functions.len > 0
-		|| options.function_call_behavior != '' || options.tool_choice != none
+		|| options.response_mime_type != '' || options.functions.len > 0 || options.function_call_behavior != ''
 		|| options.web_search_options != none || options.provider_options.len > 0 {
-		return error('Google AI requested option is unsupported by the text-only client')
+		return error('Google AI requested option is unsupported by this client')
+	}
+	for tool in options.tools {
+		if tool.strict {
+			return error('Google AI strict tool parameter mode is not supported')
+		}
+	}
+	if choice := options.tool_choice {
+		if options.tools.len == 0 {
+			return error('Google AI tool_choice requires at least one tool definition')
+		}
+		if choice.name != '' && choice.name !in options.tools.map(it.name) {
+			return error('Google AI named tool_choice must match a declared tool')
+		}
+		if choice.mode.to_lower() !in ['auto', 'none', 'any', 'required', 'function', 'tool'] {
+			return error('Google AI tool_choice mode is not supported')
+		}
 	}
 	if _ := options.streaming_func {
 		return error('Google AI streaming is not supported by this bounded transport')
@@ -214,8 +252,9 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 		role := match message.role {
 			.human { 'user' }
 			.ai { 'model' }
+			.tool { 'user' }
 			else {
-				return error('Google AI currently supports user, model, and system text messages only')
+				return error('Google AI currently supports user, model, and system messages only')
 			}
 		}
 		mut parts := []json2.Any{}
@@ -226,7 +265,46 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 						'text': json2.Any(part.text)
 					})
 				}
-				else { return error('Google AI currently supports text message parts only') }
+				schema.BinaryPart {
+					if part.data.len == 0 || part.data.len > max_inline_image_bytes {
+						return error('Google AI inline image must be non-empty and no larger than 5 MiB')
+					}
+					if !part.mime_type.to_lower().starts_with('image/') {
+						return error('Google AI binary message parts must be images')
+					}
+					parts << json2.Any({
+						'inlineData': json2.Any({
+							'mimeType': json2.Any(part.mime_type)
+							'data':     json2.Any(base64.encode(part.data))
+						})
+					})
+				}
+				schema.ToolCall {
+					args := json2.decode[map[string]json2.Any](part.function_call.arguments,
+						json2.DecoderOptions{}) or {
+						return error('Google AI function call history must contain a JSON object')
+					}
+					parts << json2.Any({
+						'functionCall': json2.Any({
+							'name': json2.Any(part.function_call.name)
+							'args': json2.Any(args)
+						})
+					})
+				}
+				schema.ToolResult {
+					parts << json2.Any({
+						'functionResponse': json2.Any({
+							'name':     json2.Any(part.name)
+							'response': json2.Any({
+								'result': json2.Any(part.content)
+							})
+						})
+					})
+				}
+				schema.ImageURLPart {
+					return error('Google AI image URLs must be converted to bounded inline data first')
+				}
+				else { return error('Google AI message part is not supported') }
 			}
 		}
 		contents << json2.Any({
@@ -269,6 +347,45 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 	}
 	if generation.len > 0 {
 		request['generationConfig'] = json2.Any(generation)
+	}
+	if options.tools.len > 0 {
+		mut declarations := []json2.Any{cap: options.tools.len}
+		for tool in options.tools {
+			if tool.name.trim_space() == '' {
+				return error('Google AI tool name must not be empty')
+			}
+			mut declaration := map[string]json2.Any{
+				'name':       json2.Any(tool.name)
+				'parameters': tool.parameters
+			}
+			if tool.description != '' {
+				declaration['description'] = json2.Any(tool.description)
+			}
+			declarations << json2.Any(declaration)
+		}
+		request['tools'] = json2.Any([json2.Any({
+			'functionDeclarations': json2.Any(declarations)
+		})])
+	}
+	if tool_choice := options.tool_choice {
+		mode := if tool_choice.name != '' {
+			'ANY'
+		} else {
+			match tool_choice.mode.to_lower() {
+				'none' { 'NONE' }
+				'any', 'required', 'function', 'tool' { 'ANY' }
+				else { 'AUTO' }
+			}
+		}
+		mut function_calling_config := map[string]json2.Any{
+			'mode': json2.Any(mode)
+		}
+		if tool_choice.name != '' {
+			function_calling_config['allowedFunctionNames'] = json2.Any([json2.Any(tool_choice.name)])
+		}
+		request['toolConfig'] = json2.Any({
+			'functionCallingConfig': json2.Any(function_calling_config)
+		})
 	}
 	return request
 }
