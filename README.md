@@ -33,7 +33,7 @@ The current core packages include:
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
 - `jsonschema`: a validated, recursive subset for tool parameter schemas.
-- `chains`: prompt-backed completion and chat-model chains, document stuffing, sequential map-reduce and map-rerank, retrieval QA, sequential composition, memory
+- `chains`: prompt-backed completion and chat-model chains, document stuffing, sequential map-reduce, map-rerank and refine, retrieval QA, sequential composition, memory
   loading, bounded conversational retrieval QA, and input/output validation.
 - `agents`: tool-calling agent and bounded executor with tool dispatch,
   callbacks, memory integration, and optional intermediate-step output.

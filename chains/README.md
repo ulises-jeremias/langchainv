@@ -25,6 +25,13 @@ steps. It runs sequentially and uses the same default and maximum document
 count and byte caps as map-reduce. Invalid output or non-integer scores fail the
 call.
 
+`new_refine_documents_chain` formats the first document, creates an initial
+answer, then calls a second `LLMChain` with the previous answer and each later
+document. Its document prompt can use `page_content` and document metadata.
+Caller-supplied inputs needed by either prompt pass through to both chains. It
+requires at least one document and bounds document count, source
+bytes, and formatted document bytes before calling either model.
+
 The retrieval QA variant queries an injected retriever, joins page content into
 the prompt context, and returns a completion. Document count, context bytes,
 and formatted prompt bytes have validated caps. Its prompt must include the
