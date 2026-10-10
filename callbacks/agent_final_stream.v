@@ -3,7 +3,7 @@ module callbacks
 
 import context
 
-const default_final_keywords = ['Final Answer:', 'Final:', 'AI:']
+pub const default_final_keywords = ['Final Answer:', 'Final:', 'AI:']
 const final_stream_buffer_capacity = 64
 const max_final_stream_chunk_bytes = 65536
 
@@ -11,8 +11,9 @@ const max_final_stream_chunk_bytes = 65536
 // The egress queue is bounded; chunks are counted as dropped if its consumer falls behind.
 pub struct AgentFinalStreamHandler {
 	SimpleHandler
+pub:
+	keywords []string
 pub mut:
-	keywords       []string
 	dropped_chunks u64
 	dropped_bytes  u64
 mut:
