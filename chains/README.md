@@ -10,6 +10,10 @@ between ordered child chains. Each child receives the original inputs and all
 values produced by earlier children. The result contains only the selected
 output keys.
 
+`new_simple_sequential_chain(children)` handles chains that each have one
+input and one output. It passes the value through using the standard `input`
+and `output` keys, regardless of each child's internal key names.
+
 The chain uses default `llms.CallOptions`. Change `options` before execution to
 set provider-neutral controls. The broader LangChainGo chain family remains
 tracked in the parity ledger.

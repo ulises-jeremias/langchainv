@@ -94,3 +94,66 @@ pub fn (chain SequentialChain) input_keys() []string {
 pub fn (chain SequentialChain) output_keys() []string {
 	return chain.output_variables.clone()
 }
+
+// SimpleSequentialChain composes single-input, single-output child chains.
+pub struct SimpleSequentialChain {
+pub mut:
+	chains       []Chain
+	memory_store ?schema.Memory
+}
+
+// new_simple_sequential_chain validates that every child has one input and output.
+pub fn new_simple_sequential_chain(child_chains []Chain) !SimpleSequentialChain {
+	if child_chains.len == 0 {
+		return error('simple sequential chain requires at least one child chain')
+	}
+	for index, chain in child_chains {
+		child_inputs := chain.input_keys()
+		if child_inputs.len != 1 {
+			return error('chain at index ${index} must declare exactly one input')
+		}
+		child_outputs := chain.output_keys()
+		if child_outputs.len != 1 {
+			return error('chain at index ${index} must declare exactly one output')
+		}
+		if child_inputs[0].trim_space() == '' || child_outputs[0].trim_space() == '' {
+			return error('chain at index ${index} input and output keys must be non-empty')
+		}
+	}
+	return SimpleSequentialChain{
+		chains: child_chains.clone()
+	}
+}
+
+// call passes one value through each child and returns it as `output`.
+pub fn (chain SimpleSequentialChain) call(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	mut value := inputs['input'] or { return error('missing simple sequential chain input `input`') }
+	for child in chain.chains {
+		keys := child.input_keys()
+		mut child_inputs := map[string]json2.Any{}
+		child_inputs[keys[0]] = value
+		child_outputs := call(mut ctx, child, child_inputs)!
+		output_key := child.output_keys()[0]
+		value = child_outputs[output_key] or {
+			return error('chain did not produce declared output `${output_key}`')
+		}
+	}
+	return {
+		'output': value
+	}
+}
+
+// memory returns optional memory shared by the simple sequential chain wrapper.
+pub fn (chain SimpleSequentialChain) memory() ?schema.Memory {
+	return chain.memory_store
+}
+
+// input_keys returns the single input name used by this chain.
+pub fn (chain SimpleSequentialChain) input_keys() []string {
+	return ['input']
+}
+
+// output_keys returns the single output name used by this chain.
+pub fn (chain SimpleSequentialChain) output_keys() []string {
+	return ['output']
+}
