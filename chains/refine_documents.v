@@ -23,7 +23,7 @@ pub:
 	max_documents         int = 16
 	max_document_bytes    int = 65536
 pub mut:
-	document_prompt       prompts.StringTemplate
+	document_prompt prompts.StringTemplate
 }
 
 // RefineDocumentsChain starts with the first document, then revises the answer.
