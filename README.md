@@ -33,7 +33,7 @@ The current core packages include:
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
 - `chains`: prompt-backed completion and chat-model chains, retrieval QA, sequential composition, memory
-  loading, and input/output validation.
+  loading, bounded conversational retrieval QA, and input/output validation.
 - `agents`: tool-calling agent and bounded executor with tool dispatch,
   callbacks, memory integration, and optional intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
