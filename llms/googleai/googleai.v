@@ -73,7 +73,10 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, 'https') or { return error('invalid Google AI base URL: ${err.msg()}') }
-	model := options.model.trim_space().trim_prefix('models/')
+	mut model := options.model.trim_space()
+	if model.starts_with('models/') {
+		model = model['models/'.len..]
+	}
 	if model == '' || model.contains('/') || model.contains('?') || model.contains('#') {
 		return error('Google AI model must be a single model identifier')
 	}
