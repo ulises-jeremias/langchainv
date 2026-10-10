@@ -14,6 +14,10 @@ output keys.
 input and one output. It passes the value through using the standard `input`
 and `output` keys, regardless of each child's internal key names.
 
+`new_transform_chain(fn, input_keys, output_keys)` adapts a caller-supplied V
+function. It gives the function a copy of the input map and checks that all
+declared outputs exist before returning.
+
 The chain uses default `llms.CallOptions`. Change `options` before execution to
 set provider-neutral controls. The broader LangChainGo chain family remains
 tracked in the parity ledger.
