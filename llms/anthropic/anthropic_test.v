@@ -77,6 +77,51 @@ fn test_generate_content_maps_tool_use_blocks() {
 	assert response.choices[0].tool_calls[0].function_call.arguments.contains('"query":"v"')
 }
 
+fn test_generate_content_encodes_remote_and_inline_images() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"content":[{"type":"text","text":"seen"}]}', 200)
+	message := schema.Message{
+		role:  .human
+		parts: [
+			schema.ContentPart(schema.TextPart{
+				text: 'Describe these.'
+			}),
+			schema.ContentPart(schema.ImageURLPart{
+				url: 'https://example.test/image.png'
+			}),
+			schema.ContentPart(schema.BinaryPart{
+				mime_type: 'image/png'
+				data:      [u8(1), 2]
+			}),
+		]
+	}
+	client.generate_content(mut ctx, [message], llms.CallOptions{}) or { panic(err) }
+	assert state.requests[0].body.contains('"type":"url"')
+	assert state.requests[0].body.contains('"url":"https://example.test/image.png"')
+	assert state.requests[0].body.contains('"type":"base64"')
+	assert state.requests[0].body.contains('"media_type":"image/png"')
+	assert state.requests[0].body.contains('"data":"AQI="')
+}
+
+fn test_generate_content_rejects_unsafe_image_urls() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	message := schema.Message{
+		role:  .human
+		parts: [
+			schema.ContentPart(schema.ImageURLPart{
+				url: 'http://example.test/image.png'
+			}),
+		]
+	}
+	client.generate_content(mut ctx, [message], llms.CallOptions{}) or {
+		assert err.msg().contains('HTTPS')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected non-HTTPS image URL to fail'
+}
+
 fn test_generate_content_encodes_tools_and_choice() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"content":[{"type":"text","text":"ready"}],"stop_reason":"end_turn"}', 200)

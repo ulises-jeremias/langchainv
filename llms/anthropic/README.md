@@ -1,7 +1,8 @@
 # Anthropic Messages
 
 `anthropic.Client` implements `llms.Model` and `llms.CompletionModel` with the
-non-streaming Messages API. It supports text and system messages, client tool
+non-streaming Messages API. It supports text and system messages, HTTPS image
+URLs, inline JPEG/PNG/GIF/WebP images up to 5 MiB each, client tool
 definitions/results, tool-use responses, generation stop sequences, and usage
 accounting. `complete` wraps a prompt as a user message.
 
@@ -11,6 +12,7 @@ transports. The client uses the `x-api-key` and `anthropic-version` headers,
 omits provider error bodies from status errors, and never uses live credentials
 in the test suite.
 
-Streaming, image content, reasoning replay, server tools, and provider-specific
-options are not implemented. Unsupported common options return errors instead
-of being silently ignored.
+Streaming, reasoning replay, server tools, and provider-specific options are
+not implemented. HTTPS image URLs are limited to 8192 bytes and may not include
+user information; image detail hints are rejected. Unsupported common options
+return errors instead of being silently ignored.

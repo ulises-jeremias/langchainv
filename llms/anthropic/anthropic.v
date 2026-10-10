@@ -2,7 +2,9 @@
 module anthropic
 
 import context
+import encoding.base64
 import json2
+import net.urllib
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -11,6 +13,7 @@ const default_base_url = 'https://api.anthropic.com/v1'
 const default_model = 'claude-sonnet-4-6'
 const default_max_tokens = 1024
 const max_response_bytes = 16 * 1024 * 1024
+const max_inline_image_bytes = 5 * 1024 * 1024
 
 // Client implements Anthropic Messages over the bounded injectable transport.
 pub struct Client {
@@ -289,8 +292,42 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 					'content':     json2.Any(part.content)
 				})
 			}
-			schema.ImageURLPart, schema.BinaryPart {
-				return error('Anthropic image messages are not supported yet')
+			schema.ImageURLPart {
+				if part.detail != '' {
+					return error('Anthropic image detail hints are not supported')
+				}
+				parsed_url := urllib.parse(part.url) or {
+					return error('Anthropic image URL is invalid')
+				}
+				if parsed_url.scheme.to_lower() != 'https' || parsed_url.host == '' || part.url.len > 8192 {
+					return error('Anthropic image URL must be HTTPS, include a host, and be at most 8192 bytes')
+				}
+				if _ := parsed_url.user {
+					return error('Anthropic image URL user information is not allowed')
+				}
+				content << json2.Any({
+					'type':   json2.Any('image')
+					'source': json2.Any({
+						'type': json2.Any('url')
+						'url':  json2.Any(part.url)
+					})
+				})
+			}
+			schema.BinaryPart {
+				if part.mime_type !in ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] {
+					return error('Anthropic binary image MIME type is unsupported')
+				}
+				if part.data.len == 0 || part.data.len > max_inline_image_bytes {
+					return error('Anthropic inline image must be between 1 byte and 5 MiB')
+				}
+				content << json2.Any({
+					'type':   json2.Any('image')
+					'source': json2.Any({
+						'type':       json2.Any('base64')
+						'media_type': json2.Any(part.mime_type)
+						'data':       json2.Any(base64.encode(part.data))
+					})
+				})
 			}
 			schema.ThinkingPart, schema.RedactedThinkingPart {
 				return error('Anthropic reasoning message replay is not supported yet')

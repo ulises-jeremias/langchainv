@@ -36,7 +36,7 @@ The inventory is based on upstream commit
 
 | Provider package | Status |
 |---|---|
-| Anthropic | partial: non-streaming Messages API client with text/system messages, client tool definitions and tool-use responses, stop sequences, usage mapping, injectable bounded HTTP transport, and offline fixtures; images, streaming, reasoning replay, and provider-specific options remain outstanding |
+| Anthropic | partial: non-streaming Messages API client with text/system and bounded image messages, client tool definitions and tool-use responses, stop sequences, usage mapping, injectable bounded HTTP transport, and offline fixtures; streaming, reasoning replay, and provider-specific options remain outstanding |
 | AWS Bedrock | not started |
 | Cloudflare | not started |
 | Cohere | not started |
