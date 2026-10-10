@@ -35,7 +35,7 @@ jobs:
         run: |
           make -C vlang
           echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
-          v version
+          ./vlang/v version
 
       - name: Install under the V module path
         run: |
