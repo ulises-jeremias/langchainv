@@ -34,8 +34,8 @@ The current core packages include:
   typed JSON parsers.
 - `chains`: prompt-backed completion chains, sequential composition, memory
   loading, and input/output validation.
-- `agents`: bounded agent executor with tool dispatch, callbacks, memory
-  integration, and optional intermediate-step output.
+- `agents`: tool-calling agent and bounded executor with tool dispatch,
+  callbacks, memory integration, and optional intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, and bounded in-memory cosine store.

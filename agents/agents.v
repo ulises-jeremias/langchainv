@@ -39,14 +39,14 @@ pub:
 
 // Executor runs an agent until it finishes or reaches its iteration bound.
 pub struct Executor {
-pub:
-	agent Agent
-pub mut:
+	// These fields stay private so callers cannot bypass constructor validation.
 	max_iterations            int = default_max_iterations
 	return_intermediate_steps bool
 	call_options              llms.CallOptions
 	memory_store              ?schema.Memory
 	callbacks_handler         ?callbacks.Handler
+pub:
+	agent Agent
 }
 
 // new_executor validates and creates an agent executor.
