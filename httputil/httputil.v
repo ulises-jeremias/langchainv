@@ -68,7 +68,7 @@ pub fn (client DefaultClient) do(mut ctx context.Context, request Request) !Resp
 	if parsed_url.scheme.to_lower() !in ['http', 'https'] || parsed_url.host == '' {
 		return error('HTTP URL must use http or https and include a host')
 	}
-	if parsed_url.user is urllib.Userinfo {
+	if _ := parsed_url.user {
 		return error('HTTP URL user information is not allowed')
 	}
 	mut headers := http.Header{}
