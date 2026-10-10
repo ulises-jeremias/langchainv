@@ -70,3 +70,36 @@ fn test_llm_chain_loads_and_saves_optional_memory() {
 	assert answer.str().contains('Human: first')
 	assert answer.str().ends_with('Question: second')
 }
+
+fn test_conversation_chain_uses_history_and_saves_turns() {
+	mut ctx := context.background()
+	conversation := memory.new_conversation_buffer('history', 'input', 'output') or {
+		panic(err)
+	}
+	mut chain := new_conversation_chain(EchoCompletionModel{}, schema.Memory(conversation)) or {
+		panic(err)
+	}
+	first := call(mut ctx, chain, {
+		'input': json2.Any('first question')
+	}) or { panic(err) }
+	first_answer := first['output'] or { panic('missing first answer') }
+	assert first_answer.str().contains('Current conversation:\n\nHuman: first question')
+	assert chain.input_keys() == ['history', 'input']
+	second := call(mut ctx, chain, {
+		'input': json2.Any('second question')
+	}) or { panic(err) }
+	second_answer := second['output'] or { panic('missing second answer') }
+	assert second_answer.str().contains('Human: first question')
+	assert second_answer.str().ends_with('Human: second question\nAI:')
+}
+
+fn test_conversation_chain_requires_history_memory() {
+	no_history := memory.new_conversation_buffer('context', 'input', 'output') or {
+		panic(err)
+	}
+	new_conversation_chain(EchoCompletionModel{}, schema.Memory(no_history)) or {
+		assert err.msg().contains('history')
+		return
+	}
+	assert false, 'expected conversation chain to require history memory'
+}

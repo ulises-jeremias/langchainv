@@ -11,6 +11,10 @@ The chat-model variant accepts a role-tagged prompt, sends its rendered
 messages to an llms.Model, and returns the first choice's content. It shares
 provider-neutral call options and the chain memory lifecycle.
 
+`new_conversation_chain(model, memory)` creates a completion chain with a
+transcript prompt. Its memory must expose `history` and be configured to save
+the `input` and `output` keys; use `new_llm_chain` for a custom prompt or keys.
+
 `new_llm_chain(model, prompt, output_key)` creates a completion chain from a
 `llms.CompletionModel` and a `prompts.StringTemplate`. Its `input_keys()` come
 from the template. Set `memory_store` before calling the chain to load and save

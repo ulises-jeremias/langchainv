@@ -33,6 +33,20 @@ pub fn new_llm_chain(model llms.CompletionModel, prompt prompts.StringTemplate, 
 	}
 }
 
+// new_conversation_chain creates a completion chain with a transcript prompt
+// and required memory under the `history` key. Configure that memory to save
+// turns from the `input` and `output` keys.
+pub fn new_conversation_chain(model llms.CompletionModel, conversation_memory schema.Memory) !LLMChain {
+	if 'history' !in conversation_memory.memory_keys() {
+		return error('conversation chain memory must provide the `history` key')
+	}
+	mut chain := new_llm_chain(model, prompts.StringTemplate{
+		template: 'The following is a friendly conversation between a human and an AI. The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.\n\nCurrent conversation:\n{history}\nHuman: {input}\nAI:'
+	}, 'output')!
+	chain.memory_store = conversation_memory
+	return chain
+}
+
 // call formats the prompt and returns the model completion under output_key.
 pub fn (chain LLMChain) call(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
 	chain.options.validate()!
