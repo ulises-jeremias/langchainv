@@ -25,7 +25,7 @@ The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
 - `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, Anthropic Messages, and Ollama chat.
-- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI embeddings.
+- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI/Ollama embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, bounded window buffer, and token-bounded buffer with an injected counter.
@@ -63,6 +63,9 @@ See [`chains/README.md`](chains/README.md) for the completion-model chain API.
 
 See [`embeddings/openai/README.md`](embeddings/openai/README.md) for the
 OpenAI embeddings client and its injectable HTTP transport.
+
+See [`embeddings/ollama/README.md`](embeddings/ollama/README.md) for the
+Ollama embeddings client and its injectable HTTP transport.
 
 See [`llms/openai/README.md`](llms/openai/README.md) for OpenAI chat generation,
 tool calls, and multimodal image inputs.
