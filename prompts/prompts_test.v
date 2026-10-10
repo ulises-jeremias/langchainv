@@ -3,6 +3,28 @@ module prompts
 import json2
 import ulises_jeremias.langchainv.schema
 
+struct FixtureExampleSelectorState {
+mut:
+	examples        []map[string]string
+	selected_inputs map[string]string
+}
+
+struct FixtureExampleSelector {
+	state &FixtureExampleSelectorState
+}
+
+fn (selector FixtureExampleSelector) add_example(example map[string]string) string {
+	mut state := selector.state
+	state.examples << example.clone()
+	return 'fixture-' + state.examples.len.str()
+}
+
+fn (selector FixtureExampleSelector) select_examples(input_variables map[string]string) []map[string]string {
+	mut state := selector.state
+	state.selected_inputs = input_variables.clone()
+	return state.examples.clone()
+}
+
 fn test_string_template_format_and_variables() {
 	template := StringTemplate{
 		template: 'Hello, {name}! You have {count} messages.'
@@ -119,4 +141,27 @@ fn test_few_shot_prompt_requires_at_least_one_example() {
 		return
 	}
 	assert false, 'expected empty examples to fail'
+}
+
+fn test_selected_few_shot_prompt_passes_inputs_to_selector() {
+	mut selector_state := &FixtureExampleSelectorState{
+		examples: [
+			{
+				'word':        'hola'
+				'translation': 'hello'
+			},
+		]
+	}
+	selector := FixtureExampleSelector{
+		state: selector_state
+	}
+	prompt := new_selected_few_shot_prompt(StringTemplate{
+		template: '{word} -> {translation}'
+	}, selector, '', 'Translate {word}:', ' / ') or { panic(err) }
+	formatted := prompt.format({
+		'word': json2.Any('gracias')
+	}) or { panic(err) }
+	assert formatted == 'hola -> hello / Translate gracias:'
+	assert selector_state.selected_inputs.len == 1
+	assert selector_state.selected_inputs['word'] == 'gracias'
 }
