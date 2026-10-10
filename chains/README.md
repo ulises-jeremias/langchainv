@@ -1,5 +1,13 @@
 # Chains
 
+`new_stuff_documents_chain` accepts an array created by
+`documents_value(documents)` under `input_documents` by default, joins each
+document's `page_content`, and inserts the result into the configured prompt
+variable (default `context`). Additional prompt variables pass through to the
+inner `LLMChain`. Configure the separator, input/variable names, and document
+count and byte limits with `StuffDocumentsOptions`. Invalid document objects
+and oversized contexts fail before the model call.
+
 The retrieval QA variant queries an injected retriever, joins page content into
 the prompt context, and returns a completion. Document count, context bytes,
 and formatted prompt bytes have validated caps. Its prompt must include the
