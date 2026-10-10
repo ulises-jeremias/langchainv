@@ -25,7 +25,7 @@ The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
 - `llms`: model contracts and provider-neutral generation results.
-- `embeddings`: provider client adapter, bounded batching, vector aggregation, and vector math.
+- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, and bounded window buffer.
@@ -58,6 +58,9 @@ bounded final-answer streaming.
 See [`memory/README.md`](memory/README.md) for full and windowed conversation memory.
 
 See [`chains/README.md`](chains/README.md) for the completion-model chain API.
+
+See [`embeddings/openai/README.md`](embeddings/openai/README.md) for the
+OpenAI embeddings client and its injectable HTTP transport.
 
 ## Compatibility
 
