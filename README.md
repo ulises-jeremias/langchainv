@@ -26,7 +26,7 @@ The current core packages include:
 - `schema`: documents, multimodal messages, and shared interfaces.
 - `llms`: model contracts and provider-neutral generation results.
 - `embeddings`: embedding contracts, batching, and vector math.
-- `tools`: agent tool contracts.
+- `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: in-memory chat history and conversation buffer.
 - `prompts`: validated string templates.
 - `outputparser`: string, boolean, list, regex, structured, combining, and

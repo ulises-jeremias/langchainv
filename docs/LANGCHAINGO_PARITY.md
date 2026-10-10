@@ -25,7 +25,7 @@ The inventory is based on upstream commit
 | `prompts` | prompt values, string/chat/message templates, template formats/rendering, validation, example selectors, few-shot | partial: validated string placeholders and escaping |
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents, typed multimodal messages, memory/history/retriever contracts |
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; package tests and example compilation pass in PR #1 CI (2026-10-09); full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
-| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract |
+| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract and bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, and parentheses; expression length, operation count, and nesting are limited; Starlark math builtins and the remaining integrations are outstanding |
 | `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | not started |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
@@ -65,7 +65,7 @@ Pinecone, Qdrant, Redis, and Weaviate — all not started.
 ## Document loaders and tools
 
 - Loaders still outstanding: AssemblyAI, HTML, Notion, and PDF.
-- Tools still outstanding: calculator, DuckDuckGo, Metaphor, Perplexity, scraper,
+- Tools still outstanding: DuckDuckGo, Metaphor, Perplexity, scraper,
   SerpAPI, SQL database (MySQL/PostgreSQL/SQLite), Wikipedia, and Zapier.
 
 ## Cross-cutting parity requirements
