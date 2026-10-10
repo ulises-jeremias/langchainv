@@ -2,6 +2,7 @@
 module documentloaders
 
 import context
+import encoding.html as html_entities
 import json2
 import net.html
 import ulises_jeremias.langchainv.schema
@@ -46,7 +47,7 @@ pub fn (loader HTMLLoader) load(mut ctx context.Context) ![]schema.Document {
 	root := dom.get_root()
 	body := root.get_tag('body') or { root }
 	return [schema.Document{
-		page_content: body.text().trim_space()
+		page_content: html_entities.unescape(body.text().trim_space(), all: true)
 		metadata:     map[string]json2.Any{}
 	}]
 }

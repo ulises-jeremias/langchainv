@@ -19,7 +19,7 @@ fn test_html_loader_falls_back_to_document_text_and_splits() {
 	splitter := textsplitter.new_recursive_character_text_splitter(
 		chunk_size:    7
 		chunk_overlap: 0
-		separators:    [' ']
+		separators:    [' ', '']
 	) or { panic(err) }
 	mut ctx := context.background()
 	documents := loader.load_and_split(mut ctx, splitter) or { panic(err) }
