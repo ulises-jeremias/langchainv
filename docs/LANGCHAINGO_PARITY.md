@@ -17,7 +17,7 @@ The inventory is based on upstream commit
 | `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; see V-native queue behavior in package docs |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract, input/output validation, prompt-backed completion and chat-model chains, a fixed-prompt completion conversation chain with history memory, bounded retrieval QA with optional source-document return, bounded history-based standalone-question rewriting for conversational retrieval QA, validated sequential composition, simple sequential key adaptation, and function-backed transform chain; other chain types remain outstanding |
 | `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded HTML text, text-file, and CSV loaders; bounded recursive directory traversal for `.txt`, `.md`, `.csv`, `.html`, and `.htm` files with extension filters, CSV columns, source metadata, and bounded splitting; PDF, Notion, and AssemblyAI remain outstanding |
-| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Google AI, Hugging Face, Jina, OpenAI, Ollama, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, OpenAI and Jina `/v1/embeddings`, Ollama `/api/embed`, and Gemini `batchEmbedContents` clients with injectable transport; Bedrock, Cybertron, Hugging Face, and VoyageAI remain outstanding |
+| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Google AI, Hugging Face, Jina, OpenAI, Ollama, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, OpenAI, Jina, and Voyage `/v1/embeddings`, Ollama `/api/embed`, and Gemini `batchEmbedContents` clients with injectable transport; Bedrock, Cybertron, and Hugging Face remain outstanding |
 | `jsonschema` | schema generation and validation helpers | partial: recursive object/array definitions, primitive types, descriptions, string enums, properties, required names, and item schemas with consistency validation; advanced JSON Schema keywords and validation against instance values remain outstanding |
 | `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract, non-streaming OpenAI Chat Completions, Anthropic Messages, and Ollama chat with text, bounded images, client tool calls, usage accounting, and offline transport tests |
 | `memory` | buffer, window buffer, token buffer, simple/chat memory, message history, AlloyDB, Cloud SQL, MongoDB, SQLite, Zep | partial: no-op and fixed-value simple memory, in-memory chat history, conversation buffer, bounded conversation window buffer, and injected-token-counter memory that evicts complete oldest turns; other memory forms and persistent backends remain outstanding |
@@ -58,12 +58,14 @@ OpenAI — partial: JSON float requests, configurable model/base URL/dimensions,
 input-order restoration, and injected HTTP transport. Jina — partial: bounded
 JSON float requests, configurable model/base URL, response-order restoration,
 and injected HTTP transport; task/dimension options and asynchronous batches
-remain outstanding. Ollama — partial: batched
+remain outstanding. VoyageAI — partial: bounded JSON float requests, configurable
+model/base URL, query/document input modes, and injected HTTP transport;
+dimension and task configuration remain outstanding. Ollama — partial: batched
 `/api/embed`, configurable model/base URL, input and response limits, vector
 shape validation, and injected HTTP transport. Google AI — partial: batched
 `batchEmbedContents`, configurable model/base URL/task/dimensions, vector shape
-validation, and injected HTTP transport. Bedrock, Cybertron, Hugging Face, Jina,
-and VoyageAI — not started.
+validation, and injected HTTP transport. Bedrock, Cybertron, and Hugging Face
+remain not started.
 
 ## Vector stores
 

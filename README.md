@@ -25,7 +25,7 @@ The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
 - `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, Anthropic Messages, Ollama chat, and Gemini text/image/function-tool generation.
-- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, and Jina embeddings.
+- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, and Voyage AI embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, bounded window buffer, and token-bounded buffer with an injected counter.
@@ -73,6 +73,9 @@ Gemini batch embeddings client and its injectable HTTP transport.
 
 See [`embeddings/jina/README.md`](embeddings/jina/README.md) for the Jina text
 embeddings client and its injectable HTTP transport.
+
+See [`embeddings/voyageai/README.md`](embeddings/voyageai/README.md) for the
+Voyage AI client and its query/document-specific input modes.
 
 See [`llms/openai/README.md`](llms/openai/README.md) for OpenAI chat generation,
 tool calls, and multimodal image inputs.
