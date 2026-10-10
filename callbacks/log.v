@@ -41,6 +41,10 @@ pub fn (handler LogHandler) llm_generate_content_end(mut ctx context.Context, re
 		if choice.generation_info.len > 0 {
 			println('GenerationInfo: ${choice.generation_info}')
 		}
+		if choice.function_call != none {
+			call := choice.function_call or { schema.FunctionCall{} }
+			println('FuncCall: ${call.name} ${call.arguments}')
+		}
 		for call in choice.tool_calls {
 			println('ToolCall: ${call}')
 		}
