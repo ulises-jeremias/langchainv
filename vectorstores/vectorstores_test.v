@@ -46,9 +46,11 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	assert results.len == 2
 	assert results[0].page_content == 'alpha document'
 	assert results[0].score > results[1].score
-	match results[0].metadata['source'] or { panic('missing nested metadata') } {
+	source_metadata := results[0].metadata['source'] or { panic('missing nested metadata') }
+	match source_metadata {
 		map[string]json2.Any {
-			assert it['origin'] or { panic('missing nested origin') } == json2.Any('original')
+			origin := source_metadata['origin'] or { panic('missing nested origin') }
+			assert origin == json2.Any('original')
 		}
 		else {
 			assert false, 'expected nested metadata map'
