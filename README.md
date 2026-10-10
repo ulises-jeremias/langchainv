@@ -27,7 +27,7 @@ The current core packages include:
 - `llms`: model contracts and provider-neutral generation results.
 - `embeddings`: embedding contracts, batching, and vector math.
 - `tools`: agent tool contract and bounded arithmetic calculator.
-- `memory`: in-memory chat history, conversation buffer, and bounded window buffer.
+- `memory`: no-op memory, in-memory chat history, conversation buffer, and bounded window buffer.
 - `prompts`: validated string templates.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.

@@ -87,3 +87,15 @@ fn test_conversation_window_buffer_defaults_and_limits_window_size() {
 	}
 	assert false, 'expected oversized window to fail'
 }
+
+fn test_simple_memory_implements_no_op_memory_contract() {
+	mut ctx := context.background()
+	mut memory_contract := schema.Memory(new_simple_memory())
+	assert memory_contract.memory_keys().len == 0
+	loaded := memory_contract.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	assert loaded.len == 0
+	memory_contract.save_context(mut ctx, map[string]json2.Any{}, map[string]json2.Any{}) or {
+		panic(err)
+	}
+	memory_contract.clear(mut ctx) or { panic(err) }
+}
