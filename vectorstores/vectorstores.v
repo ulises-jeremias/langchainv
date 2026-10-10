@@ -256,13 +256,35 @@ fn metadata_matches(metadata map[string]json2.Any, filter map[string]json2.Any) 
 }
 
 fn clone_document(document schema.Document) schema.Document {
-	mut metadata := map[string]json2.Any{}
-	for key, value in document.metadata {
-		metadata[key] = value
-	}
 	return schema.Document{
 		page_content: document.page_content
-		metadata:     metadata
+		metadata:     clone_metadata(document.metadata)
 		score:        document.score
+	}
+}
+
+fn clone_metadata(metadata map[string]json2.Any) map[string]json2.Any {
+	mut cloned := map[string]json2.Any{}
+	for key, value in metadata {
+		cloned[key] = clone_json_value(value)
+	}
+	return cloned
+}
+
+fn clone_json_value(value json2.Any) json2.Any {
+	match value {
+		[]json2.Any {
+			mut cloned := []json2.Any{cap: value.len}
+			for item in value {
+				cloned << clone_json_value(item)
+			}
+			return json2.Any(cloned)
+		}
+		map[string]json2.Any {
+			return json2.Any(clone_metadata(value))
+		}
+		else {
+			return value
+		}
 	}
 }

@@ -27,10 +27,14 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	mut store := new_in_memory_vector_store(FixtureEmbedder{}, 3) or { panic(err) }
 	mut first := schema.new_document('alpha document')
 	first.metadata['kind'] = json2.Any('guide')
+	mut nested_metadata := map[string]json2.Any{}
+	nested_metadata['origin'] = json2.Any('original')
+	first.metadata['source'] = json2.Any(nested_metadata)
 	second := schema.new_document('beta document')
 	store.add_documents(mut ctx, [first, second], StoreOptions{
 		namespace: 'docs'
 	}) or { panic(err) }
+	nested_metadata['origin'] = json2.Any('changed')
 	third := schema.new_document('another alpha')
 	store.add_documents(mut ctx, [third], StoreOptions{
 		namespace: 'other'
@@ -42,6 +46,15 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	assert results.len == 2
 	assert results[0].page_content == 'alpha document'
 	assert results[0].score > results[1].score
+	match results[0].metadata['source'] or { panic('missing nested metadata') } {
+		map[string]json2.Any {
+			assert it['origin'] or { panic('missing nested origin') } == json2.Any('original')
+		}
+		else {
+			assert false, 'expected nested metadata map'
+		}
+	}
+	results[0].metadata['kind'] = json2.Any('changed result')
 	options.filter['kind'] = json2.Any('guide')
 	filtered := store.similarity_search(mut ctx, 'alpha query', 2, options) or { panic(err) }
 	assert filtered.len == 1
