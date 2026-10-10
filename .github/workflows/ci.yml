@@ -38,7 +38,7 @@ jobs:
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
           v fmt -verify .
-          for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders textsplitter; do
+          for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders textsplitter httputil; do
             v test "./$package"
           done
           v -o /tmp/langchainv-text-splitter examples/text_splitter/main.v

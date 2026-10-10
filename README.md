@@ -25,7 +25,8 @@ The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
 - `llms`: model contracts and provider-neutral generation results.
-- `embeddings`: embedding contracts, batching, and vector math.
+- `embeddings`: provider client adapter, bounded batching, vector aggregation, and vector math.
+- `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, and bounded window buffer.
 - `prompts`: validated string templates.
