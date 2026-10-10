@@ -4,7 +4,6 @@ module chains
 import context
 import json2
 import strconv
-import ulises_jeremias.langchainv.outputparser
 import ulises_jeremias.langchainv.schema
 
 const default_map_rerank_input_key = 'input_documents'
@@ -88,26 +87,20 @@ pub fn new_map_rerank_documents_chain(llm_chain LLMChain, options MapRerankDocum
 }
 
 fn parse_map_rerank_result(text string, answer_key string, rank_key string) !RankedMapRerankResult {
-	parser := outputparser.new_regex_parser(r'\s*(?P<answer>.*?)\nScore: (?P<score>.*)')!
-	parsed := parser.parse(text)!
-	if parsed !is map[string]json2.Any {
-		return error('map-rerank output parser did not return a named result map')
+	score_marker := '\nScore: '
+	score_index := text.index(score_marker) or {
+		return error('map-rerank output is missing `${rank_key}` after an answer')
 	}
-	values := parsed as map[string]json2.Any
-	answer_value := values[answer_key] or {
+	answer := text[..score_index].trim_space()
+	if answer == '' {
 		return error('map-rerank output is missing answer key `${answer_key}`')
 	}
-	score_value := values[rank_key] or {
-		return error('map-rerank output is missing rank key `${rank_key}`')
-	}
-	if answer_value !is string || score_value !is string {
-		return error('map-rerank answer and score outputs must be strings')
-	}
-	score := strconv.atoi((score_value as string).trim_space()) or {
+	score_text := text[score_index + score_marker.len..].trim_space()
+	score := strconv.atoi(score_text) or {
 		return error('map-rerank score must be an integer')
 	}
 	return RankedMapRerankResult{
-		answer: answer_value as string
+		answer: answer
 		score:  score
 	}
 }
