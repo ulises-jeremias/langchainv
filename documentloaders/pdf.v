@@ -62,6 +62,9 @@ pub fn new_pdf_loader(path string, options PDFLoaderOptions) !PDFLoader {
 	executable_path := os.find_abs_path_of_executable(executable) or {
 		return error('pdftotext executable was not found or is not executable')
 	}
+	if !os.is_file(executable_path) || !os.is_executable(executable_path) {
+		return error('pdftotext executable was not found or is not executable')
+	}
 	return PDFLoader{
 		path:             path
 		executable_path:  executable_path

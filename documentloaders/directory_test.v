@@ -4,6 +4,32 @@ import context
 import os
 import ulises_jeremias.langchainv.textsplitter
 
+fn create_directory_pdf_fixture(path string, contents string) ! {
+	stream := 'BT /F1 12 Tf 72 720 Td (${contents}) Tj ET\n'
+	objects := [
+		'<< /Type /Catalog /Pages 2 0 R >>',
+		'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+		'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+		'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+		'<< /Length ${stream.len} >>\nstream\n${stream}endstream',
+	]
+	mut pdf := '%PDF-1.4\n'
+	mut offsets := []int{}
+	for i, object in objects {
+		offsets << pdf.len
+		pdf += '${i + 1} 0 obj\n${object}\nendobj\n'
+	}
+	xref_offset := pdf.len
+	pdf += 'xref\n0 6\n0000000000 65535 f \n'
+	for offset in offsets {
+		value := offset.str()
+		padding := '0'.repeat(10 - value.len)
+		pdf += '${padding}${value} 00000 n \n'
+	}
+	pdf += 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref_offset}\n%%EOF\n'
+	os.write_file(path, pdf)!
+}
+
 fn create_directory_loader_fixture() !string {
 	root := os.join_path(os.temp_dir(), 'langchainv-directory-loader-${os.getpid()}')
 	os.rmdir_all(root) or {}
@@ -80,11 +106,8 @@ fn test_recursive_directory_loader_loads_pdf_with_source_metadata() {
 	defer {
 		os.rmdir_all(root) or {}
 	}
-	pdf_path := create_pdf_loader_fixture('PDF directory text') or { panic(err) }
-	defer {
-		os.rm(pdf_path) or {}
-	}
-	os.mv(pdf_path, os.join_path(root, 'document.pdf')) or { panic(err) }
+	pdf_path := os.join_path(root, 'document.pdf')
+	create_directory_pdf_fixture(pdf_path, 'PDF directory text') or { panic(err) }
 	loader := new_recursive_directory_loader(root: root, allowed_extensions: ['pdf']) or {
 		panic(err)
 	}
