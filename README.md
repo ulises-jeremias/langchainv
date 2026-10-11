@@ -39,7 +39,7 @@ The current core packages include:
   callbacks, memory integration, and optional intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
-- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Qdrant REST integration.
+- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Qdrant and Pinecone REST integrations.
 - `documentloaders`: size-bounded HTML, text-file, and CSV content loaders plus a
   bounded recursive directory loader for text, Markdown, CSV, and HTML files.
 - `textsplitter`: recursive character and tokenizer-injected token chunks, plus
@@ -120,6 +120,9 @@ generation and its supported options.
 
 See [`vectorstores/qdrant/README.md`](vectorstores/qdrant/README.md) for the
 Qdrant REST adapter and its collection requirements.
+
+See [`vectorstores/pinecone/README.md`](vectorstores/pinecone/README.md) for the
+Pinecone index host and metadata requirements.
 
 ## Compatibility
 

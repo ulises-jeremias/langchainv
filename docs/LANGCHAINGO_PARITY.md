@@ -26,7 +26,7 @@ The inventory is based on upstream commit
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents, typed multimodal messages, memory/history/retriever contracts |
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; package tests and example compilation pass in PR #1 CI (2026-10-09); full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
 | `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, and parentheses, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, and Zapier MCP Streamable HTTP tool discovery/calls; integrations use injectable HTTP transport and bounded inputs/responses; Starlark math builtins and remaining integrations are outstanding |
-| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Qdrant REST adapter with injected embeddings, payload equality filters, namespaces, and UUID deletes; persistent stores beyond Qdrant and full filter/distance parity remain outstanding |
+| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Qdrant/Pinecone REST adapters with injected embeddings, namespaces, and metadata filters; persistent stores beyond these and full filter/distance parity remain outstanding |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, and request/response byte and timeout limits; redacted debug logging remains outstanding |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | not started |
@@ -81,12 +81,16 @@ wrapping training layers or downloading weights during ordinary checks.
 
 AlloyDB, Azure AI Search, Bedrock Knowledge Bases, Chroma, Cloud SQL, Dolt,
 MariaDB, Milvus (including v2), MongoDB vector search, OpenSearch, pgvector,
-Pinecone, Redis, and Weaviate remain not started. Qdrant — partial: REST
+Redis, and Weaviate remain not started. Qdrant — partial: REST
 upsert/query/delete against existing single-vector collections, API-key or
 HTTPS authentication, payload metadata filters, namespaces, injected
 embeddings/transport, and bounded requests; collection management, named or
 multi-vector search, the full filter DSL, custom point IDs, and vector return
-remain outstanding.
+remain outstanding. Pinecone — partial: HTTPS upsert/query/delete against
+provisioned index hosts, API-key auth, namespaces, scalar metadata equality
+filters, injected embeddings/transport, and bounded requests; index management,
+sparse/hybrid vectors, full filter operators, integrated text inference, and
+vector return remain outstanding.
 
 ## Document loaders and tools
 
