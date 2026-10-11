@@ -17,9 +17,27 @@ mut:
 	response httputil.Response
 }
 
+struct StreamCapture {
+mut:
+	value string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	return state.response
+}
+
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 13 < body.len { offset + 13 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
 	return state.response
 }
 
@@ -144,18 +162,38 @@ fn test_generate_content_encodes_inline_image_and_json_mode() {
 	assert state.requests[0].body.contains('"images":["AQI="]')
 }
 
-fn test_generate_content_rejects_unsupported_options_before_network() {
+fn test_generate_content_rejects_unsupported_provider_options_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
-	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
 	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		streaming_func: stream
+		provider_options: {
+			'unsupported': json2.Any(true)
+		}
 	}) or {
-		assert err.msg().contains('streaming is not supported')
+		assert err.msg().contains('provider_options are not supported')
 		assert state.requests.len == 0
 		return
 	}
-	assert false, 'expected streaming to be rejected'
+	assert false, 'expected unsupported provider options to be rejected'
+}
+
+fn test_generate_content_streams_ndjson_content_and_usage() {
+	mut ctx := context.background()
+	body := '{"message":{"content":"hel"},"done":false}\n{"message":{"content":"lo"},"done":false}\n{"message":{},"done":true,"done_reason":"stop","prompt_eval_count":2,"eval_count":2}\n'
+	client, state := new_fixture_client(body, 200)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'stop'
+	assert response.usage.total_tokens == 4
+	assert state.requests[0].body.contains('"stream":true')
+	assert (state.requests[0].headers['Accept'] or { '' }) == 'application/x-ndjson'
 }
 
 fn test_generate_content_bounds_message_count_before_network() {

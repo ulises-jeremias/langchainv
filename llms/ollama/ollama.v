@@ -1,4 +1,4 @@
-// Package ollama implements non-streaming Ollama chat generation.
+// Package ollama implements Ollama chat generation.
 module ollama
 
 import context
@@ -39,6 +39,19 @@ struct ChatResponse {
 	done_reason       string
 	prompt_eval_count int
 	eval_count        int
+}
+
+struct OllamaStreamState {
+mut:
+	buffer          string
+	content         string
+	thinking        string
+	tool_calls      []ChatToolCall
+	done_reason     string
+	prompt_tokens   int
+	completion_tokens int
+	received_bytes  i64
+	error           string
 }
 
 struct ChatMessage {
@@ -94,7 +107,7 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 	return response.choices[0].content
 }
 
-// generate_content implements non-streaming Ollama /api/chat requests.
+// generate_content implements streaming and non-streaming Ollama /api/chat requests.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	if messages.len > max_chat_messages {
@@ -115,6 +128,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		options.model.trim_space()
 	}
 	request := make_request(client, model, messages, options)!
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
 	body := json2.encode(request, json2.EncoderOptions{})
 	if body.len > max_request_bytes {
 		return error('Ollama chat request exceeds the 8 MiB size limit')
@@ -143,8 +162,11 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	decoded := json2.decode[ChatResponse](response.body, json2.DecoderOptions{}) or {
 		return error('could not decode Ollama chat response: ${err.msg()}')
 	}
-	if decoded.message.content == '' && decoded.message.thinking == ''
-		&& decoded.message.tool_calls.len == 0 {
+	return response_from_chat(decoded)!
+}
+
+fn response_from_chat(decoded ChatResponse) !llms.Response {
+	if decoded.message.content == '' && decoded.message.thinking == '' && decoded.message.tool_calls.len == 0 {
 		return error('Ollama returned an empty chat response')
 	}
 	mut tool_calls := []schema.ToolCall{cap: decoded.message.tool_calls.len}
@@ -192,13 +214,115 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	}
 }
 
+fn (client Client) generate_stream(mut ctx context.Context, request map[string]json2.Any, options llms.CallOptions) !llms.Response {
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Ollama HTTP transport does not support streaming responses')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut stream_request := map[string]json2.Any{}
+	for key, value in request {
+		stream_request[key] = value
+	}
+	stream_request['stream'] = json2.Any(true)
+	body := json2.encode(stream_request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('Ollama chat request exceeds the 8 MiB size limit')
+	}
+	mut state := &OllamaStreamState{}
+	mut process_line := fn [options, mut state] (mut callback_ctx context.Context, line string) {
+		if line.trim_space() == '' {
+			return
+		}
+		chunk := json2.decode[ChatResponse](line, json2.DecoderOptions{}) or {
+			state.error = 'could not decode Ollama streaming response'
+			return
+		}
+		if chunk.message.content != '' {
+			state.content += chunk.message.content
+			if callback := options.streaming_func {
+				callback(mut callback_ctx, chunk.message.content.bytes()) or {
+					state.error = 'Ollama streaming callback failed: ${err.msg()}'
+					return
+				}
+			}
+		}
+		if chunk.message.thinking != '' {
+			state.thinking += chunk.message.thinking
+			if callback := options.streaming_reasoning_func {
+				callback(mut callback_ctx, chunk.message.thinking.bytes(), chunk.message.content.bytes()) or {
+					state.error = 'Ollama reasoning callback failed: ${err.msg()}'
+					return
+				}
+			}
+		} else if chunk.message.content != '' {
+			if callback := options.streaming_reasoning_func {
+				callback(mut callback_ctx, []u8{}, chunk.message.content.bytes()) or {
+					state.error = 'Ollama reasoning callback failed: ${err.msg()}'
+					return
+				}
+			}
+		}
+		if chunk.message.tool_calls.len > 0 {
+			state.tool_calls = chunk.message.tool_calls
+		}
+		if chunk.done_reason != '' {
+			state.done_reason = chunk.done_reason
+		}
+		if chunk.prompt_eval_count > 0 {
+			state.prompt_tokens = chunk.prompt_eval_count
+		}
+		if chunk.eval_count > 0 {
+			state.completion_tokens = chunk.eval_count
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/api/chat'
+		headers: {
+			'Content-Type': 'application/json'
+			'Accept':       'application/x-ndjson'
+		}
+		body:    body
+	}, fn [mut state, mut process_line] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Ollama chat response exceeds the 16 MiB size limit')
+		}
+		state.buffer += bytes.bytestr()
+		for {
+			line_end := state.buffer.index('\n') or { break }
+			line := state.buffer[..line_end].trim_right('\r')
+			state.buffer = state.buffer[line_end + 1..]
+			process_line(mut callback_ctx, line)
+			if state.error != '' {
+				return error(state.error)
+			}
+		}
+	}) or {
+		return error('Ollama chat stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Ollama chat request returned HTTP ${response.status_code}')
+	}
+	if state.buffer.trim_space() != '' {
+		process_line(mut ctx, state.buffer.trim_right('\r'))
+	}
+	if state.error != '' {
+		return error(state.error)
+	}
+	return response_from_chat(ChatResponse{
+		message: ChatMessage{
+			content: state.content
+			thinking: state.thinking
+			tool_calls: state.tool_calls
+		}
+		done_reason: state.done_reason
+		prompt_eval_count: state.prompt_tokens
+		eval_count: state.completion_tokens
+	})
+}
+
 fn validate_call_options(options llms.CallOptions) ! {
-	if _ := options.streaming_func {
-		return error('Ollama streaming is not supported by the bounded HTTP transport')
-	}
-	if _ := options.streaming_reasoning_func {
-		return error('Ollama streaming is not supported by the bounded HTTP transport')
-	}
 	if options.provider_options.len > 0 {
 		return error('Ollama provider_options are not supported; use typed call options')
 	}
