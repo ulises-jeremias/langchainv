@@ -43,7 +43,7 @@ The current core packages include:
   intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
-- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Qdrant, Pinecone, and Weaviate REST integrations.
+- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, Qdrant, Pinecone, and Weaviate REST integrations.
 - `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders
   plus a bounded recursive directory loader for those file types. PDF extraction
   requires Poppler's `pdftotext` executable.
@@ -140,6 +140,9 @@ Pinecone index host and metadata requirements.
 
 See [`vectorstores/weaviate/README.md`](vectorstores/weaviate/README.md) for
 Weaviate class, namespace, and filter requirements.
+
+See [`vectorstores/milvus/README.md`](vectorstores/milvus/README.md) for the
+Milvus REST v2 adapter and collection schema requirements.
 
 ## Compatibility
 

@@ -26,7 +26,7 @@ The inventory is based on upstream commit
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents, typed multimodal messages, memory/history/retriever contracts |
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; package tests and example compilation pass in PR #1 CI (2026-10-09); full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
 | `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, parentheses, and the Starlark math module's functions/constants, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, Zapier MCP Streamable HTTP tool discovery/calls, and SQLDatabase table inventory/schema/sample/query APIs over V's SQLite driver with optional PostgreSQL/MySQL drivers; SQL tests use in-memory SQLite, while database driver calls materialize rows before output caps and cannot be interrupted mid-query through `context.Context` |
-| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Chroma/Qdrant/Pinecone/Weaviate REST adapters with injected embeddings, namespaces, and metadata filters; persistent stores beyond these and full filter/distance parity remain outstanding |
+| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Chroma/Milvus/Qdrant/Pinecone/Weaviate REST adapters with injected embeddings, namespaces, and metadata filters; persistent stores beyond these and full filter/distance parity remain outstanding |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, request/response byte and timeout limits, bounded incremental response callbacks, a chunk-independent SSE decoder, and redacted logging decorators for streaming and non-streaming clients |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | partial: opt-in core generation and canceled-context checks, with capability checks for multiturn history, streaming chunks/error propagation, tool-call JSON/replay, and typed token usage; CI tests use deterministic offline model doubles, and calling `test_model` against a live provider is explicit |
@@ -80,8 +80,8 @@ wrapping training layers or downloading weights during ordinary checks.
 ## Vector stores
 
 AlloyDB, Azure AI Search, Bedrock Knowledge Bases, Cloud SQL, Dolt, MariaDB,
-Milvus (including v2), MongoDB vector search, OpenSearch, pgvector, and Redis
-remain not started. Chroma — partial: v2 REST create/get-or-create and
+MongoDB vector search, OpenSearch, pgvector, and Redis remain not started.
+Chroma — partial: v2 REST create/get-or-create and
 delete collection management, upsert/query/delete, injected embeddings and
 HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
 equality filters, namespaces, score thresholds, and bounded payloads; custom
@@ -97,6 +97,11 @@ provisioned index hosts, API-key auth, namespaces, scalar metadata equality
 filters, injected embeddings/transport, and bounded requests; index management,
 sparse/hybrid vectors, full filter operators, integrated text inference, and
 vector return remain outstanding.
+Milvus — partial: REST v2 insert/search/delete against an existing collection,
+bearer-token auth, scalar metadata equality filters, namespaces, COSINE/IP/L2
+metric selection, injected embeddings/transport, and bounded requests; schema
+management, collection administration, advanced filters, minimum-score
+filtering for L2, and vector return remain outstanding.
 Weaviate — partial: batch object upsert and delete against a provisioned class,
 GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
 certainty thresholds, injected embeddings/transport, and bounded requests;
