@@ -45,7 +45,9 @@ pub fn new_store(embedder embeddings.Embedder, options Options) !Store {
 		return error('Pinecone index host is required and must be at most 2048 bytes')
 	}
 	httputil.validate_url(host, 'https')!
-	if host.contains('/') || host.contains('?') || host.contains('#') {
+	scheme_end := host.index('://') or { return error('Pinecone index host is invalid') }
+	authority := host[scheme_end + 3..]
+	if authority.contains('/') || authority.contains('?') || authority.contains('#') {
 		return error('Pinecone index host must not contain a path, query, or fragment')
 	}
 	return Store{
