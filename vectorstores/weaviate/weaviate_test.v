@@ -1,6 +1,7 @@
 module weaviate
 
 import context
+import json2
 import net.http
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.schema
@@ -90,7 +91,7 @@ fn test_weaviate_similarity_search_maps_certainty_and_metadata() {
 	assert documents.len == 1
 	assert documents[0].page_content == 'answer'
 	assert documents[0].score > f32(0.89) && documents[0].score < f32(0.91)
-	assert documents[0].metadata['category'] == 'guide'
+	assert (documents[0].metadata['category'] or { json2.Any('') }) == json2.Any('guide')
 	request := state.requests[0]
 	assert request.url.ends_with('/v1/graphql')
 	assert request.body.contains('nearVector')
