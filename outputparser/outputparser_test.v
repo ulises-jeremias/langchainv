@@ -87,6 +87,12 @@ struct DefinedExampleChild {
 	detail string
 }
 
+enum DefinedTone {
+	red
+	green
+	blue
+}
+
 struct DefinedExample {
 	name         string
 	display_name string @[json: 'display_name']
@@ -99,6 +105,9 @@ struct DefinedExample {
 	optional_map map[string]?string
 	flags_map    map[string]?bool
 	numbers_map  map[string]?i32
+	tones        []DefinedTone
+	fixed_tones  [2]DefinedTone
+	tone_map     map[string]DefinedTone
 	labels       [2]string
 	active       [2]bool
 	scores       [3]int
@@ -125,8 +134,11 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert instructions.contains('"optional_map": Record<string, string | null>;')
 	assert instructions.contains('"flags_map": Record<string, boolean | null>;')
 	assert instructions.contains('"numbers_map": Record<string, number | null>;')
+	assert instructions.contains('"tones": number[];')
+	assert instructions.contains('"fixed_tones": number[];')
+	assert instructions.contains('"tone_map": Record<string, number>;')
 	assert !instructions.contains('"ignored"')
-	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"optional_map":{"present":"value","missing":null},"flags_map":{"enabled":true,"unset":null},"numbers_map":{"count":7,"unset":null},"labels":["first","second"],"active":[true,false],"scores":[1,2,3],"optional":["set",null],"flags":[true,null],"nullable":[7,null]}\n```') or {
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"optional_map":{"present":"value","missing":null},"flags_map":{"enabled":true,"unset":null},"numbers_map":{"count":7,"unset":null},"tones":[0,2],"fixed_tones":[1,2],"tone_map":{"favorite":2},"labels":["first","second"],"active":[true,false],"scores":[1,2,3],"optional":["set",null],"flags":[true,null],"nullable":[7,null]}\n```') or {
 		panic(err)
 	}
 	assert parsed.name == 'Ada'
@@ -146,6 +158,9 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	number_map_value := parsed.numbers_map['count'] or { panic('expected optional number map value') }
 	assert number_map_value == 7
 	assert parsed.numbers_map['unset'] == none
+	assert parsed.tones == [DefinedTone.red, DefinedTone.blue]
+	assert parsed.fixed_tones == [DefinedTone.green, DefinedTone.blue]!
+	assert parsed.tone_map['favorite'] == DefinedTone.blue
 	assert parsed.labels == ['first', 'second']
 	assert parsed.active == [true, false]!
 	assert parsed.scores == [1, 2, 3]!

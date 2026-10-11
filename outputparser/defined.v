@@ -198,6 +198,10 @@ fn defined_map_schema[K, T](_values map[K]T, name string) !DefinedContainerSchem
 				return DefinedContainerSchema{
 					field_type: 'Record<string, number>'
 				}
+			} $else $if T is $enum {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, number>'
+				}
 			} $else $if T is ?string {
 				return DefinedContainerSchema{
 					field_type: 'Record<string, string | null>'
@@ -233,6 +237,8 @@ fn defined_array_element_schema[T](_values []T) !string {
 	} $else $if T is bool {
 		return 'boolean'
 	} $else $if T is $int || T is $float {
+		return 'number'
+	} $else $if T is $enum {
 		return 'number'
 	} $else $if T is ?string {
 		return '(string | null)'

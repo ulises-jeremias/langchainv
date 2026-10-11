@@ -32,9 +32,11 @@ and verifies all configured response schema names are present. Generic
 schema and decodes fenced JSON into the concrete struct type. It currently
 supports strings, booleans, numeric fields, their optional forms, slices,
 fixed arrays, and string-keyed maps of those primitives, enums, and nested
-structs. Slices and fixed arrays can also contain nested structs. Fixed arrays
-of scalar values can contain strings, booleans, numbers, or nullable versions
-of those types. Unsupported V field types return an error. Maps of nested
+structs. Slices and fixed arrays can also contain nested structs or enums.
+Fixed arrays of scalar values can contain strings, booleans, numbers, enums, or
+nullable versions of string, boolean, and numeric types. String-keyed maps also
+support scalar enum values and nullable primitive values. Unsupported V field
+types return an error. Maps of nested
 structs require string keys. The `@[json: fieldName]` and `@[describe: "..."]`
 attributes supply JSON names and prompt descriptions.
 
