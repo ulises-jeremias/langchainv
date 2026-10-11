@@ -147,15 +147,15 @@ pub fn (tool Tool) call(mut ctx context.Context, input string) !string {
 	if i64(input.len) > max_mcp_tool_input_bytes {
 		return error('Zapier MCP tool input exceeds the 1 MiB limit')
 	}
-	mut arguments := map[string]json2.Any{}
+	mut tool_arguments := map[string]json2.Any{}
 	if input.trim_space() != '' {
-		arguments = json2.decode[map[string]json2.Any](input, json2.DecoderOptions{}) or {
+		tool_arguments = json2.decode[map[string]json2.Any](input, json2.DecoderOptions{}) or {
 			return error('Zapier MCP tool input must be a JSON object')
 		}
 	}
 	mut params := map[string]json2.Any{}
 	params['name'] = json2.Any(tool.info.name)
-	params['arguments'] = json2.Any(arguments)
+	params['arguments'] = json2.Any(tool_arguments)
 	response := tool.client.request(mut ctx, 'tools/call', json2.Any(params))!
 	result := mcp_result(response)!
 	if mcp_bool(result, 'isError') {
@@ -165,7 +165,7 @@ pub fn (tool Tool) call(mut ctx context.Context, input string) !string {
 }
 
 fn (client Client) initialize(mut ctx context.Context) ! {
-	state := client.state
+	mut state := client.state
 	if state.initialized {
 		return
 	}
@@ -248,7 +248,7 @@ fn (client Client) send(mut ctx context.Context, body string) !httputil.Response
 		mut state := client.state
 		state.session_id = session_id
 	}
-	content_type := response.headers.get_custom('Content-Type').to_lower()
+	content_type := response.headers.get_custom('Content-Type') or { '' }
 	if content_type.starts_with('text/event-stream') {
 		mut event_json := ''
 		for line in response.body.split_into_lines() {
