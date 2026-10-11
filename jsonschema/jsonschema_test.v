@@ -270,7 +270,7 @@ fn test_instance_validation_checks_missing_required_properties() {
 	assert false, 'expected missing required property to fail'
 }
 
-fn test_instance_validation_bounds_node_count_and_bytes() {
+fn test_instance_validation_bounds_node_count() {
 	mut values := []json2.Any{cap: 10001}
 	for _ in 0 .. 10001 {
 		values << json2.Any(0)
@@ -283,6 +283,9 @@ fn test_instance_validation_bounds_node_count_and_bytes() {
 		return
 	}
 	assert false, 'expected too many JSON instance nodes to fail'
+}
+
+fn test_instance_validation_bounds_bytes() {
 	Definition{
 		type_: .string
 	}.validate_instance(json2.Any('x'.repeat(1048577))) or {
