@@ -26,3 +26,8 @@ transport or an injected `HTTPClient`. Set a Wikipedia language code when
 constructing the tool; queries are capped at 4 KiB and results at 20. It
 returns article titles and plain-text excerpts without making live calls in
 tests.
+
+`tools/serpapi` searches Google through SerpApi. Pass an explicit key to
+`new_tool` or use `new_default_tool` to read `SERPAPI_API_KEY`; both use the
+bounded default transport or an injected `HTTPClient`. Queries are capped at
+4 KiB and returned organic results at 10. Tests use a fake transport.
