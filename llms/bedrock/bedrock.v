@@ -3,6 +3,7 @@ module bedrock
 
 import context
 import encoding.base64
+import hash.crc32
 import json2
 import math
 import ulises_jeremias.langchainv.httputil
@@ -14,6 +15,135 @@ const max_request_bytes = 5 * 1024 * 1024
 const max_response_bytes = 8 * 1024 * 1024
 const max_image_bytes = 3 * 1024 * 1024
 const max_message_content_bytes = 4 * 1024 * 1024
+const max_stream_frame_bytes = 1024 * 1024
+
+struct BedrockStreamEvent {
+	content_block_start ?BedrockStreamStartEvent @[json: 'contentBlockStart']
+	content_block_delta ?BedrockStreamDeltaEvent @[json: 'contentBlockDelta']
+	message_stop        ?BedrockStreamStopEvent  @[json: 'messageStop']
+	metadata            ?BedrockStreamMetadataEvent
+}
+
+struct BedrockStreamStartEvent {
+	content_block_index int @[json: 'contentBlockIndex']
+	start               BedrockStreamBlockStart
+}
+
+struct BedrockStreamBlockStart {
+	tool_use ?BedrockStreamToolStart @[json: 'toolUse']
+}
+
+struct BedrockStreamToolStart {
+	tool_use_id string @[json: 'toolUseId']
+	name        string
+}
+
+struct BedrockStreamDeltaEvent {
+	content_block_index int @[json: 'contentBlockIndex']
+	delta               BedrockStreamDelta
+}
+
+struct BedrockStreamDelta {
+	text      string
+	tool_use  ?BedrockStreamToolDelta @[json: 'toolUse']
+	reasoning ?BedrockStreamReasoning @[json: 'reasoningContent']
+}
+
+struct BedrockStreamToolDelta {
+	input string
+}
+
+struct BedrockStreamReasoning {
+	text             string
+	signature        string
+	redacted_content string @[json: 'redactedContent']
+}
+
+struct BedrockStreamStopEvent {
+	stop_reason string @[json: 'stopReason']
+}
+
+struct BedrockStreamMetadataEvent {
+	usage BedrockStreamUsage
+}
+
+struct BedrockStreamUsage {
+	input_tokens  int @[json: 'inputTokens']
+	output_tokens int @[json: 'outputTokens']
+	total_tokens  int @[json: 'totalTokens']
+}
+
+struct BedrockStreamBlock {
+	index     int
+	text      string
+	reasoning string
+	signature string
+	redacted  string
+	tool_id   string
+	tool_name string
+	tool_json string
+}
+
+struct BedrockStreamState {
+mut:
+	content        string
+	stop_reason    string
+	input_tokens   int
+	output_tokens  int
+	total_tokens   int
+	blocks         []BedrockStreamBlock
+	received_bytes i64
+	error          string
+}
+
+struct EventStreamDecoder {
+mut:
+	buffer []u8
+pub:
+	max_frame_bytes int = max_stream_frame_bytes
+}
+
+fn (mut decoder EventStreamDecoder) push(chunk []u8) ![][]u8 {
+	if chunk.len > max_response_bytes - decoder.buffer.len {
+		return error('Amazon Bedrock Converse stream exceeds 8 MiB')
+	}
+	decoder.buffer << chunk
+	mut payloads := [][]u8{}
+	for decoder.buffer.len >= 12 {
+		total_length := read_u32_be(decoder.buffer, 0)
+		header_length := read_u32_be(decoder.buffer, 4)
+		if total_length < 16 || total_length > u32(decoder.max_frame_bytes)
+			|| header_length > total_length - 16 {
+			return error('Amazon Bedrock event stream frame has invalid lengths')
+		}
+		if decoder.buffer.len < int(total_length) {
+			break
+		}
+		frame := decoder.buffer[..int(total_length)].clone()
+		if crc32.sum(frame[..8]) != read_u32_be(frame, 8) {
+			return error('Amazon Bedrock event stream prelude checksum is invalid')
+		}
+		if crc32.sum(frame[..int(total_length) - 4]) != read_u32_be(frame,
+			int(total_length) - 4) {
+			return error('Amazon Bedrock event stream message checksum is invalid')
+		}
+		payload_start := 12 + int(header_length)
+		payloads << frame[payload_start..int(total_length) - 4].clone()
+		decoder.buffer = decoder.buffer[int(total_length)..].clone()
+	}
+	return payloads
+}
+
+fn (mut decoder EventStreamDecoder) finish() ! {
+	if decoder.buffer.len != 0 {
+		return error('Amazon Bedrock event stream ended with a truncated frame')
+	}
+}
+
+fn read_u32_be(bytes []u8, offset int) u32 {
+	return (u32(bytes[offset]) << 24) | (u32(bytes[offset + 1]) << 16) |
+		(u32(bytes[offset + 2]) << 8) | u32(bytes[offset + 3])
+}
 
 // Options configures an AWS region and a Bedrock Converse model ID.
 pub struct Options {
@@ -84,6 +214,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	if body.len > max_request_bytes {
 		return error('Amazon Bedrock Converse request exceeds 5 MiB')
 	}
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, model, body, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, model, body, options)
+	}
 	ctx_error := ctx.err()
 	if ctx_error !is none {
 		return ctx_error
@@ -112,6 +248,259 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	return parse_response(decoded)
 }
 
+fn (client Client) generate_stream(mut ctx context.Context, model string, body string, options llms.CallOptions) !llms.Response {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Amazon Bedrock HTTP transport does not support streaming responses')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut decoder := EventStreamDecoder{}
+	mut state := &BedrockStreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, payload []u8) {
+		raw := json2.decode[map[string]json2.Any](payload.bytestr(), json2.DecoderOptions{}) or {
+			state.error = 'Amazon Bedrock returned an invalid event stream payload'
+			return
+		}
+		event := json2.decode[BedrockStreamEvent](payload.bytestr(), json2.DecoderOptions{}) or {
+			state.error = 'Amazon Bedrock returned an invalid event stream payload'
+			return
+		}
+		if start := event.content_block_start {
+			if start.content_block_index < 0 || start.content_block_index >= 128 {
+				state.error = 'Amazon Bedrock content block index is outside the supported range'
+				return
+			}
+			for state.blocks.len <= start.content_block_index {
+				state.blocks << BedrockStreamBlock{
+					index: state.blocks.len
+				}
+			}
+			if start_value := raw['contentBlockStart'] {
+				if start_value is map[string]json2.Any {
+					start_map := start_value as map[string]json2.Any
+					if start_data := start_map['start'] {
+						if start_data is map[string]json2.Any {
+							for key in (start_data as map[string]json2.Any).keys() {
+								if key != 'toolUse' {
+									state.error = 'Amazon Bedrock returned an unsupported content block start'
+									return
+								}
+							}
+						}
+					}
+				}
+			}
+			if tool := start.start.tool_use {
+				state.blocks[start.content_block_index] = BedrockStreamBlock{
+					index:     start.content_block_index
+					tool_id:   tool.tool_use_id
+					tool_name: tool.name
+				}
+			}
+			return
+		}
+		if delta_event := event.content_block_delta {
+			if delta_event.content_block_index < 0 || delta_event.content_block_index >= 128 {
+				state.error = 'Amazon Bedrock content block index is outside the supported range'
+				return
+			}
+			for state.blocks.len <= delta_event.content_block_index {
+				state.blocks << BedrockStreamBlock{
+					index: state.blocks.len
+				}
+			}
+			if delta_value := raw['contentBlockDelta'] {
+				if delta_value is map[string]json2.Any {
+					delta_map := delta_value as map[string]json2.Any
+					if delta_content := delta_map['delta'] {
+						if delta_content is map[string]json2.Any {
+							for key in (delta_content as map[string]json2.Any).keys() {
+								if key !in ['text', 'toolUse', 'reasoningContent'] {
+									state.error = 'Amazon Bedrock returned an unsupported content block delta'
+									return
+								}
+							}
+						}
+					}
+				}
+			}
+			if delta_event.delta.text != '' {
+				state.content += delta_event.delta.text
+				block := state.blocks[delta_event.content_block_index]
+				state.blocks[delta_event.content_block_index] = BedrockStreamBlock{
+					index:     block.index
+					text:      block.text + delta_event.delta.text
+					reasoning: block.reasoning
+					signature: block.signature
+					redacted:  block.redacted
+					tool_id:   block.tool_id
+					tool_name: block.tool_name
+					tool_json: block.tool_json
+				}
+				if callback := options.streaming_func {
+					callback(mut callback_ctx, delta_event.delta.text.bytes()) or {
+						state.error = 'Amazon Bedrock streaming callback failed: ${err.msg()}'
+						return
+					}
+				}
+				if callback := options.streaming_reasoning_func {
+					callback(mut callback_ctx, []u8{}, delta_event.delta.text.bytes()) or {
+						state.error = 'Amazon Bedrock reasoning callback failed: ${err.msg()}'
+						return
+					}
+				}
+			}
+			if reasoning := delta_event.delta.reasoning {
+				block := state.blocks[delta_event.content_block_index]
+				state.blocks[delta_event.content_block_index] = BedrockStreamBlock{
+					index:     block.index
+					text:      block.text
+					reasoning: block.reasoning + reasoning.text
+					signature: block.signature + reasoning.signature
+					redacted:  block.redacted + reasoning.redacted_content
+					tool_id:   block.tool_id
+					tool_name: block.tool_name
+					tool_json: block.tool_json
+				}
+				if reasoning.text != '' {
+					if callback := options.streaming_reasoning_func {
+						callback(mut callback_ctx, reasoning.text.bytes(), []u8{}) or {
+							state.error = 'Amazon Bedrock reasoning callback failed: ${err.msg()}'
+							return
+						}
+					}
+				}
+			}
+			if tool_delta := delta_event.delta.tool_use {
+				block := state.blocks[delta_event.content_block_index]
+				state.blocks[delta_event.content_block_index] = BedrockStreamBlock{
+					index:     block.index
+					text:      block.text
+					reasoning: block.reasoning
+					signature: block.signature
+					redacted:  block.redacted
+					tool_id:   block.tool_id
+					tool_name: block.tool_name
+					tool_json: block.tool_json + tool_delta.input
+				}
+			}
+			return
+		}
+		if stop := event.message_stop {
+			state.stop_reason = stop.stop_reason
+			return
+		}
+		if metadata := event.metadata {
+			state.input_tokens = metadata.usage.input_tokens
+			state.output_tokens = metadata.usage.output_tokens
+			state.total_tokens = metadata.usage.total_tokens
+			return
+		}
+		for key in ['internalServerException', 'modelStreamErrorException',
+			'serviceUnavailableException', 'throttlingException', 'validationException'] {
+			if _ := raw[key] {
+				state.error = 'Amazon Bedrock returned an error event while streaming'
+				return
+			}
+		}
+		for key in raw.keys() {
+			if key in ['messageStart', 'contentBlockStop'] {
+				return
+			}
+		}
+		state.error = 'Amazon Bedrock returned an unsupported event while streaming'
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     'https://bedrock-runtime.${client.region}.amazonaws.com/model/${model}/converse-stream'
+		headers: {
+			'Authorization': 'Bearer ${client.api_key}'
+			'Content-Type':  'application/json'
+			'Accept':        'application/vnd.amazon.eventstream'
+		}
+		body:    body
+	}, fn [mut decoder, mut state, mut process_event] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Amazon Bedrock Converse response exceeds 8 MiB')
+		}
+		for payload in decoder.push(bytes)! {
+			process_event(mut callback_ctx, payload)
+			if state.error != '' {
+				return error(state.error)
+			}
+		}
+	}) or {
+		return error('Amazon Bedrock ConverseStream request failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Amazon Bedrock ConverseStream request returned HTTP ${response.status_code}')
+	}
+	decoder.finish()!
+	mut parts := []schema.ContentPart{}
+	mut tool_calls := []schema.ToolCall{}
+	for block in state.blocks {
+		if block.text != '' {
+			parts << schema.ContentPart(schema.TextPart{
+				text: block.text
+			})
+		}
+		if block.reasoning != '' {
+			parts << schema.ContentPart(schema.ThinkingPart{
+				text:      block.reasoning
+				signature: block.signature
+			})
+		}
+		if block.redacted != '' {
+			parts << schema.ContentPart(schema.RedactedThinkingPart{
+				data: block.redacted
+			})
+		}
+		if block.tool_id != '' || block.tool_name != '' || block.tool_json != '' {
+			if block.tool_id == '' || block.tool_name == '' {
+				return error('Amazon Bedrock toolUse block is missing name or ID')
+			}
+			input := json2.decode[json2.Any](block.tool_json, json2.DecoderOptions{}) or {
+				return error('Amazon Bedrock streamed tool input is invalid JSON')
+			}
+			call := schema.ToolCall{
+				id:            block.tool_id
+				call_type:     'function'
+				function_call: schema.FunctionCall{
+					name:      block.tool_name
+					arguments: json2.encode(input, json2.EncoderOptions{})
+				}
+			}
+			tool_calls << call
+			parts << schema.ContentPart(call)
+		}
+	}
+	if parts.len == 0 {
+		return error('Amazon Bedrock returned an empty streaming response')
+	}
+	total_tokens := if state.total_tokens > 0 {
+		state.total_tokens
+	} else {
+		state.input_tokens + state.output_tokens
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:     state.content
+			stop_reason: state.stop_reason
+			tool_calls:  tool_calls
+			parts:       parts
+		}]
+		usage:   llms.Usage{
+			prompt_tokens:     state.input_tokens
+			completion_tokens: state.output_tokens
+			total_tokens:      total_tokens
+		}
+	}
+}
+
 // complete wraps a prompt as a user message and returns the first choice.
 pub fn (client Client) complete(mut ctx context.Context, prompt string, options llms.CallOptions) !string {
 	response := client.generate_content(mut ctx, [schema.text_message(.human, prompt)], options)!
@@ -136,12 +525,6 @@ fn validate_options(options llms.CallOptions) ! {
 	}
 	if options.provider_options.len > 0 || options.metadata.len > 0 || options.web_search_options != none {
 		return error('Amazon Bedrock Converse provider options are not supported')
-	}
-	if _ := options.streaming_func {
-		return error('Amazon Bedrock Converse streaming is not supported by the bounded transport')
-	}
-	if _ := options.streaming_reasoning_func {
-		return error('Amazon Bedrock Converse streaming is not supported by the bounded transport')
 	}
 	if !math.is_finite(options.temperature) || options.temperature < 0 || options.temperature > 1
 		|| !math.is_finite(options.top_p) {
@@ -387,13 +770,13 @@ fn parse_response(response map[string]json2.Any) !llms.Response {
 			if name == '' || id == '' {
 				return error('Amazon Bedrock toolUse block is missing name or ID')
 			}
-			arguments := tool_use['input'] or { json2.Any(map[string]json2.Any{}) }
+			tool_input := tool_use['input'] or { json2.Any(map[string]json2.Any{}) }
 			call := schema.ToolCall{
 				id:            id
 				call_type:     'function'
 				function_call: schema.FunctionCall{
 					name:      name
-					arguments: json2.encode(arguments, json2.EncoderOptions{})
+					arguments: json2.encode(tool_input, json2.EncoderOptions{})
 				}
 			}
 			tool_calls << call

@@ -1,6 +1,7 @@
 module bedrock
 
 import context
+import hash.crc32
 import net.http
 import json2
 import ulises_jeremias.langchainv.httputil
@@ -22,6 +23,54 @@ fn (client BedrockFixtureHTTP) do(mut _ctx context.Context, request httputil.Req
 	mut state := client.state
 	state.requests << request
 	return state.response
+}
+
+fn (client BedrockFixtureHTTP) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 19 < body.len { offset + 19 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
+	return state.response
+}
+
+struct StreamCapture {
+mut:
+	value string
+}
+
+struct ReasoningCapture {
+mut:
+	value string
+}
+
+fn append_u32_be(mut bytes []u8, value u32) {
+	bytes << u8(value >> 24)
+	bytes << u8(value >> 16)
+	bytes << u8(value >> 8)
+	bytes << u8(value)
+}
+
+fn event_stream_frame(payload string) []u8 {
+	mut frame := []u8{}
+	append_u32_be(mut frame, u32(payload.len + 16))
+	append_u32_be(mut frame, 0)
+	append_u32_be(mut frame, crc32.sum(frame))
+	frame << payload.bytes()
+	append_u32_be(mut frame, crc32.sum(frame))
+	return frame
+}
+
+fn event_stream_body(payloads []string) string {
+	mut bytes := []u8{}
+	for payload in payloads {
+		bytes << event_stream_frame(payload)
+	}
+	return bytes.bytestr()
 }
 
 fn new_bedrock_fixture(body string) (Client, &BedrockFixtureState) {
@@ -154,4 +203,96 @@ fn test_client_rejects_invalid_region() {
 		return
 	}
 	assert false, 'expected invalid region rejection'
+}
+
+fn test_converse_streams_text_and_usage() {
+	mut ctx := context.background()
+	body := event_stream_body([
+		'{"messageStart":{"role":"assistant"}}',
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"text":"hel"}}}',
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"text":"lo"}}}',
+		'{"messageStop":{"stopReason":"end_turn"}}',
+		'{"metadata":{"usage":{"inputTokens":5,"outputTokens":2,"totalTokens":7}}}',
+	])
+	client, state := new_bedrock_fixture(body)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'end_turn'
+	assert response.usage.prompt_tokens == 5
+	assert response.usage.completion_tokens == 2
+	assert response.usage.total_tokens == 7
+	assert state.requests[0].url.ends_with('/converse-stream')
+	assert (state.requests[0].headers['Accept'] or { '' }) == 'application/vnd.amazon.eventstream'
+}
+
+fn test_converse_streams_fragmented_tool_input() {
+	mut ctx := context.background()
+	body := event_stream_body([
+		'{"contentBlockStart":{"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"call-1","name":"lookup"}}}}',
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"toolUse":{"input":"{\\"q\\":"}}}}',
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"toolUse":{"input":"\\"v\\"}"}}}}',
+		'{"messageStop":{"stopReason":"tool_use"}}',
+	])
+	client, _ := new_bedrock_fixture(body)
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'lookup')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].id == 'call-1'
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments == '{"q":"v"}'
+}
+
+fn test_converse_streams_reasoning_deltas_and_signature() {
+	mut ctx := context.background()
+	body := event_stream_body([
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"reasoningContent":{"text":"plan"}}}}',
+		'{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"reasoningContent":{"signature":"sig-1"}}}}',
+		'{"contentBlockDelta":{"contentBlockIndex":1,"delta":{"text":"answer"}}}',
+		'{"messageStop":{"stopReason":"end_turn"}}',
+	])
+	client, _ := new_bedrock_fixture(body)
+	mut captured := &ReasoningCapture{}
+	stream := llms.ReasoningStreamFunc(fn [mut captured] (mut _ context.Context, reasoning []u8, output []u8) ! {
+		captured.value += reasoning.bytestr() + output.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'why?')], llms.CallOptions{
+		streaming_reasoning_func: stream
+	}) or { panic(err) }
+	assert captured.value == 'plananswer'
+	assert response.choices[0].content == 'answer'
+	assert response.choices[0].parts.len == 2
+	part := response.choices[0].parts[0]
+	assert part is schema.ThinkingPart
+	thinking := part as schema.ThinkingPart
+	assert thinking.text == 'plan'
+	assert thinking.signature == 'sig-1'
+}
+
+fn test_eventstream_decoder_rejects_bad_checksums_and_truncated_frames() {
+	frame := event_stream_frame('{"messageStart":{"role":"assistant"}}')
+	mut corrupted := frame.clone()
+	corrupted[8] ^= u8(1)
+	mut bad_crc_decoder := EventStreamDecoder{}
+	bad_crc_decoder.push(corrupted) or {
+		assert err.msg().contains('prelude checksum')
+		return
+	}
+	assert false, 'expected invalid prelude checksum to fail'
+
+	mut truncated_decoder := EventStreamDecoder{}
+	truncated_decoder.push(frame[..frame.len - 1]) or { panic(err) }
+	truncated_decoder.finish() or {
+		assert err.msg().contains('truncated frame')
+		return
+	}
+	assert false, 'expected truncated event stream frame to fail'
 }
