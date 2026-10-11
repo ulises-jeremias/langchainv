@@ -27,15 +27,17 @@ The current core packages include:
 - `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, Gemini text/image/function-tool generation, Vertex AI Gemini generation with explicit OAuth access tokens, and watsonx.ai text generation with IBM API-key exchange or explicit IAM tokens.
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
-- `tools`: agent tool contract and bounded arithmetic calculator.
+- `tools`: agent tool contract, bounded arithmetic calculator, search and web tools, Zapier MCP, and SQL database inspection/query helpers.
 - `testing/llmtest`: opt-in model contract checks for generation, cancellation, multiturn, streaming, tool calls, and usage.
 - `memory`: no-op memory, in-memory and bounded session-specific SQLite chat history, conversation buffer, bounded window buffer, and token-bounded buffer with an injected counter.
 - `prompts`: validated string templates, role-tagged chat templates, and fixed- or selector-backed few-shot prompts.
 - `outputparser`: string, boolean, list, regex, structured, combining, and
   typed JSON parsers.
 - `jsonschema`: a validated, recursive subset for tool parameter schemas.
-- `chains`: prompt-backed completion and chat-model chains, document stuffing, sequential map-reduce, map-rerank and refine, retrieval QA, sequential composition, memory
-  loading, bounded conversational retrieval QA, and input/output validation.
+- `chains`: prompt-backed completion and chat-model chains, document stuffing,
+  sequential map-reduce, map-rerank and refine, constitutional critique and
+  revision, retrieval QA, sequential composition, memory loading, bounded
+  conversational retrieval QA, and input/output validation.
 - `agents`: tool-calling agent and bounded executor with tool dispatch,
   callbacks, memory integration, and optional intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard

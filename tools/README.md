@@ -56,3 +56,12 @@ discovers server-provided tools, and adapts each to the shared tool contract.
 It supports JSON and server-sent event responses, requires HTTPS, caps response
 size and tool count, and accepts an injected transport for offline tests. The
 retired Zapier NLA API is not used.
+
+`tools/sqldatabase` wraps V's database driver and provides dialect-aware table
+discovery, schema details, sample rows, raw and parameterized SQL query output.
+It supports SQLite by default and PostgreSQL/MySQL when V is built with the
+matching `db_pg` or `db_mysql` flag. Configure ignored tables and limits for
+query bytes, output bytes, visible tables, result rows, and sample rows. The
+standard V database driver materializes each query result before this package
+applies its row and output limits, and its in-flight queries cannot be cancelled through
+`context.Context`; only use it with a database and query source you trust.

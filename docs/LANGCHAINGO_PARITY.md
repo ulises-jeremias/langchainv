@@ -25,7 +25,7 @@ The inventory is based on upstream commit
 | `prompts` | prompt values, string/chat/message templates, template formats/rendering, validation, example selectors, few-shot | partial: validated string placeholders and escaping; role-tagged text chat templates, static few-shot examples, and injected ExampleSelector support; alternate formats, typed multimodal templates, and built-in example selectors remain outstanding |
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents, typed multimodal messages, memory/history/retriever contracts |
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; package tests and example compilation pass in PR #1 CI (2026-10-09); full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
-| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, parentheses, and the Starlark math module's functions/constants, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, and Zapier MCP Streamable HTTP tool discovery/calls; integrations use injectable HTTP transport and bounded inputs/responses; SQL database integrations remain outstanding |
+| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, parentheses, and the Starlark math module's functions/constants, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, Zapier MCP Streamable HTTP tool discovery/calls, and SQLDatabase table inventory/schema/sample/query APIs over V's SQLite driver with optional PostgreSQL/MySQL drivers; SQL tests use in-memory SQLite, while database driver calls materialize rows before output caps and cannot be interrupted mid-query through `context.Context` |
 | `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Qdrant/Pinecone REST adapters with injected embeddings, namespaces, and metadata filters; persistent stores beyond these and full filter/distance parity remain outstanding |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, request/response byte and timeout limits, bounded incremental response callbacks, and a chunk-independent SSE decoder; redacted debug logging remains outstanding |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
@@ -95,8 +95,10 @@ vector return remain outstanding.
 ## Document loaders and tools
 
 - Loaders still outstanding: PDF. AssemblyAI provides bounded HTTPS URL submission and status polling with injectable HTTP and offline tests. HTML uses V's standard-library parser; full browser-style parsing and network fetching are outside its scope.
-- Tools still outstanding: SQL database (MySQL/PostgreSQL/SQLite). Zapier's
-  retired NLA API is replaced by the current MCP Streamable HTTP integration.
+- SQLDatabase exposes SQLite by default and PostgreSQL/MySQL through V's
+  compile-time database drivers; test environments verify the SQLite backend
+  with in-memory fixtures. Zapier's retired NLA API is replaced by the current
+  MCP Streamable HTTP integration.
 
 ## Cross-cutting parity requirements
 
