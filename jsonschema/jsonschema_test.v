@@ -269,3 +269,25 @@ fn test_instance_validation_checks_missing_required_properties() {
 	}
 	assert false, 'expected missing required property to fail'
 }
+
+fn test_instance_validation_bounds_node_count_and_bytes() {
+	mut values := []json2.Any{cap: 10001}
+	for _ in 0 .. 10001 {
+		values << json2.Any(0)
+	}
+	Definition{
+		type_: .array
+		items:  &Definition{}
+	}.validate_instance(json2.Any(values)) or {
+		assert err.msg().contains('10000-node limit')
+		return
+	}
+	assert false, 'expected too many JSON instance nodes to fail'
+	Definition{
+		type_: .string
+	}.validate_instance(json2.Any('x'.repeat(1048577))) or {
+		assert err.msg().contains('1048576-byte limit')
+		return
+	}
+	assert false, 'expected oversized JSON instance to fail'
+}

@@ -5,6 +5,14 @@ import json2
 import math
 
 const max_schema_depth = 64
+const max_instance_nodes = 10000
+const max_instance_bytes = 1048576
+
+struct InstanceBudget {
+mut:
+	nodes int
+	bytes int
+}
 
 // DataType identifies the JSON primitive or container type.
 pub enum DataType {
@@ -129,7 +137,46 @@ pub fn (definition Definition) validate() ! {
 // JSON Schema subset. Errors include the failing instance path.
 pub fn (definition Definition) validate_instance(instance json2.Any) ! {
 	definition.validate()!
+	mut budget := InstanceBudget{}
+	inspect_instance(instance, '$', 0, mut budget)!
 	definition.validate_instance_at(instance, '$', 0)!
+}
+
+fn inspect_instance(instance json2.Any, path string, depth int, mut budget InstanceBudget) ! {
+	if depth > max_schema_depth {
+		return error('JSON Schema instance nesting exceeds the 64-level limit at ${path}')
+	}
+	budget.nodes++
+	if budget.nodes > max_instance_nodes {
+		return error('JSON Schema instance exceeds the ${max_instance_nodes}-node limit at ${path}')
+	}
+	instance_bytes := match instance {
+		string { instance.len }
+		f64, f32, i64, int, i32, i16, i8, u64, u32, u16, u8 { 8 }
+		bool, json2.Null { 1 }
+		else { 0 }
+	}
+	if instance_bytes > max_instance_bytes - budget.bytes {
+		return error('JSON Schema instance exceeds the ${max_instance_bytes}-byte limit at ${path}')
+	}
+	budget.bytes += instance_bytes
+	match instance {
+		[]json2.Any {
+			for index, item in instance {
+				inspect_instance(item, '${path}[${index}]', depth + 1, mut budget)!
+			}
+		}
+		map[string]json2.Any {
+			for name, value in instance {
+				if name.len > max_instance_bytes - budget.bytes {
+					return error('JSON Schema instance exceeds the ${max_instance_bytes}-byte limit at ${path}')
+				}
+				budget.bytes += name.len
+				inspect_instance(value, '${path}.${name}', depth + 1, mut budget)!
+			}
+		}
+		else {}
+	}
 }
 
 fn (definition Definition) validate_instance_at(instance json2.Any, path string, depth int) ! {

@@ -15,6 +15,8 @@ the supported definition subset recursively and includes the failing instance
 path in errors. It covers type checks, string enums, object properties and
 required names, the boolean form of `additionalProperties`, array items,
 numeric minimum/maximum, string minLength/maxLength, and array minItems/maxItems.
+Instances are capped at 10,000 nodes, 1 MiB of aggregate scalar/key bytes, and
+64 levels of nesting before schema evaluation.
 
 Unions, references, formats, schema-valued `additionalProperties`, and schema
 composition remain unsupported. Pass a raw schema to a tool when those
