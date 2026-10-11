@@ -125,10 +125,24 @@ fn clone_json_value(value json2.Any) json2.Any {
 // ConversationBuffer stores input/output turns and exposes their transcript.
 pub struct ConversationBuffer {
 pub:
-	history    schema.ChatMessageHistory
-	memory_key string
-	input_key  string
-	output_key string
+	history         schema.ChatMessageHistory
+	memory_key      string
+	input_key       string
+	output_key      string
+	human_prefix    string
+	ai_prefix       string
+}
+
+// ConversationBufferOptions configures a conversation buffer. Empty memory_key
+// selects `history`; empty input/output keys are inferred when the respective
+// map contains exactly one value.
+pub struct ConversationBufferOptions {
+	pub:
+	memory_key      string
+	input_key       string
+	output_key      string
+	human_prefix    string
+	ai_prefix       string
 }
 
 // new_conversation_buffer creates a buffer with explicit key names.
@@ -137,10 +151,28 @@ pub fn new_conversation_buffer(memory_key string, input_key string, output_key s
 		return error('memory, input, and output keys must be non-empty')
 	}
 	return ConversationBuffer{
-		history:    new_in_memory_chat_message_history()
-		memory_key: memory_key
-		input_key:  input_key
-		output_key: output_key
+		history:      new_in_memory_chat_message_history()
+		memory_key:   memory_key
+		input_key:    input_key
+		output_key:   output_key
+		human_prefix: 'Human'
+		ai_prefix:    'AI'
+	}
+}
+
+// new_conversation_buffer_with_options creates a configurable conversation
+// buffer. Blank prefix values select the standard `Human` and `AI` labels.
+pub fn new_conversation_buffer_with_options(options ConversationBufferOptions) !ConversationBuffer {
+	memory_key := if options.memory_key.trim_space() == '' { 'history' } else { options.memory_key }
+	human_prefix := if options.human_prefix.trim_space() == '' { 'Human' } else { options.human_prefix }
+	ai_prefix := if options.ai_prefix.trim_space() == '' { 'AI' } else { options.ai_prefix }
+	return ConversationBuffer{
+		history:         new_in_memory_chat_message_history()
+		memory_key:      memory_key
+		input_key:       options.input_key
+		output_key:      options.output_key
+		human_prefix:    human_prefix
+		ai_prefix:       ai_prefix
 	}
 }
 
@@ -156,8 +188,8 @@ pub fn (buffer ConversationBuffer) load_memory_variables(mut ctx context.Context
 	for message in messages {
 		role := match message.role {
 			.system { 'System' }
-			.human { 'Human' }
-			.ai { 'AI' }
+			.human { buffer.human_prefix }
+			.ai { buffer.ai_prefix }
 			.tool { 'Tool' }
 			.generic { 'Message' }
 		}
@@ -171,15 +203,29 @@ pub fn (buffer ConversationBuffer) load_memory_variables(mut ctx context.Context
 // save_context appends one human and one assistant message to the history.
 pub fn (buffer ConversationBuffer) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
 	if buffer.input_key !in inputs {
-		return error('missing memory input `${buffer.input_key}`')
+		if buffer.input_key != '' || inputs.len != 1 {
+			return error('conversation memory needs an input key or exactly one input value')
+		}
 	}
 	if buffer.output_key !in outputs {
-		return error('missing memory output `${buffer.output_key}`')
+		if buffer.output_key != '' || outputs.len != 1 {
+			return error('conversation memory needs an output key or exactly one output value')
+		}
 	}
-	input := inputs[buffer.input_key] or { return error('missing memory input `${buffer.input_key}`') }
-	output := outputs[buffer.output_key] or { return error('missing memory output `${buffer.output_key}`') }
-	buffer.history.add_message(mut ctx, schema.text_message(.human, input.str()))!
-	buffer.history.add_message(mut ctx, schema.text_message(.ai, output.str()))!
+	input_key := if buffer.input_key != '' { buffer.input_key } else { inputs.keys()[0] }
+	output_key := if buffer.output_key != '' { buffer.output_key } else { outputs.keys()[0] }
+	input_value := inputs[input_key] or { return error('missing conversation memory input') }
+	output_value := outputs[output_key] or { return error('missing conversation memory output') }
+	input := match input_value {
+		string { input_value }
+		else { return error('conversation memory input must be a string') }
+	}
+	output := match output_value {
+		string { output_value }
+		else { return error('conversation memory output must be a string') }
+	}
+	buffer.history.add_message(mut ctx, schema.text_message(.human, input))!
+	buffer.history.add_message(mut ctx, schema.text_message(.ai, output))!
 }
 
 // clear removes all conversation history.

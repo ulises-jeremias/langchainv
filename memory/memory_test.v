@@ -84,6 +84,50 @@ fn test_conversation_buffer_load_save_and_clear() {
 	assert cleared_history.str() == ''
 }
 
+fn test_conversation_buffer_uses_custom_prefixes_and_infers_single_keys() {
+	mut ctx := context.background()
+	mut buffer := new_conversation_buffer_with_options(ConversationBufferOptions{
+		human_prefix: 'Customer'
+		ai_prefix:    'Assistant'
+	}) or { panic(err) }
+	buffer.save_context(mut ctx, {
+		'question': json2.Any('What is V?')
+	}, {
+		'answer': json2.Any('A programming language.')
+	}) or { panic(err) }
+	transcript := buffer.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
+	assert (transcript['history'] or { panic('missing transcript') }).str() == 'Customer: What is V?\nAssistant: A programming language.'
+}
+
+fn test_conversation_buffer_rejects_ambiguous_and_non_string_values() {
+	mut ctx := context.background()
+	buffer := new_conversation_buffer_with_options(ConversationBufferOptions{}) or { panic(err) }
+	buffer.save_context(mut ctx, {
+		'first':  json2.Any('one')
+		'second': json2.Any('two')
+	}, {
+		'answer': json2.Any('result')
+	}) or {
+		assert err.msg().contains('exactly one input')
+		return
+	}
+	assert false, 'expected ambiguous input values to fail'
+}
+
+fn test_conversation_buffer_rejects_non_string_values() {
+	mut ctx := context.background()
+	mut buffer := new_conversation_buffer_with_options(ConversationBufferOptions{}) or { panic(err) }
+	buffer.save_context(mut ctx, {
+		'question': json2.Any(42)
+	}, {
+		'answer': json2.Any('result')
+	}) or {
+		assert err.msg().contains('must be a string')
+		return
+	}
+	assert false, 'expected non-string input to fail'
+}
+
 fn test_conversation_window_buffer_keeps_only_recent_turns() {
 	mut ctx := context.background()
 	mut window := new_conversation_window_buffer(2, 'history', 'question', 'answer') or {
