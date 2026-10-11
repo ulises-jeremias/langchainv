@@ -17,6 +17,11 @@ mut:
 	response httputil.Response
 }
 
+struct StreamCapture {
+mut:
+	value string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
@@ -134,14 +139,15 @@ fn test_generate_content_streams_text_and_maps_usage() {
 	mut ctx := context.background()
 	response_body := 'data: {"choices":[{"index":0,"delta":{"content":"hel"}}]}\n\ndata: {"choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}}\n\ndata: [DONE]\n\n'
 	client, state := new_fixture_client(response_body, 200)
-	mut streamed := ''
-	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
-		streamed += chunk.bytestr()
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [streamed] (mut _ context.Context, chunk []u8) ! {
+		mut capture := streamed
+		capture.value += chunk.bytestr()
 	})
 	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
 		streaming_func: stream
 	}) or { panic(err) }
-	assert streamed == 'hello'
+	assert streamed.value == 'hello'
 	assert response.choices.len == 1
 	assert response.choices[0].content == 'hello'
 	assert response.choices[0].stop_reason == 'stop'
