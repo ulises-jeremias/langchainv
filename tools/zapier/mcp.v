@@ -301,11 +301,38 @@ fn mcp_bool(values map[string]json2.Any, key string) bool {
 }
 
 fn mcp_id_matches(value json2.Any, expected int) bool {
+	if value is f64 {
+		return (value as f64) == f64(expected)
+	}
+	if value is f32 {
+		return (value as f32) == f32(expected)
+	}
 	if value is i64 {
 		return (value as i64) == i64(expected)
 	}
 	if value is int {
 		return (value as int) == expected
+	}
+	if value is i32 {
+		return (value as i32) == i32(expected)
+	}
+	if value is i16 {
+		return (value as i16) == i16(expected)
+	}
+	if value is i8 {
+		return (value as i8) == i8(expected)
+	}
+	if value is u64 {
+		return (value as u64) == u64(expected)
+	}
+	if value is u32 {
+		return (value as u32) == u32(expected)
+	}
+	if value is u16 {
+		return (value as u16) == u16(expected)
+	}
+	if value is u8 {
+		return (value as u8) == u8(expected)
 	}
 	return false
 }
