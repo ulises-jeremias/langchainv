@@ -22,6 +22,12 @@ mut:
 	value string
 }
 
+struct ReasoningCapture {
+mut:
+	reasoning string
+	output    string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
@@ -154,4 +160,21 @@ fn test_generate_content_streams_text_and_maps_usage() {
 	assert state.requests[0].headers['Accept'] == 'text/event-stream'
 	assert state.requests[0].body.contains('"stream":true')
 	assert state.requests[0].body.contains('"include_usage":true')
+}
+
+fn test_generate_content_streams_reasoning_with_associated_output() {
+	mut ctx := context.background()
+	client, _ := new_fixture_client('data: {"choices":[{"index":0,"delta":{"reasoning_content":"plan","content":"answer"}}]}\n\ndata: [DONE]\n\n', 200)
+	mut capture := &ReasoningCapture{}
+	stream := llms.ReasoningStreamFunc(fn [mut capture] (mut _ context.Context, reasoning []u8, output []u8) ! {
+		capture.reasoning += reasoning.bytestr()
+		capture.output += output.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_reasoning_func: stream
+	}) or { panic(err) }
+	assert capture.reasoning == 'plan'
+	assert capture.output == 'answer'
+	assert response.choices[0].reasoning == 'plan'
+	assert response.choices[0].content == 'answer'
 }

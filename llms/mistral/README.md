@@ -22,6 +22,9 @@ Configure a regional endpoint or another supported model with
 message, tool, JSON mode, bounded transport, and error behavior. Provider-only
 Mistral features and behavior differences beyond the translated token fields
 are not covered. Tests use an injected fake transport and never contact Mistral.
+Chat streaming is supported when the injected HTTP transport implements the
+streaming contract; the Mistral request-field translations also apply to
+streamed requests.
 
 The upstream endpoint is documented as OpenAI-compatible at
 [`https://api.mistral.ai/v1`](https://docs.mistral.ai/resources/migration-guides).

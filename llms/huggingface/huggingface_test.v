@@ -16,9 +16,27 @@ mut:
 	response httputil.Response
 }
 
+struct StreamCapture {
+mut:
+	value string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	return state.response
+}
+
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 9 < body.len { offset + 9 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
 	return state.response
 }
 
@@ -72,6 +90,24 @@ fn test_client_accepts_custom_router_and_model() {
 	}
 	assert state.requests[0].url == 'https://router.example.test/v1/chat/completions'
 	assert state.requests[0].body.contains('"model":"openai/gpt-oss-120b:fireworks-ai"')
+}
+
+fn test_streaming_translates_router_token_limit() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('data: {"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', 200)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		max_tokens:     24
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].content == 'ok'
+	assert streamed.value == 'ok'
+	assert state.requests[0].body.contains('"stream":true')
+	assert state.requests[0].body.contains('"max_tokens":24')
+	assert !state.requests[0].body.contains('"max_completion_tokens"')
 }
 
 fn test_constructor_requires_model_and_token() {

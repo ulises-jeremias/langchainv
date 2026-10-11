@@ -103,3 +103,26 @@ fn (client CloudflareHTTPClient) do(mut ctx context.Context, request httputil.Re
 	}
 	return client.inner.do(mut ctx, request)
 }
+
+fn (client CloudflareHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	if client.inner !is httputil.StreamingHTTPClient {
+		return error('configured Cloudflare HTTP transport does not support streaming responses')
+	}
+	stream_client := client.inner as httputil.StreamingHTTPClient
+	if request.body == '' {
+		return stream_client.do_stream(mut ctx, request, handler)
+	}
+	mut payload := json2.decode[map[string]json2.Any](request.body, json2.DecoderOptions{}) or {
+		return error('could not decode Cloudflare chat request')
+	}
+	if max_tokens := payload['max_completion_tokens'] {
+		payload['max_tokens'] = max_tokens
+		payload.delete('max_completion_tokens')
+	}
+	return stream_client.do_stream(mut ctx, httputil.Request{
+		method:  request.method
+		url:     request.url
+		headers: request.headers
+		body:    json2.encode(payload, json2.EncoderOptions{})
+	}, handler)
+}

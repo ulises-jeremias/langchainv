@@ -24,5 +24,6 @@ translates `max_completion_tokens` to the router's `max_tokens` field. It
 inherits supported text/image messages, tools, JSON mode, bounded transport,
 and error behavior. Model/provider availability and supported options depend
 on the selected inference provider. The legacy LangChainGo route and
-provider-specific selection options are not implemented. Tests use a fake
-transport and do not call Hugging Face.
+provider-specific selection options are not implemented. Chat streaming works
+when the injected HTTP transport implements the streaming contract. Tests use
+a fake transport and do not call Hugging Face.

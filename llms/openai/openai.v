@@ -259,7 +259,10 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 				state.error = 'OpenAI streaming returned an unexpected candidate index'
 				return
 			}
+			mut content_delta := ''
+			mut reasoning_delta := ''
 			if delta := choice.delta.content {
+				content_delta = delta
 				state.content += delta
 				if callback := options.streaming_func {
 					callback(mut callback_ctx, delta.bytes()) or {
@@ -269,9 +272,12 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 				}
 			}
 			if delta := choice.delta.reasoning {
+				reasoning_delta = delta
 				state.reasoning += delta
-				if callback := options.streaming_reasoning_func {
-					callback(mut callback_ctx, delta.bytes(), []u8{}) or {
+			}
+			if callback := options.streaming_reasoning_func {
+				if content_delta != '' || reasoning_delta != '' {
+					callback(mut callback_ctx, reasoning_delta.bytes(), content_delta.bytes()) or {
 						state.error = 'OpenAI reasoning callback failed: ${err.msg()}'
 						return
 					}

@@ -21,7 +21,8 @@ println(response.choices[0].content)
 The adapter reuses the shared OpenAI-compatible chat implementation, including
 supported text/image messages, tools, usage mapping, and bounded transport. It
 translates `max_completion_tokens` to Workers AI's `max_tokens`. Available
-options vary by model; Workers AI-specific `rejectIfBusy`, streaming, and
+options vary by model; chat streaming works when the injected HTTP transport
+implements the streaming contract. Workers AI-specific `rejectIfBusy` and
 provider-only controls remain outstanding. Tests use an injected fake
 transport and never contact Cloudflare.
 
