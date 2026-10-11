@@ -45,6 +45,7 @@ jobs:
       - name: Format and test implemented packages
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
+          v fmt -diff .
           v fmt -verify .
           for package in schema jsonschema llms llms/openai llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock tools tools/duckduckgo tools/perplexity tools/serpapi tools/wikipedia callbacks chains agents vectorstores prompts outputparser memory documentloaders textsplitter httputil; do
             v test "./$package"
