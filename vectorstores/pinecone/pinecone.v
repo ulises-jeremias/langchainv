@@ -5,7 +5,6 @@ import context
 import json2
 import math
 import net.http
-import net.urllib
 import rand
 import ulises_jeremias.langchainv.embeddings
 import ulises_jeremias.langchainv.httputil
@@ -46,8 +45,7 @@ pub fn new_store(embedder embeddings.Embedder, options Options) !Store {
 		return error('Pinecone index host is required and must be at most 2048 bytes')
 	}
 	httputil.validate_url(host, 'https')!
-	parsed := urllib.parse(host) or { return error('Pinecone index host is invalid') }
-	if parsed.path != '' && parsed.path != '/' || parsed.query != '' || parsed.fragment != '' {
+	if host.contains('/') || host.contains('?') || host.contains('#') {
 		return error('Pinecone index host must not contain a path, query, or fragment')
 	}
 	return Store{
