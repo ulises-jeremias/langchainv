@@ -28,6 +28,7 @@ The current core packages include:
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
+- `testing/llmtest`: opt-in model contract checks for generation, cancellation, multiturn, streaming, tool calls, and usage.
 - `memory`: no-op memory, in-memory chat history, conversation buffer, bounded window buffer, and token-bounded buffer with an injected counter.
 - `prompts`: validated string templates, role-tagged chat templates, and fixed- or selector-backed few-shot prompts.
 - `outputparser`: string, boolean, list, regex, structured, combining, and

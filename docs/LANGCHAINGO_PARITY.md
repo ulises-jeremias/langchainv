@@ -29,7 +29,7 @@ The inventory is based on upstream commit
 | `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store, and bounded Qdrant/Pinecone REST adapters with injected embeddings, namespaces, and metadata filters; persistent stores beyond these and full filter/distance parity remain outstanding |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, request/response byte and timeout limits, bounded incremental response callbacks, and a chunk-independent SSE decoder; redacted debug logging remains outstanding |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
-| `testing/llmtest` | LLM provider compliance and test helpers | not started |
+| `testing/llmtest` | LLM provider compliance and test helpers | partial: opt-in core generation and canceled-context checks, with capability checks for multiturn history, streaming chunks/error propagation, tool-call JSON/replay, and typed token usage; CI tests use deterministic offline model doubles, and calling `test_model` against a live provider is explicit |
 | `exp` | experimental public API surface present upstream | not started |
 
 ## LLM providers
