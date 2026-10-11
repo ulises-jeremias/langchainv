@@ -2,6 +2,7 @@
 module jsonschema
 
 import json2
+import math
 
 const max_schema_depth = 64
 
@@ -32,12 +33,19 @@ pub fn (data_type DataType) str() string {
 // Definition describes the JSON Schema subset supported by LangChainGo tools.
 pub struct Definition {
 pub:
-	type_       ?DataType
-	description string
-	enum_values []string
-	properties  map[string]Definition
-	required    []string
-	items       ?&Definition
+	type_                 ?DataType
+	description           string
+	enum_values           []string
+	properties            map[string]Definition
+	required              []string
+	items                 ?&Definition
+	minimum               ?f64
+	maximum               ?f64
+	min_length            ?int
+	max_length            ?int
+	min_items             ?int
+	max_items             ?int
+	additional_properties ?bool
 }
 
 // to_any validates the definition and converts it to a JSON value.
@@ -58,6 +66,27 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	}
 	if definition.description != '' {
 		result['description'] = json2.Any(definition.description)
+	}
+	if minimum := definition.minimum {
+		result['minimum'] = json2.Any(minimum)
+	}
+	if maximum := definition.maximum {
+		result['maximum'] = json2.Any(maximum)
+	}
+	if min_length := definition.min_length {
+		result['minLength'] = json2.Any(min_length)
+	}
+	if max_length := definition.max_length {
+		result['maxLength'] = json2.Any(max_length)
+	}
+	if min_items := definition.min_items {
+		result['minItems'] = json2.Any(min_items)
+	}
+	if max_items := definition.max_items {
+		result['maxItems'] = json2.Any(max_items)
+	}
+	if additional_properties := definition.additional_properties {
+		result['additionalProperties'] = json2.Any(additional_properties)
 	}
 	if definition.enum_values.len > 0 {
 		mut values := []json2.Any{cap: definition.enum_values.len}
@@ -112,6 +141,69 @@ fn (definition Definition) validate_depth(depth int) ! {
 		}
 		if data_type != .object && definition.properties.len > 0 {
 			return error('JSON Schema properties is only valid for object definitions')
+		}
+		if data_type !in [.number, .integer] && (definition.minimum != none || definition.maximum != none) {
+			return error('JSON Schema minimum and maximum are only valid for number or integer definitions')
+		}
+		if data_type != .string && (definition.min_length != none || definition.max_length != none) {
+			return error('JSON Schema minLength and maxLength are only valid for string definitions')
+		}
+		if data_type != .array && (definition.min_items != none || definition.max_items != none) {
+			return error('JSON Schema minItems and maxItems are only valid for array definitions')
+		}
+		if data_type != .object && definition.additional_properties != none {
+			return error('JSON Schema additionalProperties is only valid for object definitions')
+		}
+	}
+	if minimum := definition.minimum {
+		if !math.is_finite(minimum) {
+			return error('JSON Schema minimum must be finite')
+		}
+	}
+	if maximum := definition.maximum {
+		if !math.is_finite(maximum) {
+			return error('JSON Schema maximum must be finite')
+		}
+	}
+	if minimum := definition.minimum {
+		if maximum := definition.maximum {
+			if minimum > maximum {
+				return error('JSON Schema minimum must not exceed maximum')
+			}
+		}
+	}
+	if min_length := definition.min_length {
+		if min_length < 0 {
+			return error('JSON Schema minLength must not be negative')
+		}
+	}
+	if max_length := definition.max_length {
+		if max_length < 0 {
+			return error('JSON Schema maxLength must not be negative')
+		}
+	}
+	if min_length := definition.min_length {
+		if max_length := definition.max_length {
+			if min_length > max_length {
+				return error('JSON Schema minLength must not exceed maxLength')
+			}
+		}
+	}
+	if min_items := definition.min_items {
+		if min_items < 0 {
+			return error('JSON Schema minItems must not be negative')
+		}
+	}
+	if max_items := definition.max_items {
+		if max_items < 0 {
+			return error('JSON Schema maxItems must not be negative')
+		}
+	}
+	if min_items := definition.min_items {
+		if max_items := definition.max_items {
+			if min_items > max_items {
+				return error('JSON Schema minItems must not exceed maxItems')
+			}
 		}
 	}
 	mut enum_values := map[string]bool{}

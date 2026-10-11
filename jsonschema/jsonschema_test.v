@@ -36,6 +36,81 @@ fn test_definition_encodes_all_json_data_types() {
 	assert DataType.boolean.str() == 'boolean'
 }
 
+fn test_definition_encodes_standard_constraints() {
+	definition := Definition{
+		type_: .object
+		additional_properties: false
+		properties: {
+			'count': Definition{
+				type_: .integer
+				minimum: 1
+				maximum: 10
+			}
+			'name': Definition{
+				type_: .string
+				min_length: 2
+				max_length: 40
+			}
+			'tags': Definition{
+				type_: .array
+				min_items: 1
+				max_items: 5
+				items: &Definition{
+					type_: .string
+				}
+			}
+		}
+	}
+	encoded := definition.encode() or { panic(err) }
+	assert encoded.contains('"minimum":1')
+	assert encoded.contains('"maximum":10')
+	assert encoded.contains('"minLength":2')
+	assert encoded.contains('"maxLength":40')
+	assert encoded.contains('"minItems":1')
+	assert encoded.contains('"maxItems":5')
+	assert encoded.contains('"additionalProperties":false')
+}
+
+fn test_definition_rejects_invalid_constraint_types_and_ranges() {
+	invalid_definitions := [
+		Definition{
+			type_: .string
+			minimum: 1
+		},
+		Definition{
+			type_: .number
+			min_length: 1
+		},
+		Definition{
+			type_: .object
+			min_items: 1
+		},
+		Definition{
+			type_: .string
+			min_length: 3
+			max_length: 2
+		},
+		Definition{
+			type_: .array
+			min_items: 3
+			max_items: 2
+		},
+		Definition{
+			type_: .number
+			minimum: 3
+			maximum: 2
+		},
+		Definition{
+			type_: .object
+			additional_properties: false
+		},
+	]
+	for definition in invalid_definitions {
+		definition.validate() or { continue }
+		assert false, 'expected invalid JSON Schema constraints to fail'
+	}
+}
+
 fn test_definition_rejects_required_properties_that_are_missing() {
 	Definition{
 		type_:    .object
