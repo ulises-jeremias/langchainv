@@ -70,9 +70,9 @@ struct StreamEvent {
 }
 
 struct StreamDelta {
-	message      StreamMessage
+	message       StreamMessage
 	finish_reason string
-	usage        Usage
+	usage         Usage
 }
 
 struct StreamMessage {
@@ -85,9 +85,9 @@ struct StreamContent {
 }
 
 struct StreamToolCall {
-	id       string
+	id        string
 	call_type string @[json: 'type']
-	function StreamFunction
+	function  StreamFunction
 }
 
 struct StreamFunction {
@@ -296,7 +296,9 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 				state.input_tokens = event.delta.usage.tokens.input_tokens
 				state.output_tokens = event.delta.usage.tokens.output_tokens
 			}
-			'message-start', 'content-start', 'content-end', 'tool-call-end', 'tool-plan-delta', 'citation-start', 'citation-end', 'debug' {}
+			'message-start', 'content-start', 'content-end', 'tool-call-end', 'tool-plan-delta',
+			'citation-start', 'citation-end', 'debug' {
+			}
 			'error' {
 				state.error = 'Cohere returned an error event while streaming'
 			}
@@ -352,11 +354,15 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		}
 	}
 	choice := parse_choice(ChatResponse{
-		message: ResponseMessage{
-			content:    if state.content == '' { []ContentBlock{} } else { [ContentBlock{
-				block_type: 'text'
-				text:       state.content
-			}] }
+		message:       ResponseMessage{
+			content:    if state.content == '' {
+				[]ContentBlock{}
+			} else {
+				[ContentBlock{
+					block_type: 'text'
+					text:       state.content
+				}]
+			}
 			tool_calls: calls
 		}
 		finish_reason: state.finish_reason
