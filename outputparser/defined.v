@@ -125,6 +125,13 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = 'Record<string, boolean>'
 			} $else $if field.typ is map[string]int || field.typ is map[string]i64 || field.typ is map[string]i32 || field.typ is map[string]i16 || field.typ is map[string]i8 || field.typ is map[string]u64 || field.typ is map[string]u32 || field.typ is map[string]u16 || field.typ is map[string]u8 || field.typ is map[string]f32 || field.typ is map[string]f64 {
 				field_type = 'Record<string, number>'
+			} $else $if field.typ is $map {
+				nested_name := '${name}_${field.name.capitalize()}'
+				map_schema := defined_map_schema(source.$(field.name), nested_name)!
+				field_type = map_schema.field_type
+				if map_schema.nested_schema != '' {
+					nested_schemas << map_schema.nested_schema
+				}
 			} $else $if field.is_enum {
 				field_type = 'number'
 			} $else $if field.typ is $struct {
@@ -162,12 +169,35 @@ fn defined_container_schema[T](_values []T, name string) !DefinedContainerSchema
 		// The type is enough to build this schema, even when the input slice is empty.
 		return DefinedContainerSchema{
 			field_type:    '${name}[]'
-			nested_schema: defined_struct_schema(T{}, name)!
+			nested_schema: defined_nested_struct_schema[T](name)!
 		}
 	} $else {
 		return DefinedContainerSchema{
 			field_type: '${defined_array_element_schema(_values)!}[]'
 		}
+	}
+}
+
+fn defined_map_schema[K, T](_values map[K]T, name string) !DefinedContainerSchema {
+	$if K is string {
+		$if T is $struct {
+			return DefinedContainerSchema{
+				field_type:    'Record<string, ${name}>'
+				nested_schema: defined_nested_struct_schema[T](name)!
+			}
+		} $else {
+			return error('maps must contain nested structs or supported scalar values')
+		}
+	} $else {
+		return error('maps must use string keys')
+	}
+}
+
+fn defined_nested_struct_schema[T](name string) !string {
+	$if T is $struct {
+		return defined_struct_schema(T{}, name)
+	} $else {
+		return error('container values must be nested structs')
 	}
 }
 
@@ -179,6 +209,6 @@ fn defined_array_element_schema[T](_values []T) !string {
 	} $else $if T is $int || T is $float {
 		return 'number'
 	} $else {
-		return error('fixed arrays must contain strings, booleans, or numbers')
+		return error('arrays must contain strings, booleans, numbers, or nested structs')
 	}
 }

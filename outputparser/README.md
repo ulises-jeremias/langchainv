@@ -34,9 +34,9 @@ supports strings, booleans, numeric fields, their optional forms, slices,
 fixed arrays, and string-keyed maps of those primitives, enums, and nested
 structs. Slices and fixed arrays can also contain nested structs. Fixed arrays
 of scalar values can contain strings, booleans, or numbers. Unsupported V
-field types, including maps of nested structs, return an error. The `@[json:
-fieldName]` and `@[describe: "..."]` attributes supply JSON names and prompt
-descriptions.
+field types return an error. Maps of nested structs require string keys. The
+`@[json: fieldName]` and `@[describe: "..."]` attributes supply JSON names and
+prompt descriptions.
 
 `Combining` splits on two consecutive newlines, applies one parser per
 section, and merges only string-valued maps. See the
