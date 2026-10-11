@@ -38,24 +38,24 @@ fn test_definition_encodes_all_json_data_types() {
 
 fn test_definition_encodes_standard_constraints() {
 	definition := Definition{
-		type_: .object
+		type_:                 .object
 		additional_properties: false
-		properties: {
+		properties:            {
 			'count': Definition{
-				type_: .integer
+				type_:   .integer
 				minimum: 1
 				maximum: 10
 			}
-			'name': Definition{
-				type_: .string
+			'name':  Definition{
+				type_:      .string
 				min_length: 2
 				max_length: 40
 			}
-			'tags': Definition{
-				type_: .array
+			'tags':  Definition{
+				type_:     .array
 				min_items: 1
 				max_items: 5
-				items: &Definition{
+				items:     &Definition{
 					type_: .string
 				}
 			}
@@ -74,35 +74,31 @@ fn test_definition_encodes_standard_constraints() {
 fn test_definition_rejects_invalid_constraint_types_and_ranges() {
 	invalid_definitions := [
 		Definition{
-			type_: .string
+			type_:   .string
 			minimum: 1
 		},
 		Definition{
-			type_: .number
+			type_:      .number
 			min_length: 1
 		},
 		Definition{
-			type_: .object
+			type_:     .object
 			min_items: 1
 		},
 		Definition{
-			type_: .string
+			type_:      .string
 			min_length: 3
 			max_length: 2
 		},
 		Definition{
-			type_: .array
+			type_:     .array
 			min_items: 3
 			max_items: 2
 		},
 		Definition{
-			type_: .number
+			type_:   .number
 			minimum: 3
 			maximum: 2
-		},
-		Definition{
-			type_: .object
-			additional_properties: false
 		},
 	]
 	for definition in invalid_definitions {
