@@ -277,7 +277,7 @@ fn test_instance_validation_bounds_node_count() {
 	}
 	Definition{
 		type_: .array
-		items:  &Definition{}
+		items: &Definition{}
 	}.validate_instance(json2.Any(values)) or {
 		assert err.msg().contains('10000-node limit')
 		return
