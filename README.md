@@ -24,7 +24,7 @@ import ulises_jeremias.langchainv
 The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
-- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, and Gemini text/image/function-tool generation.
+- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, Gemini text/image/function-tool generation, and Vertex AI Gemini generation with explicit OAuth access tokens.
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract and bounded arithmetic calculator.
@@ -91,6 +91,9 @@ chat through its OpenAI-compatible API.
 
 See [`llms/local/README.md`](llms/local/README.md) for running an explicitly
 configured local executable with bounded arguments/output and context cancellation.
+
+See [`llms/vertex/README.md`](llms/vertex/README.md) for Gemini generation on
+Vertex AI using an explicitly supplied OAuth access token.
 
 See [`llms/bedrock/README.md`](llms/bedrock/README.md) for Amazon Bedrock
 Converse chat, tool use, images, and API-key authentication details.
