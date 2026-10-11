@@ -379,14 +379,14 @@ pub fn (database SQLDatabase) table_info(mut ctx context.Context, tables []strin
 		schema_text := state.engine.table_info(mut ctx, table) or {
 			return error('could not read SQL table schema')
 		}
-		append_bounded(mut output, schema_text + '\n\n', state.options.max_output_bytes)!
+		output = append_bounded(output, schema_text + '\n\n', state.options.max_output_bytes)!
 		if state.options.sample_rows > 0 {
 			identifier := quote_identifier(state.dialect, table)!
 			result := state.engine.query(mut ctx,
 				'SELECT * FROM ${identifier} LIMIT ${state.options.sample_rows}') or {
 				return error('could not read SQL table sample rows')
 			}
-			append_bounded(mut output, '/*\n${format_query_result(result, state.options)!}*/\n\n',
+			output = append_bounded(output, '/*\n${format_query_result(result, state.options)!}*/\n\n',
 				state.options.max_output_bytes)!
 		}
 	}
