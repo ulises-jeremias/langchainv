@@ -80,8 +80,8 @@ wrapping training layers or downloading weights during ordinary checks.
 ## Vector stores
 
 AlloyDB, Azure AI Search, Bedrock Knowledge Bases, Cloud SQL, Dolt, MariaDB,
-Milvus (including v2), MongoDB vector search, OpenSearch, pgvector, Redis, and
-Weaviate remain not started. Chroma — partial: v2 REST create/get-or-create and
+Milvus (including v2), MongoDB vector search, OpenSearch, pgvector, and Redis
+remain not started. Chroma — partial: v2 REST create/get-or-create and
 delete collection management, upsert/query/delete, injected embeddings and
 HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
 equality filters, namespaces, score thresholds, and bounded payloads; custom
@@ -97,6 +97,11 @@ provisioned index hosts, API-key auth, namespaces, scalar metadata equality
 filters, injected embeddings/transport, and bounded requests; index management,
 sparse/hybrid vectors, full filter operators, integrated text inference, and
 vector return remain outstanding.
+Weaviate — partial: batch object upsert and delete against a provisioned class,
+GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
+certainty thresholds, injected embeddings/transport, and bounded requests;
+class/schema management, advanced filter operators, and vector return remain
+outstanding.
 
 ## Document loaders and tools
 

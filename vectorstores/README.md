@@ -11,7 +11,7 @@ The in-memory implementation currently supports only cosine distance. It
 requires non-empty, finite vectors of consistent dimensions and rejects query
 dimension mismatches.
 
-The `chroma`, `qdrant`, and `pinecone` subpackages provide bounded REST adapters
-for existing remote collections or indexes. Each accepts an injected embedder
-and HTTP client for offline tests. See the package README files for supported
-filters, limits, authentication, and server setup.
+The `chroma`, `qdrant`, `pinecone`, and `weaviate` subpackages provide bounded
+REST adapters for existing remote collections or indexes. Each accepts an
+injected embedder and HTTP client for offline tests. See the package README
+files for supported filters, limits, authentication, and server setup.

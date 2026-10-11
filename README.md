@@ -138,6 +138,9 @@ Qdrant REST adapter and its collection requirements.
 See [`vectorstores/pinecone/README.md`](vectorstores/pinecone/README.md) for the
 Pinecone index host and metadata requirements.
 
+See [`vectorstores/weaviate/README.md`](vectorstores/weaviate/README.md) for
+Weaviate class, namespace, and filter requirements.
+
 ## Compatibility
 
 - V 0.5.2 or newer, subject to compiler compatibility notes in the docs.
