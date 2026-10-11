@@ -43,15 +43,15 @@ struct ChatResponse {
 
 struct OllamaStreamState {
 mut:
-	buffer          string
-	content         string
-	thinking        string
-	tool_calls      []ChatToolCall
-	done_reason     string
-	prompt_tokens   int
+	buffer            string
+	content           string
+	thinking          string
+	tool_calls        []ChatToolCall
+	done_reason       string
+	prompt_tokens     int
 	completion_tokens int
-	received_bytes  i64
-	error           string
+	received_bytes    i64
+	error             string
 }
 
 struct ChatMessage {
@@ -311,14 +311,14 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		return error(state.error)
 	}
 	return response_from_chat(ChatResponse{
-		message: ChatMessage{
-			content: state.content
-			thinking: state.thinking
+		message:           ChatMessage{
+			content:    state.content
+			thinking:   state.thinking
 			tool_calls: state.tool_calls
 		}
-		done_reason: state.done_reason
+		done_reason:       state.done_reason
 		prompt_eval_count: state.prompt_tokens
-		eval_count: state.completion_tokens
+		eval_count:        state.completion_tokens
 	})
 }
 
