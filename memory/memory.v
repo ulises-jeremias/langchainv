@@ -189,6 +189,13 @@ pub fn (buffer ConversationBuffer) memory_keys() []string {
 	return [buffer.memory_key]
 }
 
+// load_messages returns the typed chat history without converting it to a
+// role-labeled transcript. This is useful for callers that need message roles,
+// metadata, or multimodal content.
+pub fn (buffer ConversationBuffer) load_messages(mut ctx context.Context) ![]schema.Message {
+	return buffer.history.get_messages(mut ctx)
+}
+
 // load_memory_variables returns prior turns as a role-labeled transcript.
 pub fn (buffer ConversationBuffer) load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
 	messages := buffer.history.get_messages(mut ctx)!
@@ -273,6 +280,11 @@ pub fn new_conversation_window_buffer(window_size int, memory_key string, input_
 // memory_keys returns the key populated by this window memory.
 pub fn (window ConversationWindowBuffer) memory_keys() []string {
 	return window.buffer.memory_keys()
+}
+
+// load_messages returns the typed messages retained by the conversation window.
+pub fn (window ConversationWindowBuffer) load_messages(mut ctx context.Context) ![]schema.Message {
+	return window.buffer.load_messages(mut ctx)
 }
 
 // load_memory_variables returns the retained turns as a role-labeled transcript.

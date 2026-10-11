@@ -15,6 +15,10 @@ output_key)` stores only the latest `window_size` turns.
 Each turn is one human and one assistant message. A non-positive window size
 uses the default of five turns; sizes above 10,000 return an error. This window
 limits message count, not tokens.
+`ConversationBuffer.load_messages` and `ConversationWindowBuffer.load_messages`
+return typed message snapshots for callers that need roles, metadata, or
+multimodal content. The `schema.Memory` contract continues to expose the
+role-labeled transcript string for use by existing chains.
 
 The token buffer constructor accepts an injected llms.TokenCounter, model,
 token limit, and memory/input/output keys. It evicts oldest complete

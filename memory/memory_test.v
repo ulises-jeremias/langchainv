@@ -77,6 +77,11 @@ fn test_conversation_buffer_load_save_and_clear() {
 	loaded := buffer.load_memory_variables(mut ctx, inputs) or { panic(err) }
 	loaded_history := loaded['history'] or { panic('missing history') }
 	assert loaded_history.str() == 'Human: What is V?\nAI: A programming language.'
+	messages := buffer.load_messages(mut ctx) or { panic(err) }
+	assert messages.len == 2
+	assert messages[0].role == .human
+	assert messages[1].role == .ai
+	assert messages[0].text() == 'What is V?'
 	assert buffer.memory_keys() == ['history']
 	buffer.clear(mut ctx) or { panic(err) }
 	cleared := buffer.load_memory_variables(mut ctx, inputs) or { panic(err) }
@@ -161,6 +166,10 @@ fn test_conversation_window_buffer_keeps_only_recent_turns() {
 	loaded := window.load_memory_variables(mut ctx, map[string]json2.Any{}) or { panic(err) }
 	history := loaded['history'] or { panic('missing history') }
 	assert history.str() == 'Human: question 2\nAI: answer 2\nHuman: question 3\nAI: answer 3'
+	messages := window.load_messages(mut ctx) or { panic(err) }
+	assert messages.len == 4
+	assert messages[0].role == .human
+	assert messages[0].text() == 'question 2'
 	assert window.window_size == 2
 	assert window.memory_keys() == ['history']
 	mut memory_contract := schema.Memory(window)
