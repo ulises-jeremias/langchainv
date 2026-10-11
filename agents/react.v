@@ -87,8 +87,13 @@ pub fn new_react_agent(model llms.CompletionModel, agent_tools []tools.Tool, opt
 		}
 		seen_tools[name.to_lower()] = true
 	}
-	mut configured := options
-	configured.max_prompt_bytes = max_prompt_bytes
+	mut configured := ReactOptions{
+		input_keys:       options.input_keys.clone()
+		output_key:       options.output_key
+		max_prompt_bytes: max_prompt_bytes
+		call_options:     options.call_options
+		prompt:           options.prompt
+	}
 	if configured.prompt.template.trim_space() == '' {
 		mut question_lines := []string{cap: keys.len}
 		for key in keys {
