@@ -49,12 +49,15 @@ configured question and context variables. Set `return_source_documents` to
 include the bounded retrieved documents under `source_documents` (or a custom
 `source_documents_key`) in the chain outputs.
 
-`new_conversational_retrieval_qa_chain` first rewrites the latest question
-against bounded conversation history, then passes that standalone question to
-retrieval QA. It requires memory that supplies the configured history key and
-uses the same memory lifecycle as other chains. The answer prompt must require
-only the question and retrieved context. The condensing prompt must contain
-only the history and question variables. History, input questions, generated
+`new_conversational_retrieval_qa_chain` rewrites follow-up questions against
+bounded conversation history and skips rewriting when history is empty. The
+standalone question always drives retrieval. Set `rephrase_question: false` to
+send the original question to the answer prompt, and
+`return_generated_question: true` to include `generated_question` in the
+outputs. It requires memory that supplies the configured history key and uses
+the same memory lifecycle as other chains. The answer prompt must require only
+the question and retrieved context. The condensing prompt must contain only
+the history and question variables. History, input questions, generated
 questions, retrieved context, and final prompts are bounded.
 
 The chat-model variant accepts a role-tagged prompt, sends its rendered

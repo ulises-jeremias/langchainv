@@ -10,27 +10,32 @@ import ulises_jeremias.langchainv.schema
 const default_max_retrieval_history_bytes = 32 * 1024
 const max_retrieval_history_bytes = 1024 * 1024
 const default_max_standalone_question_bytes = 8192
+const generated_question_key = 'generated_question'
 
 // ConversationalRetrievalQAOptions bounds and configures query rewriting.
 pub struct ConversationalRetrievalQAOptions {
 pub:
-	retrieval_qa          RetrievalQAOptions
-	history_key           string = 'history'
-	max_history_bytes     int    = default_max_retrieval_history_bytes
-	max_question_bytes    int    = default_max_standalone_question_bytes
-	condense_call_options llms.CallOptions
+	retrieval_qa              RetrievalQAOptions
+	history_key               string = 'history'
+	max_history_bytes         int    = default_max_retrieval_history_bytes
+	max_question_bytes        int    = default_max_standalone_question_bytes
+	rephrase_question         bool   = true
+	return_generated_question bool
+	condense_call_options     llms.CallOptions
 }
 
 // ConversationalRetrievalQAChain rewrites a question using memory before retrieval.
 pub struct ConversationalRetrievalQAChain {
-	retrieval_chain       RetrievalQAChain
-	model                 llms.CompletionModel
-	question_prompt       prompts.StringTemplate
-	question_key          string
-	history_key           string
-	max_history_bytes     int
-	max_question_bytes    int
-	condense_call_options llms.CallOptions
+	retrieval_chain           RetrievalQAChain
+	model                     llms.CompletionModel
+	question_prompt           prompts.StringTemplate
+	question_key              string
+	history_key               string
+	max_history_bytes         int
+	max_question_bytes        int
+	rephrase_question         bool
+	return_generated_question bool
+	condense_call_options     llms.CallOptions
 }
 
 // new_conversational_retrieval_qa_chain constructs a memory-backed chain that
@@ -60,6 +65,9 @@ pub fn new_conversational_retrieval_qa_chain(retriever schema.Retriever, model l
 	if retrieval_chain.input_keys() != [qa_options.question_key] {
 		return error('conversational retrieval answer prompt must only require the question besides retrieved context')
 	}
+	if options.return_generated_question && generated_question_key in retrieval_chain.output_keys() {
+		return error('generated question output key conflicts with a configured retrieval QA output')
+	}
 	if memory := retrieval_chain.memory() {
 		if options.history_key !in memory.memory_keys() {
 			return error('conversational retrieval memory must provide `${options.history_key}`')
@@ -68,14 +76,16 @@ pub fn new_conversational_retrieval_qa_chain(retriever schema.Retriever, model l
 		return error('conversational retrieval QA requires memory')
 	}
 	return ConversationalRetrievalQAChain{
-		retrieval_chain:       retrieval_chain
-		model:                 model
-		question_prompt:       question_prompt
-		question_key:          qa_options.question_key
-		history_key:           options.history_key
-		max_history_bytes:     options.max_history_bytes
-		max_question_bytes:    options.max_question_bytes
-		condense_call_options: options.condense_call_options
+		retrieval_chain:           retrieval_chain
+		model:                     model
+		question_prompt:           question_prompt
+		question_key:              qa_options.question_key
+		history_key:               options.history_key
+		max_history_bytes:         options.max_history_bytes
+		max_question_bytes:        options.max_question_bytes
+		rephrase_question:         options.rephrase_question
+		return_generated_question: options.return_generated_question
+		condense_call_options:     options.condense_call_options
 	}
 }
 
@@ -105,21 +115,31 @@ pub fn (chain ConversationalRetrievalQAChain) call(mut ctx context.Context, inpu
 	if history.len > chain.max_history_bytes {
 		return error('conversational retrieval history exceeds the configured byte limit')
 	}
-	condense_prompt := chain.question_prompt.format({
-		chain.question_key: json2.Any(question)
-		chain.history_key:  json2.Any(history)
-	})!
-	if condense_prompt.len > max_retrieval_prompt_bytes {
-		return error('formatted conversational retrieval prompt exceeds the configured byte limit')
+	mut standalone_question := question
+	if history.len > 0 {
+		condense_prompt := chain.question_prompt.format({
+			chain.question_key: json2.Any(question)
+			chain.history_key:  json2.Any(history)
+		})!
+		if condense_prompt.len > max_retrieval_prompt_bytes {
+			return error('formatted conversational retrieval prompt exceeds the configured byte limit')
+		}
+		standalone_question = chain.model.complete(mut ctx, condense_prompt,
+			chain.condense_call_options)!.trim_space()
 	}
-	standalone_question := chain.model.complete(mut ctx, condense_prompt,
-		chain.condense_call_options)!.trim_space()
 	if standalone_question == '' || standalone_question.len > chain.max_question_bytes {
 		return error('condensed retrieval question is empty or exceeds the configured byte limit')
 	}
 	mut retrieval_inputs := inputs.clone()
-	retrieval_inputs[chain.question_key] = json2.Any(standalone_question)
-	return chain.retrieval_chain.call(mut ctx, retrieval_inputs)
+	if chain.rephrase_question {
+		retrieval_inputs[chain.question_key] = json2.Any(standalone_question)
+	}
+	mut outputs := chain.retrieval_chain.call_with_retrieval_query(mut ctx, retrieval_inputs,
+		standalone_question)!
+	if chain.return_generated_question {
+		outputs[generated_question_key] = json2.Any(standalone_question)
+	}
+	return outputs
 }
 
 // memory returns the conversation memory configured on retrieval QA.
@@ -134,5 +154,9 @@ pub fn (chain ConversationalRetrievalQAChain) input_keys() []string {
 
 // output_keys returns the configured retrieval QA outputs.
 pub fn (chain ConversationalRetrievalQAChain) output_keys() []string {
-	return chain.retrieval_chain.output_keys()
+	mut keys := chain.retrieval_chain.output_keys()
+	if chain.return_generated_question {
+		keys << generated_question_key
+	}
+	return keys
 }

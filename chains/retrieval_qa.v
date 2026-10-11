@@ -108,9 +108,13 @@ pub fn new_retrieval_qa_chain(retriever schema.Retriever, model llms.CompletionM
 
 // call retrieves and bounds context before rendering the prompt.
 pub fn (chain RetrievalQAChain) call(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	return chain.call_with_retrieval_query(mut ctx, inputs, none)
+}
+
+fn (chain RetrievalQAChain) call_with_retrieval_query(mut ctx context.Context, inputs map[string]json2.Any, retrieval_query ?string) !map[string]json2.Any {
 	chain.call_options.validate()!
 	query_value := inputs[chain.question_key] or { return error('missing retrieval QA question') }
-	query := match query_value {
+	answer_question := match query_value {
 		string {
 			query_value
 		}
@@ -118,6 +122,7 @@ pub fn (chain RetrievalQAChain) call(mut ctx context.Context, inputs map[string]
 			return error('retrieval QA question must be a string')
 		}
 	}
+	query := retrieval_query or { answer_question }
 	documents := chain.retriever.get_relevant_documents(mut ctx, query, chain.retrieval)!
 	if documents.len > chain.max_documents {
 		return error('retriever returned more documents than the configured limit')

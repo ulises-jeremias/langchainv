@@ -49,8 +49,7 @@ fn test_conversational_retrieval_qa_condenses_and_saves_original_turns() {
 		documents: [schema.new_document('The city is Paris.')]
 	}
 	mut model_state := &ConversationalCompletionState{
-		responses: ['Where is the museum?', 'The museum is in Paris.', 'When was it founded?',
-			'It was founded in 1793.']
+		responses: ['The museum is in Paris.', 'When was it founded?', 'It was founded in 1793.']
 	}
 	conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
 		panic(err)
@@ -76,14 +75,55 @@ fn test_conversational_retrieval_qa_condenses_and_saves_original_turns() {
 		'question': json2.Any('Where is it?')
 	}) or { panic(err) }
 	assert (first['answer'] or { panic('missing answer') }).str() == 'The museum is in Paris.'
-	assert retriever_state.queries == ['Where is the museum?']
+	assert retriever_state.queries == ['Where is it?']
 	second := call(mut ctx, chain, {
 		'question': json2.Any('When was it founded?')
 	}) or { panic(err) }
 	assert (second['answer'] or { panic('missing answer') }).str() == 'It was founded in 1793.'
-	assert retriever_state.queries == ['Where is the museum?', 'When was it founded?']
-	assert model_state.prompts[2].contains('Human: Where is it?')
-	assert model_state.prompts[2].contains('AI: The museum is in Paris.')
+	assert retriever_state.queries == ['Where is it?', 'When was it founded?']
+	assert model_state.prompts[1].contains('Human: Where is it?')
+	assert model_state.prompts[1].contains('AI: The museum is in Paris.')
+	assert model_state.prompts.len == 3
+}
+
+fn test_conversational_retrieval_qa_can_return_generated_question_without_rephrasing_answer() {
+	mut retriever_state := &ConversationalRetrieverState{
+		documents: [schema.new_document('source')]
+	}
+	mut model_state := &ConversationalCompletionState{
+		responses: ['rewritten standalone question', 'answer using original question']
+	}
+	mut conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
+		panic(err)
+	}
+	mut ctx := context.background()
+	conversation.save_context(mut ctx, {
+		'question': json2.Any('earlier question')
+	}, {
+		'answer': json2.Any('earlier answer')
+	}) or { panic(err) }
+	chain := new_conversational_retrieval_qa_chain(ConversationalRetrieverFixture{
+		state: retriever_state
+	}, ConversationalCompletionFixture{
+		state: model_state
+	}, prompts.StringTemplate{
+		template: 'History: {history}; Question: {question}'
+	}, prompts.StringTemplate{
+		template: '{context}; Final question: {question}'
+	}, ConversationalRetrievalQAOptions{
+		retrieval_qa:              RetrievalQAOptions{
+			memory: conversation
+		}
+		rephrase_question:         false
+		return_generated_question: true
+	}) or { panic(err) }
+	outputs := call(mut ctx, chain, {
+		'question': json2.Any('original follow-up')
+	}) or { panic(err) }
+	assert chain.output_keys() == ['answer', 'generated_question']
+	assert retriever_state.queries == ['rewritten standalone question']
+	assert model_state.prompts[1].contains('Final question: original follow-up')
+	assert (outputs['generated_question'] or { json2.Any('') }) == json2.Any('rewritten standalone question')
 }
 
 fn test_conversational_retrieval_qa_requires_memory() {
@@ -110,9 +150,15 @@ fn test_conversational_retrieval_qa_rejects_oversized_condensed_question_before_
 			responses: ['rewritten question is too long']
 		}
 	}
-	conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
+	mut conversation := chat_memory.new_conversation_buffer('history', 'question', 'answer') or {
 		panic(err)
 	}
+	mut ctx := context.background()
+	conversation.save_context(mut ctx, {
+		'question': json2.Any('earlier question')
+	}, {
+		'answer': json2.Any('earlier answer')
+	}) or { panic(err) }
 	chain := new_conversational_retrieval_qa_chain(ConversationalRetrieverFixture{
 		state: retriever_state
 	}, model, prompts.StringTemplate{
@@ -125,7 +171,6 @@ fn test_conversational_retrieval_qa_rejects_oversized_condensed_question_before_
 		}
 		max_question_bytes: 16
 	}) or { panic(err) }
-	mut ctx := context.background()
 	call(mut ctx, chain, {
 		'question': json2.Any('follow-up')
 	}) or {
