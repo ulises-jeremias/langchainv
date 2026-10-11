@@ -1,6 +1,7 @@
 module wikipedia
 
 import context
+import json2
 import ulises_jeremias.langchainv.httputil
 
 @[heap]
@@ -25,10 +26,14 @@ fn (client WikipediaFixtureHTTP) do(mut _ctx context.Context, request httputil.R
 }
 
 fn test_wikipedia_tool_encodes_query_and_formats_plain_text_results() {
+	wikipedia_response := '{"pages":[{"id":1,"key":"V_language","title":"V (programming language)","excerpt":"<span class=\"searchmatch\">V</span> is a compiled programming language."}]}'
+	json2.decode[map[string]json2.Any](wikipedia_response, json2.DecoderOptions{}) or {
+		panic('Wikipedia fixture JSON did not decode: ${err.msg()}')
+	}
 	mut state := &WikipediaFixtureState{}
 	http := WikipediaFixtureHTTP{
 		state:    state
-		response: '{"pages":[{"id":1,"key":"V_language","title":"V (programming language)","excerpt":"<span class=\"searchmatch\">V</span> is a compiled programming language."}]}'
+		response: wikipedia_response
 	}
 	tool := new_tool(1, 'en', httputil.HTTPClient(http)) or { panic(err) }
 	mut ctx := context.background()
