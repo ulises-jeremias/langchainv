@@ -34,10 +34,10 @@ mut:
 @[heap]
 struct MCPState {
 mut:
-	initialized       bool
+	initialized         bool
 	protocol_negotiated bool
-	session_id        string
-	next_id            int = 1
+	session_id          string
+	next_id             int = 1
 }
 
 // ToolInfo describes one server-provided tool and its JSON input schema.
