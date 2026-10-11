@@ -300,7 +300,9 @@ fn (_store Store) equal_filter(key string, value json2.Any) !string {
 		bool { 'valueBoolean' }
 		int, i64, i32, i16, i8, u64, u32, u16, u8 { 'valueInt' }
 		f64, f32 { 'valueNumber' }
-		else { return error('Weaviate equality filters support string, boolean, and numeric values') }
+		else {
+			return error('Weaviate equality filters support string, boolean, and numeric values')
+		}
 	}
 	if value is f64 && !math.is_finite(value as f64) {
 		return error('Weaviate filters must contain finite values')
@@ -410,9 +412,9 @@ fn graphql_errors_present(value json2.Any) bool {
 	match value {
 		json2.Null { return false }
 		[]json2.Any { return value.len > 0 }
-	map[string]json2.Any { return value.len > 0 }
-	string { return value != '' }
-	else { return true }
+		map[string]json2.Any { return value.len > 0 }
+		string { return value != '' }
+		else { return true }
 	}
 }
 

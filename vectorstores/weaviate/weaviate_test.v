@@ -40,9 +40,9 @@ fn (client WeaviateFixtureHTTP) do(mut _ctx context.Context, request httputil.Re
 
 fn weaviate_fixture_store(state &WeaviateFixtureState) !Store {
 	return new_store_with_client(WeaviateFixtureEmbedder{}, Options{
-		base_url: 'https://weaviate.example.test'
+		base_url:   'https://weaviate.example.test'
 		class_name: 'Guide'
-		api_key: 'fixture-key'
+		api_key:    'fixture-key'
 	}, httputil.HTTPClient(WeaviateFixtureHTTP{
 		state: state
 	}))
@@ -132,7 +132,7 @@ fn test_weaviate_rejects_http_200_batch_object_errors() {
 
 fn test_weaviate_rejects_remote_http_and_reserved_metadata() {
 	new_store(WeaviateFixtureEmbedder{}, Options{
-		base_url: 'http://remote.example.test'
+		base_url:   'http://remote.example.test'
 		class_name: 'Guide'
 	}) or {
 		assert err.msg().contains('HTTPS')
