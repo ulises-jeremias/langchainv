@@ -250,9 +250,9 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 }
 
 struct ConversionLimits {
-	mut:
-		image_bytes   int
-		content_bytes int
+mut:
+	image_bytes   int
+	content_bytes int
 }
 
 fn convert_message(message schema.Message, mut limits ConversionLimits) !map[string]json2.Any {
