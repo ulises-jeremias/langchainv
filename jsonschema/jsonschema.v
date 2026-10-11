@@ -42,6 +42,7 @@ pub fn (data_type DataType) str() string {
 pub struct Definition {
 pub:
 	type_                 ?DataType
+	types                 []DataType
 	description           string
 	enum_values           []string
 	properties            map[string]Definition
@@ -69,7 +70,13 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	mut result := map[string]json2.Any{
 		'properties': json2.Any(map[string]json2.Any{})
 	}
-	if data_type := definition.type_ {
+	if definition.types.len > 0 {
+		mut types := []json2.Any{cap: definition.types.len}
+		for data_type in definition.types {
+			types << json2.Any(data_type.str())
+		}
+		result['type'] = json2.Any(types)
+	} else if data_type := definition.type_ {
 		result['type'] = json2.Any(data_type.str())
 	}
 	if definition.description != '' {
@@ -183,10 +190,15 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 	if depth > max_schema_depth {
 		return error('JSON Schema instance nesting exceeds the 64-level limit at ${path}')
 	}
-	if data_type := definition.type_ {
-		if !instance_matches_type(instance, data_type) {
-			return error('JSON Schema type mismatch at ${path}: expected ${data_type.str()}')
+	if !instance_matches_definition_type(instance, definition) {
+		expected := if definition.types.len > 0 {
+			definition.types.map(it.str()).join(', ')
+		} else if data_type := definition.type_ {
+			data_type.str()
+		} else {
+			'any'
 		}
+		return error('JSON Schema type mismatch at ${path}: expected ${expected}')
 	}
 	if definition.enum_values.len > 0 {
 		if instance is string {
@@ -277,6 +289,21 @@ fn instance_matches_type(instance json2.Any, data_type DataType) bool {
 	}
 }
 
+fn instance_matches_definition_type(instance json2.Any, definition Definition) bool {
+	if definition.types.len > 0 {
+		for data_type in definition.types {
+			if instance_matches_type(instance, data_type) {
+				return true
+			}
+		}
+		return false
+	}
+	if data_type := definition.type_ {
+		return instance_matches_type(instance, data_type)
+	}
+	return true
+}
+
 fn instance_number(instance json2.Any) ?f64 {
 	return match instance {
 		f64 { instance }
@@ -322,6 +349,38 @@ fn (definition Definition) validate_depth(depth int) ! {
 		}
 		if data_type != .object && definition.additional_properties != none {
 			return error('JSON Schema additionalProperties is only valid for object definitions')
+		}
+	}
+	if definition.type_ != none && definition.types.len > 0 {
+		return error('JSON Schema cannot declare both type and types')
+	}
+	if definition.types.len > 0 {
+		mut seen_types := map[DataType]bool{}
+		for data_type in definition.types {
+			if data_type in seen_types {
+				return error('JSON Schema types must be unique')
+			}
+			seen_types[data_type] = true
+		}
+		if definition.items != none && .array !in definition.types {
+			return error('JSON Schema items requires array in types')
+		}
+		if (definition.required.len > 0 || definition.properties.len > 0
+			|| definition.additional_properties != none) && .object !in definition.types {
+			return error('JSON Schema object constraints require object in types')
+		}
+		if (definition.minimum != none || definition.maximum != none)
+			&& .number !in definition.types && .integer !in definition.types {
+			return error('JSON Schema minimum and maximum require number or integer in types')
+		}
+		if (definition.min_length != none || definition.max_length != none) && .string !in definition.types {
+			return error('JSON Schema minLength and maxLength require string in types')
+		}
+		if (definition.min_items != none || definition.max_items != none) && .array !in definition.types {
+			return error('JSON Schema minItems and maxItems require array in types')
+		}
+		if definition.enum_values.len > 0 && .string !in definition.types {
+			return error('JSON Schema string enum requires string in types')
 		}
 	}
 	if minimum := definition.minimum {

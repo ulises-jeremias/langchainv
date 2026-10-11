@@ -1,7 +1,7 @@
 # JSON Schema definitions
 
 `Definition` represents the schema subset used to describe tool parameters:
-the JSON primitive/container types, descriptions, string enums, object
+one JSON type or a list of accepted types, descriptions, string enums, object
 properties and required names, array item definitions, numeric minimum/maximum,
 string minLength/maxLength, array minItems/maxItems, and the boolean form of
 `additionalProperties`. `to_any()` produces a validated `json2.Any` tree, and
@@ -18,6 +18,6 @@ numeric minimum/maximum, string minLength/maxLength, and array minItems/maxItems
 Instances are capped at 10,000 nodes, 1 MiB of aggregate scalar/key bytes, and
 64 levels of nesting before schema evaluation.
 
-Unions, references, formats, schema-valued `additionalProperties`, and schema
-composition remain unsupported. Pass a raw schema to a tool when those
-features are needed.
+References, formats, schema-valued `additionalProperties`, and schema
+composition (`allOf`, `anyOf`, `oneOf`, and `not`) remain unsupported. Pass a
+raw schema to a tool when those features are needed.

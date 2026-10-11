@@ -38,6 +38,14 @@ fn test_definition_encodes_all_json_data_types() {
 	assert DataType.boolean.str() == 'boolean'
 }
 
+fn test_definition_encodes_union_types() {
+	definition := Definition{
+		types: [.string, .null_value]
+	}
+	encoded := definition.encode() or { panic(err) }
+	assert encoded.contains('"type":["string","null"]')
+}
+
 fn test_definition_encodes_standard_constraints() {
 	definition := Definition{
 		type_:                 .object
@@ -268,6 +276,35 @@ fn test_instance_validation_checks_missing_required_properties() {
 		return
 	}
 	assert false, 'expected missing required property to fail'
+}
+
+fn test_instance_validation_accepts_union_types_and_scopes_constraints() {
+	definition := Definition{
+		types:      [.string, .null_value]
+		min_length: 1
+	}
+	definition.validate_instance(json2.Any('valid')) or { panic(err) }
+	definition.validate_instance(json2.Any(json2.null)) or { panic(err) }
+	definition.validate_instance(json2.Any('')) or {
+		assert err.msg().contains('minLength')
+		return
+	}
+	assert false, 'expected the string-specific constraint to reject an empty string'
+}
+
+fn test_definition_rejects_duplicate_or_ambiguous_type_declarations() {
+	for definition in [
+		Definition{
+			types: [.string, .string]
+		},
+		Definition{
+			type_: .string
+			types: [.null_value]
+		},
+	] {
+		definition.validate() or { continue }
+		assert false, 'expected invalid type declaration to fail'
+	}
 }
 
 fn test_instance_validation_bounds_node_count() {
