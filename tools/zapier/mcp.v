@@ -202,7 +202,7 @@ fn (client Client) request(mut ctx context.Context, method string, params json2.
 		return error('Zapier MCP returned an invalid JSON-RPC response')
 	}
 	response_id := decoded['id'] or { return error('Zapier MCP response is missing id') }
-	if response_id != json2.Any(request_id) {
+	if !mcp_id_matches(response_id, request_id) {
 		return error('Zapier MCP response id does not match the request')
 	}
 	return decoded
@@ -296,6 +296,16 @@ fn mcp_bool(values map[string]json2.Any, key string) bool {
 	value := values[key] or { return false }
 	if value is bool {
 		return value as bool
+	}
+	return false
+}
+
+fn mcp_id_matches(value json2.Any, expected int) bool {
+	if value is i64 {
+		return (value as i64) == i64(expected)
+	}
+	if value is int {
+		return (value as int) == expected
 	}
 	return false
 }
