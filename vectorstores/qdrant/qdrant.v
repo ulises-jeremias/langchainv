@@ -16,12 +16,13 @@ const max_documents_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
 
-// Store writes embeddings and payloads to an existing Qdrant collection.
+// Store writes embeddings and payloads to one Qdrant collection.
 pub struct Store {
 pub:
-	base_url   string = 'http://127.0.0.1:6333'
-	collection string
-	api_key    string
+	base_url    string = 'http://127.0.0.1:6333'
+	collection  string
+	api_key     string
+	vector_size int
 pub mut:
 	embedder    embeddings.Embedder
 	http_client httputil.HTTPClient
@@ -65,6 +66,48 @@ pub fn new_store(collection string, embedder embeddings.Embedder, options StoreO
 	}
 }
 
+// new_store_with_collection creates a single-vector cosine collection and
+// returns a store bound to it. The embedder's output dimension must equal
+// vector_size.
+pub fn new_store_with_collection(mut ctx context.Context, collection string, vector_size int, embedder embeddings.Embedder, options StoreOptions) !Store {
+	client := httputil.HTTPClient(httputil.DefaultClient{
+		max_request_bytes:  max_payload_bytes
+		max_response_bytes: max_payload_bytes
+	})
+	return new_store_with_collection_and_client(mut ctx, collection, vector_size, embedder,
+		options, client)
+}
+
+// new_store_with_collection_and_client creates a collection with the supplied
+// HTTP transport. It supports custom transports and deterministic offline tests.
+pub fn new_store_with_collection_and_client(mut ctx context.Context, collection string, vector_size int, embedder embeddings.Embedder, options StoreOptions, http_client httputil.HTTPClient) !Store {
+	if vector_size <= 0 || vector_size > 65536 {
+		return error('Qdrant vector size must be between 1 and 65536')
+	}
+	mut store := new_store(collection, embedder, options)!
+	store.http_client = http_client
+	body := json2.encode(map[string]json2.Any{
+		'vectors': json2.Any({
+			'size':     json2.Any(vector_size)
+			'distance': json2.Any('Cosine')
+		})
+	}, json2.EncoderOptions{})
+	store.request_to(mut ctx, .put, '${store.base_url}/collections/${store.collection}', body)!
+	return Store{
+		base_url:    store.base_url
+		collection:  store.collection
+		api_key:     store.api_key
+		vector_size: vector_size
+		embedder:    store.embedder
+		http_client: store.http_client
+	}
+}
+
+// delete_collection deletes the collection bound to this store and its points.
+pub fn (store Store) delete_collection(mut ctx context.Context) ! {
+	store.request_to(mut ctx, .delete, '${store.base_url}/collections/${store.collection}', '')!
+}
+
 // StoreOptions configures endpoint, collection auth, and the embedder.
 pub struct StoreOptions {
 pub:
@@ -101,6 +144,9 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 		vector := vectors[index]
 		if vector.len == 0 || (dimension > 0 && vector.len != dimension) {
 			return error('Qdrant embeddings must be non-empty and have consistent dimensions')
+		}
+		if store.vector_size > 0 && vector.len != store.vector_size {
+			return error('Qdrant embedding dimension does not match the collection vector size')
 		}
 		dimension = vector.len
 		mut wire_vector := []json2.Any{cap: vector.len}
@@ -158,6 +204,9 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	vector := store.embedder.embed_query(mut ctx, query)!
 	if vector.len == 0 {
 		return error('Qdrant query embedding must not be empty')
+	}
+	if store.vector_size > 0 && vector.len != store.vector_size {
+		return error('Qdrant query embedding dimension does not match the collection vector size')
 	}
 	mut query_values := []json2.Any{cap: vector.len}
 	for value in vector {
@@ -267,6 +316,11 @@ pub fn (store Store) delete(mut ctx context.Context, ids []string, options vecto
 }
 
 fn (store Store) request(mut ctx context.Context, method http.Method, path string, body string) !httputil.Response {
+	return store.request_to(mut ctx, method, '${store.base_url}/collections/${store.collection}${path}',
+		body)
+}
+
+fn (store Store) request_to(mut ctx context.Context, method http.Method, url string, body string) !httputil.Response {
 	if body.len > max_payload_bytes {
 		return error('Qdrant request exceeds 4 MiB')
 	}
@@ -279,7 +333,7 @@ fn (store Store) request(mut ctx context.Context, method http.Method, path strin
 	}
 	response := store.http_client.do(mut ctx, httputil.Request{
 		method:  method
-		url:     '${store.base_url}/collections/${store.collection}${path}'
+		url:     url
 		headers: headers
 		body:    body
 	}) or {

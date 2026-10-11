@@ -76,6 +76,75 @@ fn test_qdrant_upserts_documents_with_uuid_and_bounded_payload() {
 	assert request.body.contains('[0.25,0.75]')
 }
 
+fn test_qdrant_creates_cosine_collection_uses_it_and_deletes_it() {
+	mut state := &QdrantFixtureState{
+		responses: [
+			httputil.Response{
+				status_code: 200
+				headers:     http.Header{}
+				body:        '{"result":true,"status":"ok"}'
+			},
+			httputil.Response{
+				status_code: 200
+				headers:     http.Header{}
+				body:        '{"result":{"status":"ok"}}'
+			},
+			httputil.Response{
+				status_code: 200
+				headers:     http.Header{}
+				body:        '{"result":true,"status":"ok"}'
+			},
+		]
+	}
+	mut ctx := context.background()
+	mut store := new_store_with_collection_and_client(mut ctx, 'new-docs', 2,
+		QdrantFixtureEmbedder{}, StoreOptions{
+			base_url: 'https://qdrant.example.test'
+			api_key:  'fixture-token'
+		}, httputil.HTTPClient(QdrantFixtureHTTP{
+			state: state
+		})) or { panic(err) }
+	assert state.requests.len == 1
+	create_request := state.requests[0]
+	assert create_request.method == .put
+	assert create_request.url == 'https://qdrant.example.test/collections/new-docs'
+	assert create_request.body.contains('"size":2')
+	assert create_request.body.contains('"distance":"Cosine"')
+	store.add_documents(mut ctx, [schema.new_document('new point')], vectorstores.StoreOptions{}) or {
+		panic(err)
+	}
+	assert state.requests.len == 2
+	assert state.requests[1].url.ends_with('/collections/new-docs/points?wait=true')
+	store.delete_collection(mut ctx) or { panic(err) }
+	assert state.requests.len == 3
+	assert state.requests[2].method == .delete
+	assert state.requests[2].url == 'https://qdrant.example.test/collections/new-docs'
+}
+
+fn test_qdrant_created_collection_rejects_embedding_dimension_mismatch() {
+	mut state := &QdrantFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"result":true,"status":"ok"}'
+		}]
+	}
+	mut ctx := context.background()
+	mut store := new_store_with_collection_and_client(mut ctx, 'wrong-size', 3,
+		QdrantFixtureEmbedder{}, StoreOptions{
+			base_url: 'https://qdrant.example.test'
+		}, httputil.HTTPClient(QdrantFixtureHTTP{
+			state: state
+		})) or { panic(err) }
+	store.add_documents(mut ctx, [schema.new_document('wrong vector size')],
+		vectorstores.StoreOptions{}) or {
+		assert err.msg().contains('does not match')
+		assert state.requests.len == 1
+		return
+	}
+	assert false, 'expected embedder and collection dimensions to match'
+}
+
 fn test_qdrant_search_maps_payload_filter_and_score() {
 	mut state := &QdrantFixtureState{
 		responses: [httputil.Response{

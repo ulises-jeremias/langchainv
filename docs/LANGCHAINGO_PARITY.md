@@ -87,11 +87,12 @@ HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
 equality filters, namespaces, score thresholds, and bounded payloads; custom
 collection configuration, array metadata, advanced filters, custom IDs, and
 returned vectors remain outstanding. Qdrant — partial: REST
-upsert/query/delete against existing single-vector collections, API-key or
-HTTPS authentication, payload metadata filters, namespaces, injected
-embeddings/transport, and bounded requests; collection management, named or
-multi-vector search, the full filter DSL, custom point IDs, and vector return
-remain outstanding. Pinecone — partial: HTTPS upsert/query/delete against
+create/delete and upsert/query/delete for single-vector cosine collections,
+API-key or HTTPS authentication, payload metadata filters, namespaces, injected
+embeddings/transport, and bounded requests with preflight embedding-dimension
+validation for newly created collections; named or multi-vector search, the
+full filter DSL, custom point IDs, and vector return remain outstanding.
+Pinecone — partial: HTTPS upsert/query/delete against
 provisioned index hosts, API-key auth, namespaces, scalar metadata equality
 filters, injected embeddings/transport, and bounded requests; index management,
 sparse/hybrid vectors, full filter operators, integrated text inference, and
