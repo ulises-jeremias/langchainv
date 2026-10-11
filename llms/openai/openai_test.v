@@ -153,4 +153,5 @@ fn test_generate_content_streams_text_and_maps_usage() {
 	assert response.usage.total_tokens == 4
 	assert state.requests[0].headers['Accept'] == 'text/event-stream'
 	assert state.requests[0].body.contains('"stream":true')
+	assert state.requests[0].body.contains('"include_usage":true')
 }

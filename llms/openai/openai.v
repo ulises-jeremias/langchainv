@@ -223,6 +223,9 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		stream_request[key] = value
 	}
 	stream_request['stream'] = json2.Any(true)
+	stream_request['stream_options'] = json2.Any({
+		'include_usage': json2.Any(true)
+	})
 	headers := {
 		'Authorization': 'Bearer ${client.api_key}'
 		'Content-Type':  'application/json'
