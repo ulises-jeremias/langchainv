@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,10 +24,18 @@ jobs:
         with:
           path: langchainv
 
-      - name: Set up V
-        uses: vlang/setup-v@v1.7
+      - name: Check out pinned V compiler
+        uses: actions/checkout@v7
         with:
-          check-latest: true
+          repository: vlang/v
+          ref: 03e12f368ad5061756d523891e12cd759053f486
+          path: vlang
+
+      - name: Build V compiler
+        run: |
+          make -C vlang
+          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
+          ./vlang/v version
 
       - name: Install under the V module path
         run: |
@@ -38,13 +45,8 @@ jobs:
       - name: Format and test implemented packages
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-          sudo systemd-run --scope --property=MemoryMax=4G \
-            --property=MemorySwapMax=0 --setenv=HOME="$HOME" \
-            --setenv=PATH="$PATH" --setenv=VJOBS=2 -- \
-            bash -euc '
-              cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-              v fmt -verify .
-              for package in schema llms embeddings tools callbacks chains vectorstores prompts outputparser memory documentloaders; do
-                v test "./$package"
-              done
-            '
+          v fmt -verify .
+          for package in schema jsonschema llms llms/openai llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock tools tools/duckduckgo tools/perplexity tools/serpapi tools/wikipedia tools/exa tools/scraper tools/zapier callbacks chains agents vectorstores prompts outputparser memory documentloaders textsplitter httputil; do
+            v test "./$package"
+          done
+          v -o /tmp/langchainv-text-splitter examples/text_splitter/main.v

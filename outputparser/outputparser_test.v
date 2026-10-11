@@ -33,3 +33,77 @@ fn test_comma_separated_list() {
 	assert (values[0] as string) == 'red'
 	assert (values[2] as string) == 'blue'
 }
+
+fn test_regex_parser_returns_named_capture_groups() {
+	pattern := 'Question: (?P<question>.*)' + '\n' + 'Answer: (?P<answer>.*)'
+	parser := new_regex_parser(pattern) or {
+		panic(err)
+	}
+	parsed := parser.parse('Question: why?\nAnswer: because') or { panic(err) }
+	assert parsed is map[string]json2.Any
+	values := parsed as map[string]json2.Any
+	assert (values['question'] or { panic('missing question') }) == json2.Any('why?')
+	assert (values['answer'] or { panic('missing answer') }) == json2.Any('because')
+}
+
+fn test_regex_dict_omits_no_update_values() {
+	parser := new_regex_dict(map[string]string{
+		'answer': 'Answer'
+		'source': 'Source'
+	}, 'UNCHANGED') or { panic(err) }
+	parsed := parser.parse('Answer: sky. Extra words\nSource: UNCHANGED') or { panic(err) }
+	assert parsed is map[string]json2.Any
+	values := parsed as map[string]json2.Any
+	answer := values['answer'] or { panic('missing answer') }
+	assert answer == json2.Any('sky.'), 'unexpected parsed answer: ${answer}'
+	assert 'source' !in values
+}
+
+fn test_structured_parser_requires_and_returns_schema_fields() {
+	parser := new_structured([
+		ResponseSchema{
+			name:        'answer'
+			description: 'The response.'
+		},
+	])
+	parsed := parser.parse('```json\n{"answer":"42"}\n```') or { panic(err) }
+	assert parsed is map[string]json2.Any
+	values := parsed as map[string]json2.Any
+	assert (values['answer'] or { panic('missing answer') }) == json2.Any('42')
+}
+
+fn test_combining_parser_merges_string_maps_in_section_order() {
+	first := new_regex_parser(r'(?P<first>.+)') or { panic(err) }
+	second := new_regex_parser(r'(?P<second>.+)') or { panic(err) }
+	parser := new_combining([Parser(first), Parser(second)])
+	parsed := parser.parse('one\n\ntwo') or { panic(err) }
+	assert parsed is map[string]json2.Any
+	values := parsed as map[string]json2.Any
+	assert (values['first'] or { panic('missing first') }) == json2.Any('one')
+	assert (values['second'] or { panic('missing second') }) == json2.Any('two')
+}
+
+struct DefinedExampleChild {
+	detail string
+}
+
+struct DefinedExample {
+	name         string
+	display_name string @[json: 'display_name']
+	ignored      string @[skip]
+	child        DefinedExampleChild
+}
+
+fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
+	parser := new_defined(DefinedExample{}) or { panic(err) }
+	instructions := parser.format_instructions()
+	assert instructions.contains('"display_name": string;')
+	assert instructions.contains('interface _Root_Child')
+	assert !instructions.contains('"ignored"')
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"}}\n```') or {
+		panic(err)
+	}
+	assert parsed.name == 'Ada'
+	assert parsed.display_name == 'A.'
+	assert parsed.child.detail == 'V'
+}

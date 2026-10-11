@@ -18,13 +18,13 @@ fn test_assistant_message_preserves_typed_parts() {
 	response := Response{
 		choices: [
 			Choice{
-				content: 'answer'
+				content:    'answer'
 				tool_calls: [
 					schema.ToolCall{
-						id: 'call-1'
-						call_type: 'function'
+						id:            'call-1'
+						call_type:     'function'
 						function_call: schema.FunctionCall{
-							name: 'lookup'
+							name:      'lookup'
 							arguments: '{}'
 						}
 					},
@@ -48,7 +48,7 @@ fn test_assistant_message_uses_parts_for_replay() {
 			},
 			Choice{
 				parts: [schema.ContentPart(schema.ThinkingPart{
-					text: 'reasoning'
+					text:      'reasoning'
 					signature: 'opaque'
 				})]
 			},
@@ -63,11 +63,11 @@ fn test_call_options_validate_provider_independent_constraints() {
 	valid := CallOptions{
 		min_length: 2
 		max_length: 5
-		top_p: 0.8
-		tools: [
+		top_p:      0.8
+		tools:      [
 			schema.ToolDefinition{
 				name: 'lookup'
-			}
+			},
 		]
 	}
 	valid.validate() or { panic(err) }

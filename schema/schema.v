@@ -76,14 +76,14 @@ pub:
 pub struct WebSearchOptions {
 pub:
 	search_context_size string
-	user_location      ?UserLocation
+	user_location       ?UserLocation
 }
 
 // UserLocation carries an approximate location for localized web search.
 pub struct UserLocation {
 pub:
 	location_type string
-	approximate ?ApproximateLocation
+	approximate   ?ApproximateLocation
 }
 
 // ApproximateLocation contains coarse geographic search hints.
@@ -124,7 +124,13 @@ pub:
 }
 
 // ContentPart is one typed part of a multimodal message.
-pub type ContentPart = BinaryPart | ImageURLPart | RedactedThinkingPart | TextPart | ThinkingPart | ToolCall | ToolResult
+pub type ContentPart = BinaryPart
+	| ImageURLPart
+	| RedactedThinkingPart
+	| TextPart
+	| ThinkingPart
+	| ToolCall
+	| ToolResult
 
 // Message is a chat message with ordered, typed content parts.
 pub struct Message {
@@ -137,8 +143,8 @@ pub mut:
 // text_message creates a message with a single text part.
 pub fn text_message(role Role, text string) Message {
 	return Message{
-		role:  role
-		parts: [ContentPart(TextPart{
+		role:     role
+		parts:    [ContentPart(TextPart{
 			text: text
 		})]
 		metadata: map[string]json2.Any{}
@@ -180,6 +186,7 @@ pub interface Memory {
 	load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any
 	save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) !
 	memory_keys() []string
+	clear(mut ctx context.Context) !
 }
 
 // ChatMessageHistory stores and retrieves an ordered conversation.

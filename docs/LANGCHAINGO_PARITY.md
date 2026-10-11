@@ -13,21 +13,21 @@ The inventory is based on upstream commit
 
 | Upstream package | Scope to account for | Status |
 |---|---|---|
-| `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | not started |
-| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle handler contract and ordered text dispatch |
-| `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract and input/output validation |
-| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded text-file loader |
-| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Hugging Face, Jina, OpenAI, VoyageAI | partial: contracts, newline preprocessing, batching, dot product, cosine similarity |
-| `jsonschema` | schema generation and validation helpers | not started |
-| `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract |
-| `memory` | buffer, window buffer, token buffer, simple/chat memory, message history, AlloyDB, Cloud SQL, MongoDB, SQLite, Zep | partial: in-memory chat history and conversation buffer |
-| `outputparser` | simple, boolean, comma-separated list, regex, regex dictionary, defined/structured, combining | partial: simple, boolean, comma-separated list |
-| `prompts` | prompt values, string/chat/message templates, template formats/rendering, validation, example selectors, few-shot | partial: validated string placeholders and escaping |
+| `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | partial: Plan/Finish contract, generic model tool-calling agent, and bounded iterative executor with typed string inputs, case-insensitive tool dispatch, cancellation checks, callbacks, chain memory integration, and optional intermediate-step output; MRKL/conversational variants, specialized OpenAI-functions agent, parser recovery, and full initialization remain outstanding |
+| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; see V-native queue behavior in package docs |
+| `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract, input/output validation, prompt-backed completion and chat-model chains, a fixed-prompt completion conversation chain with history memory, bounded document-stuffing into completion prompts, sequential bounded map-reduce with metadata preservation and optional intermediate steps, bounded sequential map-rerank with answer/score parsing, descending rank selection and optional sorted steps, bounded sequential refine with metadata-aware document formatting, running-answer updates and pre-call limits, bounded retrieval QA with optional source-document return, bounded history-based standalone-question rewriting for conversational retrieval QA, built-in stuff/refine/map-reduce/map-rerank QA presets, question-condensing prompt chain, stuff/refine/map-reduce summarization presets, validated sequential composition, simple sequential key adaptation, and function-backed transform chain; SQL and constitutional chains remain outstanding. Map-reduce, map-rerank, and refine currently process documents sequentially rather than using LangChainGo's concurrent mapping |
+| `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded HTML text, text-file, CSV, paginated recursive Notion blocks, and AssemblyAI transcription loaders; bounded recursive directory traversal for `.txt`, `.md`, `.csv`, `.html`, and `.htm` files with extension filters, CSV columns, source metadata, and bounded splitting; PDF remains outstanding |
+| `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Google AI, Hugging Face, Jina, OpenAI, Ollama, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, OpenAI, Jina, and Voyage `/v1/embeddings`, Hugging Face feature extraction, Ollama `/api/embed`, Gemini `batchEmbedContents`, and Amazon Bedrock Titan/Cohere `InvokeModel` clients with injectable transport; Cybertron remains outstanding |
+| `jsonschema` | schema generation and validation helpers | partial: recursive object/array definitions, primitive types, descriptions, string enums, properties, required names, and item schemas with consistency validation; advanced JSON Schema keywords and validation against instance values remain outstanding |
+| `llms` | model/chat contracts, generation, options, errors/mappers, prompt caching, reasoning, token counting/utilization, marshaling, compliance, fake/cache; providers below | partial: generation/completion/reasoning contracts, response types, common options, token-counter contract, non-streaming OpenAI Chat Completions, Anthropic Messages, Cohere Chat API v2, current Baidu Qianfan v2 OpenAI-compatible chat, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, and Ollama chat with text, bounded images, client tool calls, usage accounting, and offline transport tests |
+| `memory` | buffer, window buffer, token buffer, simple/chat memory, message history, AlloyDB, Cloud SQL, MongoDB, SQLite, Zep | partial: no-op and fixed-value simple memory, in-memory chat history, conversation buffer, bounded conversation window buffer, and injected-token-counter memory that evicts complete oldest turns; other memory forms and persistent backends remain outstanding |
+| `outputparser` | simple, boolean, comma-separated list, regex, regex dictionary, defined/structured, combining | partial: simple, boolean, comma-separated list, regex, regex dictionary, structured string fields, combining string maps, and typed `Defined[T]` for strings, booleans, numbers, primitive options, scalar slices/string-key maps, enums, and nested structs; package compilation/tests pass in PR #1 CI (2026-10-09); fixed arrays, containers of nested structs, and other field types still need coverage |
+| `prompts` | prompt values, string/chat/message templates, template formats/rendering, validation, example selectors, few-shot | partial: validated string placeholders and escaping; role-tagged text chat templates, static few-shot examples, and injected ExampleSelector support; alternate formats, typed multimodal templates, and built-in example selectors remain outstanding |
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents, typed multimodal messages, memory/history/retriever contracts |
-| `textsplitter` | recursive character, token, Markdown, document splitting and options | not started |
-| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract |
-| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter |
-| `httputil` | shared HTTP client/transport, user-agent, logging transport | not started |
+| `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; package tests and example compilation pass in PR #1 CI (2026-10-09); full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
+| `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, and parentheses, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, and Zapier MCP Streamable HTTP tool discovery/calls; integrations use injectable HTTP transport and bounded inputs/responses; Starlark math builtins and remaining integrations are outstanding |
+| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, and bounded process-local cosine-similarity store with an injected embedder; persistent stores and full filter/distance parity remain outstanding |
+| `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, and request/response byte and timeout limits; redacted debug logging remains outstanding |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | not started |
 | `exp` | experimental public API surface present upstream | not started |
@@ -36,25 +36,46 @@ The inventory is based on upstream commit
 
 | Provider package | Status |
 |---|---|
-| Anthropic | not started |
+| Anthropic | partial: non-streaming Messages API client with text/system and bounded image messages, client tool definitions and tool-use responses, stop sequences, usage mapping, injectable bounded HTTP transport, and offline fixtures; streaming, reasoning replay, and provider-specific options remain outstanding |
 | AWS Bedrock | not started |
-| Cloudflare | not started |
-| Cohere | not started |
-| ERNIE | not started |
-| Google AI / Gemini | not started |
+| Cloudflare | partial: Workers AI OpenAI-compatible Chat Completions route, required account/model configuration, `max_tokens` translation, common message/tool behavior, bounded injectable transport, and offline tests; streaming, Workers AI-specific options, and provider-only controls remain outstanding |
+| Cohere | partial: bounded non-streaming Chat API v2 text generation, sampling and stop controls, function tool calls and replay, JSON object mode, usage accounting, and injectable offline transport; streaming, image input, reasoning replay, provider extensions, and named tool selection remain outstanding. This uses the current `/v2/chat` API because Cohere marks the upstream adapter's `/v1/generate` endpoint deprecated. |
+| ERNIE | partial: current Baidu Qianfan v2 OpenAI-compatible non-streaming chat with configurable model/base URL, shared message/tool/JSON/options support, bounded transport, and fake-transport tests; legacy AK/SK token exchange, legacy routes, embeddings, streaming, and provider-specific controls remain outstanding |
+| Google AI / Gemini | partial: bounded non-streaming `generateContent` for text, system instructions, inline images, function declarations/calls/results, generation controls, candidate count, seed, JSON MIME output, finish reasons, usage mapping, Gemini `batchEmbedContents`, and injectable HTTPS transports; remote image URLs, streaming, JSON schema output, and token counting remain outstanding |
 | Google Vertex AI | not started |
-| Hugging Face | not started |
+| Hugging Face | partial: current OpenAI-compatible Inference Providers chat router with required model/provider selection, common message/tool behavior, `max_tokens` translation, bounded injectable HTTP transport, and offline tests; legacy inference route, streaming, and provider-specific options remain outstanding |
 | llamafile | not started |
 | local | not started |
-| Maritaca | not started |
-| Mistral | not started |
-| Ollama | not started |
-| OpenAI | not started |
+| Maritaca | partial: current OpenAI-compatible Chat Completions using the shared message/tool/JSON/options implementation, configurable endpoint/model, bounded transport, and fake-transport tests; Responses API, streaming, and provider-specific options remain outstanding |
+| Mistral | partial: OpenAI-compatible Chat Completions using the shared request/response implementation, with translation for Mistral's `max_tokens` and `random_seed` fields, regional base URL/model configuration, and fake-transport tests; streaming parity, native Mistral options, and provider-specific behavior beyond those field mappings remain outstanding |
+| Ollama | partial: non-streaming `/api/chat`, text and bounded inline images, tool definitions/results, JSON mode, common generation options, thinking replay, usage accounting, `/api/embed` client, and injectable offline-tested transports; streaming, pull/model management, schema-valued format, and provider options remain outstanding |
+| OpenAI | partial: non-streaming Chat Completions, completion adapter, text and image messages, function tools, usage, reasoning fields; streaming, richer reasoning replay, response APIs and broader option parity outstanding |
 | IBM watsonx | not started |
 
 ## Embedding providers
 
-Bedrock, Cybertron, Hugging Face, Jina, OpenAI, and VoyageAI — all not started.
+OpenAI — partial: JSON float requests, configurable model/base URL/dimensions,
+input-order restoration, and injected HTTP transport. Jina — partial: bounded
+JSON float requests, configurable model/base URL, response-order restoration,
+and injected HTTP transport; task/dimension options and asynchronous batches
+remain outstanding. VoyageAI — partial: bounded JSON float requests, configurable
+model/base URL, query/document input modes, and injected HTTP transport;
+dimension and task configuration remain outstanding. Ollama — partial: batched
+`/api/embed`, configurable model/base URL, input and response limits, vector
+shape validation, and injected HTTP transport. Google AI — partial: batched
+`batchEmbedContents`, configurable model/base URL/task/dimensions, vector shape
+validation, and injected HTTP transport. Hugging Face — partial: bounded
+feature-extraction requests through the current inference router with
+configurable model/task/base URL and injected transport. Bedrock — partial:
+Titan V1/V2 and Cohere V3 requests via bearer-key Runtime API, including Cohere
+query/document modes and injected transport; AWS credential-chain signing and
+broader model support remain outstanding. Cybertron remains not started: its
+upstream contract runs pretrained Transformer embedding models locally, while
+the available VTL model checkpoint format targets VTL `Sequential` networks
+and does not provide a compatible pretrained-model loader. VSL's tokenizer is
+not a substitute for that inference runtime. Revisit this adapter when a
+compatible V-native pretrained encoder/runtime exists; do not imply parity by
+wrapping training layers or downloading weights during ordinary checks.
 
 ## Vector stores
 
@@ -64,10 +85,9 @@ Pinecone, Qdrant, Redis, and Weaviate — all not started.
 
 ## Document loaders and tools
 
-- Loaders: AssemblyAI, CSV, directory, HTML, Notion, PDF, text.
-- Tools: calculator, DuckDuckGo, Metaphor, Perplexity, scraper, SerpAPI, SQL
-  database (MySQL/PostgreSQL/SQLite), Wikipedia, Zapier.
-- All are not started.
+- Loaders still outstanding: PDF. AssemblyAI provides bounded HTTPS URL submission and status polling with injectable HTTP and offline tests. HTML uses V's standard-library parser; full browser-style parsing and network fetching are outside its scope.
+- Tools still outstanding: SQL database (MySQL/PostgreSQL/SQLite). Zapier's
+  retired NLA API is replaced by the current MCP Streamable HTTP integration.
 
 ## Cross-cutting parity requirements
 
