@@ -32,7 +32,11 @@ pub fn new_tool(max_results int, user_agent string, http_client httputil.HTTPCli
 	}
 	return Tool{
 		max_results: if max_results == 0 { default_max_results } else { max_results }
-		user_agent:  if user_agent.trim_space() == '' { default_user_agent } else { user_agent.trim_space() }
+		user_agent:  if user_agent.trim_space() == '' {
+			default_user_agent
+		} else {
+			user_agent.trim_space()
+		}
 		http_client: http_client
 	}
 }
