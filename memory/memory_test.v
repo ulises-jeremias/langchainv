@@ -128,6 +128,24 @@ fn test_conversation_buffer_rejects_non_string_values() {
 	assert false, 'expected non-string input to fail'
 }
 
+fn test_conversation_buffer_uses_and_clears_injected_history() {
+	mut ctx := context.background()
+	mut history := new_in_memory_chat_message_history()
+	mut buffer := new_conversation_buffer_with_history(ConversationBufferOptions{},
+		schema.ChatMessageHistory(history)) or { panic(err) }
+	buffer.save_context(mut ctx, {
+		'question': json2.Any('question')
+	}, {
+		'answer': json2.Any('answer')
+	}) or { panic(err) }
+	messages := history.get_messages(mut ctx) or { panic(err) }
+	assert messages.len == 2
+	assert messages[0].text() == 'question'
+	assert messages[1].text() == 'answer'
+	buffer.clear(mut ctx) or { panic(err) }
+	assert (history.get_messages(mut ctx) or { panic(err) }).len == 0
+}
+
 fn test_conversation_window_buffer_keeps_only_recent_turns() {
 	mut ctx := context.background()
 	mut window := new_conversation_window_buffer(2, 'history', 'question', 'answer') or {

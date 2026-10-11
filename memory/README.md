@@ -8,8 +8,10 @@ conversation in process memory. `new_conversation_buffer_with_options` also
 supports custom human/AI transcript prefixes and infers an input or output key
 when its key option is blank and the corresponding map has exactly one string
 value. It rejects ambiguous maps and non-string values. The original constructor
-continues to require all three keys. `new_conversation_window_buffer(window_size,
-memory_key, input_key, output_key)` stores only the latest `window_size` turns.
+continues to require all three keys. Use `new_conversation_buffer_with_history`
+to supply any `schema.ChatMessageHistory` implementation, including persistent
+backends. `new_conversation_window_buffer(window_size, memory_key, input_key,
+output_key)` stores only the latest `window_size` turns.
 Each turn is one human and one assistant message. A non-positive window size
 uses the default of five turns; sizes above 10,000 return an error. This window
 limits message count, not tokens.

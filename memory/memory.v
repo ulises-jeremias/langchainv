@@ -150,19 +150,23 @@ pub fn new_conversation_buffer(memory_key string, input_key string, output_key s
 	if memory_key == '' || input_key == '' || output_key == '' {
 		return error('memory, input, and output keys must be non-empty')
 	}
-	return ConversationBuffer{
-		history:      new_in_memory_chat_message_history()
-		memory_key:   memory_key
-		input_key:    input_key
-		output_key:   output_key
-		human_prefix: 'Human'
-		ai_prefix:    'AI'
-	}
+	return new_conversation_buffer_with_options(ConversationBufferOptions{
+		memory_key: memory_key
+		input_key:  input_key
+		output_key: output_key
+	})
 }
 
 // new_conversation_buffer_with_options creates a configurable conversation
 // buffer. Blank prefix values select the standard `Human` and `AI` labels.
 pub fn new_conversation_buffer_with_options(options ConversationBufferOptions) !ConversationBuffer {
+	return new_conversation_buffer_with_history(options,
+		schema.ChatMessageHistory(new_in_memory_chat_message_history()))
+}
+
+// new_conversation_buffer_with_history creates a configurable conversation
+// buffer over a caller-provided chat history implementation.
+pub fn new_conversation_buffer_with_history(options ConversationBufferOptions, history schema.ChatMessageHistory) !ConversationBuffer {
 	memory_key := if options.memory_key.trim_space() == '' { 'history' } else { options.memory_key }
 	human_prefix := if options.human_prefix.trim_space() == '' {
 		'Human'
@@ -171,7 +175,7 @@ pub fn new_conversation_buffer_with_options(options ConversationBufferOptions) !
 	}
 	ai_prefix := if options.ai_prefix.trim_space() == '' { 'AI' } else { options.ai_prefix }
 	return ConversationBuffer{
-		history:      new_in_memory_chat_message_history()
+		history:      history
 		memory_key:   memory_key
 		input_key:    options.input_key
 		output_key:   options.output_key
