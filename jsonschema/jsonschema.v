@@ -125,6 +125,128 @@ pub fn (definition Definition) validate() ! {
 	definition.validate_depth(0)!
 }
 
+// validate_instance checks a JSON value against this definition's supported
+// JSON Schema subset. Errors include the failing instance path.
+pub fn (definition Definition) validate_instance(instance json2.Any) ! {
+	definition.validate()!
+	definition.validate_instance_at(instance, '$', 0)!
+}
+
+fn (definition Definition) validate_instance_at(instance json2.Any, path string, depth int) ! {
+	if depth > max_schema_depth {
+		return error('JSON Schema instance nesting exceeds the 64-level limit at ${path}')
+	}
+	if data_type := definition.type_ {
+		if !instance_matches_type(instance, data_type) {
+			return error('JSON Schema type mismatch at ${path}: expected ${data_type.str()}')
+		}
+	}
+	if definition.enum_values.len > 0 {
+		if instance is string {
+			if instance !in definition.enum_values {
+				return error('JSON Schema enum mismatch at ${path}')
+			}
+		} else {
+			return error('JSON Schema string enum cannot validate a non-string value at ${path}')
+		}
+	}
+	match instance {
+		string {
+			if min_length := definition.min_length {
+				if instance.runes().len < min_length {
+					return error('JSON Schema string is shorter than minLength at ${path}')
+				}
+			}
+			if max_length := definition.max_length {
+				if instance.runes().len > max_length {
+					return error('JSON Schema string is longer than maxLength at ${path}')
+				}
+			}
+		}
+		[]json2.Any {
+			if min_items := definition.min_items {
+				if instance.len < min_items {
+					return error('JSON Schema array has fewer items than minItems at ${path}')
+				}
+			}
+			if max_items := definition.max_items {
+				if instance.len > max_items {
+					return error('JSON Schema array has more items than maxItems at ${path}')
+				}
+			}
+			if items := definition.items {
+				for index, item in instance {
+					items.validate_instance_at(item, '${path}[${index}]', depth + 1)!
+				}
+			}
+		}
+		map[string]json2.Any {
+			for name in definition.required {
+				if name !in instance {
+					return error('JSON Schema required property `${name}` is missing at ${path}')
+				}
+			}
+			for name, value in instance {
+				if property := definition.properties[name] {
+					property.validate_instance_at(value, '${path}.${name}', depth + 1)!
+				} else if additional_properties := definition.additional_properties {
+					if !additional_properties {
+						return error('JSON Schema additional property `${name}` is not allowed at ${path}')
+					}
+				}
+			}
+		}
+		else {}
+	}
+	if number := instance_number(instance) {
+		if minimum := definition.minimum {
+			if number < minimum {
+				return error('JSON Schema number is below minimum at ${path}')
+			}
+		}
+		if maximum := definition.maximum {
+			if number > maximum {
+				return error('JSON Schema number is above maximum at ${path}')
+			}
+		}
+	}
+}
+
+fn instance_matches_type(instance json2.Any, data_type DataType) bool {
+	return match data_type {
+		.object { instance is map[string]json2.Any }
+		.array { instance is []json2.Any }
+		.string { instance is string }
+		.boolean { instance is bool }
+		.null_value { instance is json2.Null }
+		.number { instance_number(instance) != none }
+		.integer {
+			if number := instance_number(instance) {
+				number == math.floor(number)
+			} else {
+				false
+			}
+		}
+	}
+}
+
+fn instance_number(instance json2.Any) ?f64 {
+	return match instance {
+		f64 { instance }
+		f32 { f64(instance) }
+		i64 { f64(instance) }
+		int { f64(instance) }
+		i32 { f64(instance) }
+		i16 { f64(instance) }
+		i8 { f64(instance) }
+		u64 { f64(instance) }
+		u32 { f64(instance) }
+		u16 { f64(instance) }
+		u8 { f64(instance) }
+		else { none }
+	}
+}
+
 fn (definition Definition) validate_depth(depth int) ! {
 	if depth > max_schema_depth {
 		return error('JSON Schema nesting exceeds the 64-level limit')

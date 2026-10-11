@@ -8,9 +8,14 @@ string minLength/maxLength, array minItems/maxItems, and the boolean form of
 `encode()` serializes it. Empty `properties` maps are emitted as `{}` to match
 the upstream Definition shape.
 
-Validation rejects misplaced type-specific fields, invalid or inverted
-constraint ranges, duplicate enum/required values, missing required property
-definitions, and empty names. This package does not validate JSON instances or
-cover unions, references, formats, schema-valued `additionalProperties`, or
-composition. Pass a raw `json2.Any` schema to a tool when those features are
-needed.
+Definition validation rejects misplaced type-specific fields, invalid or
+inverted constraint ranges, duplicate enum/required values, missing required
+property definitions, and empty names. `validate_instance(json2.Any)` checks
+the supported definition subset recursively and includes the failing instance
+path in errors. It covers type checks, string enums, object properties and
+required names, the boolean form of `additionalProperties`, array items,
+numeric minimum/maximum, string minLength/maxLength, and array minItems/maxItems.
+
+Unions, references, formats, schema-valued `additionalProperties`, and schema
+composition remain unsupported. Pass a raw schema to a tool when those
+features are needed.

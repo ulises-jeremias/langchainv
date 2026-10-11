@@ -1,5 +1,7 @@
 module jsonschema
 
+import json2
+
 fn test_definition_encodes_nested_properties_and_items() {
 	definition := Definition{
 		type_:      .object
@@ -159,4 +161,111 @@ fn test_definition_rejects_excessive_nesting() {
 		return
 	}
 	assert false, 'expected excessive schema nesting to fail'
+}
+
+fn test_instance_validation_checks_nested_objects_arrays_and_required_values() {
+	definition := Definition{
+		type_:      .object
+		required:   ['name', 'scores']
+		properties: {
+			'name':   Definition{
+				type_:       .string
+				enum_values: ['Ada', 'Lin']
+			}
+			'scores': Definition{
+				type_:     .array
+				min_items: 1
+				items:     &Definition{
+					type_:   .integer
+					minimum: 0
+					maximum: 100
+				}
+			}
+		}
+	}
+	instance := json2.Any(map[string]json2.Any{
+		'name':   json2.Any('Ada')
+		'scores': json2.Any([json2.Any(90), json2.Any(100.0)])
+	})
+	definition.validate_instance(instance) or { panic(err) }
+}
+
+fn test_instance_validation_reports_type_enum_and_constraint_paths() {
+	definition := Definition{
+		type_:      .object
+		properties: {
+			'age':  Definition{
+				type_:   .integer
+				minimum: 18
+			}
+			'name': Definition{
+				type_:       .string
+				enum_values: ['Ada', 'Lin']
+			}
+		}
+	}
+	invalid_instances := [
+		json2.Any(map[string]json2.Any{
+			'age': json2.Any('18')
+		}),
+		json2.Any(map[string]json2.Any{
+			'age': json2.Any(17)
+		}),
+		json2.Any(map[string]json2.Any{
+			'age':  json2.Any(18)
+			'name': json2.Any('Grace')
+		}),
+	]
+	expected_paths := ['$.age', '$.age', '$.name']
+	for index, instance in invalid_instances {
+		definition.validate_instance(instance) or {
+			assert err.msg().contains(expected_paths[index])
+			continue
+		}
+		assert false, 'expected invalid JSON instance to fail'
+	}
+}
+
+fn test_instance_validation_applies_string_length_and_disallows_extra_properties() {
+	definition := Definition{
+		type_:                 .object
+		additional_properties: false
+		properties:            {
+			'code': Definition{
+				type_:      .string
+				min_length: 2
+				max_length: 4
+			}
+		}
+	}
+	for instance in [
+		json2.Any(map[string]json2.Any{
+			'code': json2.Any('x')
+		}),
+		json2.Any(map[string]json2.Any{
+			'code':  json2.Any('abc')
+			'extra': json2.Any(true)
+		}),
+	] {
+		definition.validate_instance(instance) or { continue }
+		assert false, 'expected string length or additional property validation to fail'
+	}
+}
+
+fn test_instance_validation_checks_missing_required_properties() {
+	definition := Definition{
+		type_:      .object
+		required:   ['name']
+		properties: {
+			'name': Definition{
+				type_: .string
+			}
+		}
+	}
+	definition.validate_instance(json2.Any(map[string]json2.Any{})) or {
+		assert err.msg().contains('required property')
+		assert err.msg().contains('$')
+		return
+	}
+	assert false, 'expected missing required property to fail'
 }

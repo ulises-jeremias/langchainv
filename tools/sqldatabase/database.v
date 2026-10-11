@@ -121,9 +121,9 @@ pub fn (engine DriverEngine) query(mut ctx context.Context, statement string) !Q
 			rows:    rows.map(it.vals.clone())
 		}
 	}
-	ctx_error = ctx.err()
-	if ctx_error !is none {
-		return ctx_error
+	ctx_error_after_query := ctx.err()
+	if ctx_error_after_query !is none {
+		return ctx_error_after_query
 	}
 	return result
 }
@@ -152,9 +152,9 @@ pub fn (engine DriverEngine) query_params(mut ctx context.Context, statement str
 			rows:    rows.map(it.vals.clone())
 		}
 	}
-	ctx_error = ctx.err()
-	if ctx_error !is none {
-		return ctx_error
+	ctx_error_after_query := ctx.err()
+	if ctx_error_after_query !is none {
+		return ctx_error_after_query
 	}
 	return result
 }
@@ -412,9 +412,9 @@ pub fn (database SQLDatabase) query(mut ctx context.Context, statement string) !
 	}
 	result := state.engine.query(mut ctx, statement) or { return err }
 	output := format_query_result(result, state.options)!
-	ctx_error = ctx.err()
-	if ctx_error !is none {
-		return ctx_error
+	ctx_error_after_query := ctx.err()
+	if ctx_error_after_query !is none {
+		return ctx_error_after_query
 	}
 	return output
 }
@@ -448,9 +448,9 @@ pub fn (database SQLDatabase) query_with_params(mut ctx context.Context, stateme
 	}
 	result := state.engine.query_params(mut ctx, statement, params) or { return err }
 	output := format_query_result(result, state.options)!
-	ctx_error = ctx.err()
-	if ctx_error !is none {
-		return ctx_error
+	ctx_error_after_query := ctx.err()
+	if ctx_error_after_query !is none {
+		return ctx_error_after_query
 	}
 	return output
 }
@@ -469,18 +469,28 @@ pub fn (database SQLDatabase) close() ! {
 }
 
 fn normalized_options(options Options) !Options {
-	mut configured := options
-	if configured.max_result_rows == 0 {
-		configured.max_result_rows = default_max_result_rows
-	}
-	if configured.max_output_bytes == 0 {
-		configured.max_output_bytes = default_max_output_bytes
-	}
-	if configured.max_query_bytes == 0 {
-		configured.max_query_bytes = default_max_query_bytes
-	}
-	if configured.max_tables == 0 {
-		configured.max_tables = 256
+	configured := Options{
+		sample_rows:      options.sample_rows
+		max_result_rows:  if options.max_result_rows == 0 {
+			default_max_result_rows
+		} else {
+			options.max_result_rows
+		}
+		max_output_bytes: if options.max_output_bytes == 0 {
+			default_max_output_bytes
+		} else {
+			options.max_output_bytes
+		}
+		max_query_bytes:  if options.max_query_bytes == 0 {
+			default_max_query_bytes
+		} else {
+			options.max_query_bytes
+		}
+		max_tables:       if options.max_tables == 0 {
+			256
+		} else {
+			options.max_tables
+		}
 	}
 	if configured.sample_rows < 0 || configured.sample_rows > 32 {
 		return error('SQL sample row count must be between 0 and 32')
@@ -515,16 +525,16 @@ fn format_query_result(result QueryResult, options Options) !string {
 		if row.len != result.columns.len {
 			return error(err_invalid_result)
 		}
-		append_bounded(mut output, row.join('\t') + '\n', options.max_output_bytes)!
+		output = append_bounded(output, row.join('\t') + '\n', options.max_output_bytes)!
 	}
 	return output
 }
 
-fn append_bounded(mut output string, value string, max_bytes int) ! {
+fn append_bounded(output string, value string, max_bytes int) !string {
 	if value.len > max_bytes - output.len {
 		return error('SQL output exceeds the configured byte limit')
 	}
-	output += value
+	return output + value
 }
 
 fn validate_table_name(name string) ! {
