@@ -17,9 +17,27 @@ mut:
 	response httputil.Response
 }
 
+struct StreamCapture {
+mut:
+	value string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	return state.response
+}
+
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 13 < body.len { offset + 13 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
 	return state.response
 }
 
@@ -110,18 +128,39 @@ fn test_generate_content_replays_tool_results() {
 	assert state.requests[0].body.contains('"data":"found"')
 }
 
-fn test_client_rejects_streaming_before_network() {
+fn test_generate_content_streams_text_and_maps_usage() {
 	mut ctx := context.background()
-	client, state := new_fixture_client('{}', 200)
-	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
-	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+	body := 'data: {"type":"message-start","delta":{"message":{"role":"assistant"}}}\n\ndata: {"type":"content-start","index":0,"delta":{"message":{"content":{"type":"text","text":""}}}}\n\ndata: {"type":"content-delta","index":0,"delta":{"message":{"content":{"text":"hel"}}}}\n\ndata: {"type":"content-delta","index":0,"delta":{"message":{"content":{"text":"lo"}}}}\n\ndata: {"type":"content-end","index":0}\n\ndata: {"type":"message-end","delta":{"finish_reason":"COMPLETE","usage":{"tokens":{"input_tokens":5,"output_tokens":2}}}}\n\n'
+	client, state := new_fixture_client(body, 200)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
 		streaming_func: stream
-	}) or {
-		assert err.msg().contains('streaming is not supported')
-		assert state.requests.len == 0
-		return
-	}
-	assert false, 'expected streaming option error'
+	}) or { panic(err) }
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'complete'
+	assert response.usage.prompt_tokens == 5
+	assert response.usage.completion_tokens == 2
+	assert state.requests[0].body.contains('"stream":true')
+	assert (state.requests[0].headers['Accept'] or { '' }) == 'text/event-stream'
+}
+
+fn test_generate_content_streams_fragmented_tool_arguments() {
+	mut ctx := context.background()
+	body := 'data: {"type":"tool-call-start","index":0,"delta":{"message":{"tool_calls":{"id":"lookup-1","type":"function","function":{"name":"lookup","arguments":""}}}}}\n\ndata: {"type":"tool-call-delta","index":0,"delta":{"message":{"tool_calls":{"function":{"arguments":"{\\"q\\":"}}}}}\n\ndata: {"type":"tool-call-delta","index":0,"delta":{"message":{"tool_calls":{"function":{"arguments":"\\"v\\"}"}}}}}\n\ndata: {"type":"message-end","delta":{"finish_reason":"TOOL_CALL"}}\n\n'
+	client, _ := new_fixture_client(body, 200)
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'lookup')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].id == 'lookup-1'
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments == '{"q":"v"}'
+	assert response.choices[0].stop_reason == 'tool_call'
 }
 
 fn test_client_rejects_out_of_range_top_p_before_network() {

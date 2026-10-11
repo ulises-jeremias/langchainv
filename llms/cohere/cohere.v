@@ -11,7 +11,7 @@ const default_base_url = 'https://api.cohere.com/v2'
 const default_model = 'command-a-plus-05-2026'
 const max_response_bytes = 16 * 1024 * 1024
 
-// Client implements non-streaming Cohere Chat over the injectable bounded transport.
+// Client implements Cohere Chat over the injectable bounded transport.
 pub struct Client {
 	api_key     string
 	http_client httputil.HTTPClient
@@ -63,6 +63,56 @@ struct Tokens {
 	output_tokens int
 }
 
+struct StreamEvent {
+	event_type string @[json: 'type']
+	index      int = -1
+	delta      StreamDelta
+}
+
+struct StreamDelta {
+	message      StreamMessage
+	finish_reason string
+	usage        Usage
+}
+
+struct StreamMessage {
+	content    StreamContent
+	tool_calls StreamToolCall
+}
+
+struct StreamContent {
+	text string
+}
+
+struct StreamToolCall {
+	id       string
+	call_type string @[json: 'type']
+	function StreamFunction
+}
+
+struct StreamFunction {
+	name      string
+	arguments string
+}
+
+struct CohereStreamState {
+mut:
+	content        string
+	finish_reason  string
+	input_tokens   int
+	output_tokens  int
+	tool_calls     []CohereStreamToolCall
+	received_bytes i64
+	error          string
+}
+
+struct CohereStreamToolCall {
+	id        string
+	call_type string
+	name      string
+	arguments string
+}
+
 // new_client creates a Cohere client with the default model and endpoint.
 pub fn new_client(api_key string, http_client httputil.HTTPClient) !Client {
 	return new_client_with_options(api_key, http_client, Options{})
@@ -109,6 +159,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		options.model.trim_space()
 	}
 	request := make_request(model, messages, options)!
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
 	body := json2.encode(request, json2.EncoderOptions{})
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
@@ -171,11 +227,147 @@ fn validate_options(options llms.CallOptions) ! {
 	if options.tool_choice != none && options.tools.len == 0 {
 		return error('Cohere tool_choice requires at least one tool definition')
 	}
-	if _ := options.streaming_func {
-		return error('Cohere Chat streaming is not supported by this bounded transport')
+}
+
+fn (client Client) generate_stream(mut ctx context.Context, request map[string]json2.Any, options llms.CallOptions) !llms.Response {
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Cohere HTTP transport does not support streaming responses')
 	}
-	if _ := options.streaming_reasoning_func {
-		return error('Cohere Chat streaming is not supported by this bounded transport')
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut stream_request := map[string]json2.Any{}
+	for key, value in request {
+		stream_request[key] = value
+	}
+	stream_request['stream'] = json2.Any(true)
+	body := json2.encode(stream_request, json2.EncoderOptions{})
+	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
+	mut state := &CohereStreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, payload []u8) {
+		event := json2.decode[StreamEvent](payload.bytestr(), json2.DecoderOptions{}) or {
+			state.error = 'could not decode Cohere streaming event'
+			return
+		}
+		match event.event_type {
+			'content-delta' {
+				text := event.delta.message.content.text
+				state.content += text
+				if text != '' {
+					if callback := options.streaming_func {
+						callback(mut callback_ctx, text.bytes()) or {
+							state.error = 'Cohere streaming callback failed: ${err.msg()}'
+							return
+						}
+					}
+					if callback := options.streaming_reasoning_func {
+						callback(mut callback_ctx, []u8{}, text.bytes()) or {
+							state.error = 'Cohere reasoning callback failed: ${err.msg()}'
+							return
+						}
+					}
+				}
+			}
+			'tool-call-start' {
+				if event.index < 0 || event.index >= 128 {
+					state.error = 'Cohere tool call index is outside the supported range'
+					return
+				}
+				for state.tool_calls.len <= event.index {
+					state.tool_calls << CohereStreamToolCall{}
+				}
+				call := event.delta.message.tool_calls
+				state.tool_calls[event.index] = CohereStreamToolCall{
+					id:        call.id
+					call_type: call.call_type
+					name:      call.function.name
+					arguments: call.function.arguments
+				}
+			}
+			'tool-call-delta' {
+				if event.index < 0 || event.index >= state.tool_calls.len {
+					state.error = 'Cohere tool call delta has no matching start event'
+					return
+				}
+				mut call := state.tool_calls[event.index]
+				call.arguments += event.delta.message.tool_calls.function.arguments
+				state.tool_calls[event.index] = call
+			}
+			'message-end' {
+				state.finish_reason = event.delta.finish_reason
+				state.input_tokens = event.delta.usage.tokens.input_tokens
+				state.output_tokens = event.delta.usage.tokens.output_tokens
+			}
+			'message-start', 'content-start', 'content-end', 'tool-call-end', 'tool-plan-delta', 'citation-start', 'citation-end', 'debug' {}
+			'error' {
+				state.error = 'Cohere returned an error event while streaming'
+			}
+			else {
+				state.error = 'Cohere returned unsupported streaming event `${event.event_type}`'
+			}
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/chat'
+		headers: {
+			'Authorization': 'Bearer ${client.api_key}'
+			'Content-Type':  'application/json'
+			'Accept':        'text/event-stream'
+		}
+		body:    body
+	}, fn [mut decoder, mut state, mut process_event] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Cohere chat response exceeds 16 MiB')
+		}
+		for payload in decoder.push(bytes)! {
+			process_event(mut callback_ctx, payload)
+			if state.error != '' {
+				return error(state.error)
+			}
+		}
+	}) or {
+		return error('Cohere chat stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Cohere chat request returned HTTP ${response.status_code}')
+	}
+	for payload in decoder.finish()! {
+		process_event(mut ctx, payload)
+		if state.error != '' {
+			return error(state.error)
+		}
+	}
+	mut calls := []ResponseToolCall{cap: state.tool_calls.len}
+	for streamed_call in state.tool_calls {
+		if streamed_call.id == '' || streamed_call.name == '' {
+			return error('Cohere returned a tool call without an ID or function name')
+		}
+		calls << ResponseToolCall{
+			id:        streamed_call.id
+			call_type: streamed_call.call_type
+			function:  ResponseFunction{
+				name:      streamed_call.name
+				arguments: streamed_call.arguments
+			}
+		}
+	}
+	choice := parse_choice(ChatResponse{
+		message: ResponseMessage{
+			content:    if state.content == '' { []ContentBlock{} } else { [ContentBlock{
+				block_type: 'text'
+				text:       state.content
+			}] }
+			tool_calls: calls
+		}
+		finish_reason: state.finish_reason
+	})!
+	return llms.Response{
+		choices: [choice]
+		usage:   llms.Usage{
+			prompt_tokens:     state.input_tokens
+			completion_tokens: state.output_tokens
+			total_tokens:      state.input_tokens + state.output_tokens
+		}
 	}
 }
 
