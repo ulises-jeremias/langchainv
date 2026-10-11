@@ -94,7 +94,7 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 	if vectors.len != documents.len {
 		return error('embedder returned ${vectors.len} vectors for ${documents.len} documents')
 	}
-	mut points := []map[string]json2.Any{cap: documents.len}
+	mut points := []json2.Any{cap: documents.len}
 	mut ids := []string{cap: documents.len}
 	mut dimension := -1
 	for index, document in documents {
@@ -119,11 +119,11 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 		if options.namespace != '' {
 			payload['namespace'] = json2.Any(options.namespace)
 		}
-		points << map[string]json2.Any{
+		points << json2.Any(map[string]json2.Any{
 			'id':      json2.Any(id)
 			'vector':  json2.Any(wire_vector)
 			'payload': json2.Any(payload)
-		}
+		})
 	}
 	body := json2.encode(map[string]json2.Any{
 		'points': json2.Any(points)
