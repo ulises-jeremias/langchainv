@@ -3,13 +3,19 @@
 `Tool` defines the shared agent-tool contract. `new_calculator()` returns an
 offline calculator that supports numeric literals, parentheses, unary signs,
 addition, subtraction, multiplication, division, modulo, and right-associative
-exponentiation with `**`. It accepts either an expression string or a JSON
-object with a string-valued `expression` field.
+exponentiation with `**`. It also supports the functions and constants exposed
+by Starlark's `math` module: `acos`, `acosh`, `asin`, `asinh`, `atan`, `atan2`,
+`atanh`, `ceil`, `copysign`, `cos`, `cosh`, `degrees`, `e`, `exp`, `fabs`,
+`floor`, `gamma`, `hypot`, `log`, `mod`, `pi`, `pow`, `radians`, `remainder`,
+`round`, `sin`, `sinh`, `sqrt`, `tan`, and `tanh`. `log` accepts an optional
+base. The tool accepts either an expression string or a JSON object with a
+string-valued `expression` field.
 
 The calculator does not execute source code. It caps expressions at 4,096
-bytes, 512 parsed values/operators, and 64 levels of nesting. Invalid
+bytes, 512 parsed values/operators/calls, and 64 levels of nesting. Invalid
 expressions are returned as `error from evaluator: ...` strings so an agent can
-correct its input. Starlark built-in functions and constants are not included.
+correct its input. Math calls accept positional and named numeric arguments;
+general-purpose Starlark statements and evaluation are not implemented.
 
 `tools/perplexity` provides a search tool backed by Perplexity's
 OpenAI-compatible Sonar API. Pass an explicit key and injectable `HTTPClient`
