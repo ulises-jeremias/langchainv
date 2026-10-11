@@ -358,7 +358,7 @@ fn (definition Definition) validate_depth(depth int) ! {
 		}
 		if data_type !in [.number, .integer]
 			&& (definition.minimum != none || definition.maximum != none
-			|| definition.exclusive_minimum != none || definition.exclusive_maximum != none) {
+				|| definition.exclusive_minimum != none || definition.exclusive_maximum != none) {
 			return error('JSON Schema numeric bounds are only valid for number or integer definitions')
 		}
 		if data_type != .string && (definition.min_length != none || definition.max_length != none) {
