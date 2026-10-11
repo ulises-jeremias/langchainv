@@ -44,3 +44,9 @@ and same-origin links. Crawling is sequential, defaults to depth 1 and at most
 10 pages, and caps per-page, aggregate-response, output, URL, and blacklist
 limits. External-origin links, non-HTTPS links, and blacklisted paths are not
 followed. Tests use deterministic fake responses.
+
+`tools/zapier` connects to Zapier's current MCP Streamable HTTP endpoint,
+discovers server-provided tools, and adapts each to the shared tool contract.
+It supports JSON and server-sent event responses, requires HTTPS, caps response
+size and tool count, and accepts an injected transport for offline tests. The
+retired Zapier NLA API is not used.
