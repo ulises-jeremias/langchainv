@@ -16,10 +16,10 @@ const max_pdf_timeout_ms = 120000
 // PDFLoaderOptions configures the Poppler executable and resource bounds.
 pub struct PDFLoaderOptions {
 pub:
-	pdftotext_path  string
+	pdftotext_path   string
 	max_input_bytes  i64 = default_pdf_max_input_bytes
 	max_output_bytes i64 = default_pdf_max_output_bytes
-	timeout_ms       int  = default_pdf_timeout_ms
+	timeout_ms       int = default_pdf_timeout_ms
 }
 
 // PDFLoader extracts text from one PDF using the pdftotext executable.
