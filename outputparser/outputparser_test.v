@@ -134,10 +134,13 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert parsed.labels == ['first', 'second']
 	assert parsed.active == [true, false]!
 	assert parsed.scores == [1, 2, 3]!
-	assert parsed.optional[0] == 'set'
+	optional_value := parsed.optional[0] or { panic('expected optional string value') }
+	assert optional_value == 'set'
 	assert parsed.optional[1] == none
-	assert parsed.flags[0] == true
+	flag_value := parsed.flags[0] or { panic('expected optional boolean value') }
+	assert flag_value
 	assert parsed.flags[1] == none
-	assert parsed.nullable[0] == 7
+	numeric_value := parsed.nullable[0] or { panic('expected optional number value') }
+	assert numeric_value == 7
 	assert parsed.nullable[1] == none
 }
