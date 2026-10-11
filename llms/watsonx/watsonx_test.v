@@ -12,13 +12,17 @@ struct FixtureHTTPClient {
 
 struct FixtureHTTPState {
 mut:
-	requests []httputil.Request
-	response httputil.Response
+	requests     []httputil.Request
+	response     httputil.Response
+	iam_response httputil.Response
 }
 
 fn (client FixtureHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	if request.url == default_iam_url {
+		return state.iam_response
+	}
 	return state.response
 }
 
@@ -115,6 +119,39 @@ fn test_generate_content_requires_results() {
 	assert false, 'expected an empty result list to fail'
 }
 
+fn test_api_key_exchanges_and_caches_iam_token() {
+	mut state := &FixtureHTTPState{
+		response:     httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"results":[{"generated_text":"answer"}]}'
+		}
+		iam_response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"access_token":"cached-iam-token","expiration":2000000000}'
+		}
+	}
+	mut client := new_client(Options{
+		project_id: 'project-123'
+		model:      'ibm/granite-3-8b-instruct'
+		api_key:    'key+/with=reserved'
+	}, httputil.HTTPClient(FixtureHTTPClient{
+		state: state
+	})) or { panic(err) }
+	mut ctx := context.background()
+	for _ in 0 .. 2 {
+		assert client.complete(mut ctx, 'question', llms.CallOptions{}) or { panic(err) } == 'answer'
+	}
+	assert state.requests.len == 3
+	assert state.requests[0].url == default_iam_url
+	assert state.requests[0].headers['Content-Type'] == 'application/x-www-form-urlencoded'
+	assert state.requests[0].body.contains('grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey')
+	assert state.requests[0].body.contains('apikey=key%2B%2Fwith%3Dreserved')
+	assert state.requests[1].headers['Authorization'] == 'Bearer cached-iam-token'
+	assert state.requests[2].headers['Authorization'] == 'Bearer cached-iam-token'
+}
+
 fn test_new_client_rejects_invalid_credentials_and_urls() {
 	mut state := &FixtureHTTPState{}
 	new_client(Options{
@@ -123,7 +160,7 @@ fn test_new_client_rejects_invalid_credentials_and_urls() {
 	}, httputil.HTTPClient(FixtureHTTPClient{
 		state: state
 	})) or {
-		assert err.msg().contains('access token')
+		assert err.msg().contains('exactly one')
 		return
 	}
 	new_client(Options{
