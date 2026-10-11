@@ -31,3 +31,9 @@ tests.
 `new_tool` or use `new_default_tool` to read `SERPAPI_API_KEY`; both use the
 bounded default transport or an injected `HTTPClient`. Queries are capped at
 4 KiB and returned organic results at 10. Tests use a fake transport.
+
+`tools/exa` searches Exa's semantic web index, which is the current API
+successor to upstream LangChainGo's Metaphor tool. Pass an explicit key to
+`new_tool` or use `new_default_tool` to read `EXA_API_KEY`; both support an
+injected transport. It returns bounded title, URL, and highlight/text excerpts
+and uses fake HTTP fixtures in tests.
