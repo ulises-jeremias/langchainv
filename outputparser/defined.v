@@ -208,7 +208,13 @@ fn defined_array_element_schema[T](_values []T) !string {
 		return 'boolean'
 	} $else $if T is $int || T is $float {
 		return 'number'
+	} $else $if T is ?string {
+		return '(string | null)'
+	} $else $if T is ?bool {
+		return '(boolean | null)'
+	} $else $if T is ?int || T is ?i64 || T is ?i32 || T is ?i16 || T is ?i8 || T is ?u64 || T is ?u32 || T is ?u16 || T is ?u8 || T is ?f32 || T is ?f64 {
+		return '(number | null)'
 	} $else {
-		return error('arrays must contain strings, booleans, numbers, or nested structs')
+		return error('arrays must contain strings, booleans, numbers, primitive options, or nested structs')
 	}
 }

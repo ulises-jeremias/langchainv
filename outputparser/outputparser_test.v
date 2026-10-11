@@ -99,6 +99,9 @@ struct DefinedExample {
 	labels       [2]string
 	active       [2]bool
 	scores       [3]int
+	optional     []?string
+	flags        [2]?bool
+	nullable     []?i32
 }
 
 fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
@@ -108,13 +111,16 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert instructions.contains('"labels": string[];')
 	assert instructions.contains('"active": boolean[];')
 	assert instructions.contains('"scores": number[];')
+	assert instructions.contains('"optional": (string | null)[];')
+	assert instructions.contains('"flags": (boolean | null)[];')
+	assert instructions.contains('"nullable": (number | null)[];')
 	assert instructions.contains('interface _Root_Child')
 	assert instructions.contains('"children": _Root_Children[];')
 	assert instructions.contains('"fixed": _Root_Fixed[];')
 	assert instructions.contains('"by_name": Record<string, _Root_By_name>;')
 	assert instructions.contains('"metadata": Record<string, string>;')
 	assert !instructions.contains('"ignored"')
-	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3]}\n```') or {
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3],"optional":["set",null],"flags":[true,null],"nullable":[7,null]}\n```') or {
 		panic(err)
 	}
 	assert parsed.name == 'Ada'
@@ -128,4 +134,10 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert parsed.labels == ['first', 'second']
 	assert parsed.active == [true, false]!
 	assert parsed.scores == [1, 2, 3]!
+	assert parsed.optional[0] == 'set'
+	assert parsed.optional[1] == none
+	assert parsed.flags[0] == true
+	assert parsed.flags[1] == none
+	assert parsed.nullable[0] == 7
+	assert parsed.nullable[1] == none
 }

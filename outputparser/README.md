@@ -33,10 +33,10 @@ schema and decodes fenced JSON into the concrete struct type. It currently
 supports strings, booleans, numeric fields, their optional forms, slices,
 fixed arrays, and string-keyed maps of those primitives, enums, and nested
 structs. Slices and fixed arrays can also contain nested structs. Fixed arrays
-of scalar values can contain strings, booleans, or numbers. Unsupported V
-field types return an error. Maps of nested structs require string keys. The
-`@[json: fieldName]` and `@[describe: "..."]` attributes supply JSON names and
-prompt descriptions.
+of scalar values can contain strings, booleans, numbers, or nullable versions
+of those types. Unsupported V field types return an error. Maps of nested
+structs require string keys. The `@[json: fieldName]` and `@[describe: "..."]`
+attributes supply JSON names and prompt descriptions.
 
 `Combining` splits on two consecutive newlines, applies one parser per
 section, and merges only string-valued maps. See the
