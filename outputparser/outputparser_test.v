@@ -92,18 +92,27 @@ struct DefinedExample {
 	display_name string @[json: 'display_name']
 	ignored      string @[skip]
 	child        DefinedExampleChild
+	labels       [2]string
+	active       [2]bool
+	scores       [3]int
 }
 
 fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	parser := new_defined(DefinedExample{}) or { panic(err) }
 	instructions := parser.format_instructions()
 	assert instructions.contains('"display_name": string;')
+	assert instructions.contains('"labels": string[];')
+	assert instructions.contains('"active": boolean[];')
+	assert instructions.contains('"scores": number[];')
 	assert instructions.contains('interface _Root_Child')
 	assert !instructions.contains('"ignored"')
-	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"}}\n```') or {
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3]}\n```') or {
 		panic(err)
 	}
 	assert parsed.name == 'Ada'
 	assert parsed.display_name == 'A.'
 	assert parsed.child.detail == 'V'
+	assert parsed.labels == ['first', 'second']
+	assert parsed.active == [true, false]!
+	assert parsed.scores == [1, 2, 3]!
 }

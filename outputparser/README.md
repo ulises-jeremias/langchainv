@@ -30,12 +30,12 @@ return errors rather than deferring invalid-pattern failures to parsing.
 and verifies all configured response schema names are present. Generic
 `Defined[T]` uses V's compile-time field walk to create an interface-like
 schema and decodes fenced JSON into the concrete struct type. It currently
-supports strings, booleans, numeric fields, their optional forms, slices and
-string-keyed maps of those primitives, enums, and nested structs. Unsupported
-V field types (including fixed arrays and containers of nested structs) return
-an error. V field attributes
-`@[json: fieldName]` and `@[describe: "..."]` supply JSON names and prompt
-descriptions.
+supports strings, booleans, numeric fields, their optional forms, slices,
+fixed arrays, and string-keyed maps of those primitives, enums, and nested
+structs. Fixed arrays can contain strings, booleans, or numbers. Unsupported V
+field types (including containers of nested structs) return an error. The
+`@[json: fieldName]` and `@[describe: "..."]` attributes supply JSON names and
+prompt descriptions.
 
 `Combining` splits on two consecutive newlines, applies one parser per
 section, and merges only string-valued maps. See the

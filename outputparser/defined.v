@@ -11,9 +11,9 @@ pub struct Defined[T] {
 }
 
 // new_defined derives a prompt schema from a non-empty struct value.
-// Primitive fields, primitive options, slices/maps of supported scalars, enums,
-// and nested structs are supported. Unsupported field types return an error
-// rather than silently producing an inaccurate schema.
+// Primitive fields, primitive options, slices/maps/fixed arrays of supported
+// scalars, enums, and nested structs are supported. Unsupported field types
+// return an error rather than silently producing an inaccurate schema.
 pub fn new_defined[T](source T) !Defined[T] {
 	$if T !is $struct {
 		return error('defined parser expects a struct, got ${T.name}')
@@ -105,6 +105,9 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = 'boolean[]'
 			} $else $if field.typ is []int || field.typ is []i64 || field.typ is []i32 || field.typ is []i16 || field.typ is []i8 || field.typ is []u64 || field.typ is []u32 || field.typ is []u16 || field.typ is []u8 || field.typ is []f32 || field.typ is []f64 {
 				field_type = 'number[]'
+			} $else $if field.typ is $array_fixed {
+				array_schema := defined_array_element_schema(source.$(field.name)[..])!
+				field_type = '${array_schema}[]'
 			} $else $if field.typ is map[string]string {
 				field_type = 'Record<string, string>'
 			} $else $if field.typ is map[string]bool {
@@ -119,7 +122,7 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = '${name}_${field.name.capitalize()}'
 				nested_schemas << defined_struct_schema(source.$(field.name), field_type)!
 			} $else {
-				return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices and maps, enums, and nested structs')
+				return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices, fixed arrays and maps, enums, and nested structs')
 			}
 			mut line := '\t"${field_name}": ${field_type};'
 			if description != '' {
@@ -136,4 +139,16 @@ fn defined_struct_schema[T](source T, name string) !string {
 		definition += '\n' + nested_schemas.join('\n')
 	}
 	return definition
+}
+
+fn defined_array_element_schema[T](_values []T) !string {
+	$if T is string {
+		return 'string'
+	} $else $if T is bool {
+		return 'boolean'
+	} $else $if T is $int || T is $float {
+		return 'number'
+	} $else {
+		return error('fixed arrays must contain strings, booleans, or numbers')
+	}
 }
