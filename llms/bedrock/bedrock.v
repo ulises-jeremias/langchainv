@@ -152,8 +152,7 @@ fn validate_options(options llms.CallOptions) ! {
 fn make_request(messages []schema.Message, options llms.CallOptions) !map[string]json2.Any {
 	mut system_parts := []json2.Any{}
 	mut wire_messages := []json2.Any{}
-	mut total_image_bytes := 0
-	mut total_content_bytes := 0
+	mut limits := ConversionLimits{}
 	for message in messages {
 		if message.role == .system {
 			for part in message.parts {
@@ -161,18 +160,17 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 					return error('Amazon Bedrock system messages support text content only')
 				}
 				text := (part as schema.TextPart).text
-				if text.len > max_message_content_bytes - total_content_bytes {
+				if text.len > max_message_content_bytes - limits.content_bytes {
 					return error('Amazon Bedrock message content exceeds 4 MiB')
 				}
-				total_content_bytes += text.len
+				limits.content_bytes += text.len
 				system_parts << json2.Any({
 					'text': json2.Any(text)
 				})
 			}
 			continue
 		}
-		wire_messages << json2.Any(convert_message(message, mut total_image_bytes,
-			mut total_content_bytes)!)
+		wire_messages << json2.Any(convert_message(message, mut limits)!)
 	}
 	if wire_messages.len == 0 {
 		return error('Amazon Bedrock requires at least one non-system message')
@@ -251,7 +249,13 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 	return request
 }
 
-fn convert_message(message schema.Message, mut total_image_bytes int, mut total_content_bytes int) !map[string]json2.Any {
+struct ConversionLimits {
+	mut:
+		image_bytes   int
+		content_bytes int
+}
+
+fn convert_message(message schema.Message, mut limits ConversionLimits) !map[string]json2.Any {
 	role := match message.role {
 		.human, .generic, .tool { 'user' }
 		.ai { 'assistant' }
@@ -261,10 +265,10 @@ fn convert_message(message schema.Message, mut total_image_bytes int, mut total_
 	for part in message.parts {
 		match part {
 			schema.TextPart {
-				if part.text.len > max_message_content_bytes - total_content_bytes {
+				if part.text.len > max_message_content_bytes - limits.content_bytes {
 					return error('Amazon Bedrock message content exceeds 4 MiB')
 				}
-				total_content_bytes += part.text.len
+				limits.content_bytes += part.text.len
 				content << json2.Any({
 					'text': json2.Any(part.text)
 				})
@@ -274,10 +278,10 @@ fn convert_message(message schema.Message, mut total_image_bytes int, mut total_
 					return error('Amazon Bedrock inline images require user messages')
 				}
 				if part.mime_type !in ['image/jpeg', 'image/png'] || part.data.len == 0
-					|| part.data.len > max_image_bytes - total_image_bytes {
+					|| part.data.len > max_image_bytes - limits.image_bytes {
 					return error('Amazon Bedrock images must be non-empty JPEG/PNG within the 3 MiB total limit')
 				}
-				total_image_bytes += part.data.len
+				limits.image_bytes += part.data.len
 				format := if part.mime_type == 'image/jpeg' { 'jpeg' } else { 'png' }
 				content << json2.Any({
 					'image': json2.Any({
@@ -292,11 +296,11 @@ fn convert_message(message schema.Message, mut total_image_bytes int, mut total_
 				if message.role != .ai || part.id == '' || part.function_call.name.trim_space() == '' {
 					return error('Amazon Bedrock tool calls require assistant messages and a non-empty name')
 				}
-				if part.function_call.arguments.len > max_message_content_bytes - total_content_bytes {
+				if part.function_call.arguments.len > max_message_content_bytes - limits.content_bytes {
 					return error('Amazon Bedrock message content exceeds 4 MiB')
 				}
-				total_content_bytes += part.function_call.arguments.len
-				arguments := json2.decode[map[string]json2.Any](part.function_call.arguments,
+				limits.content_bytes += part.function_call.arguments.len
+				tool_arguments := json2.decode[map[string]json2.Any](part.function_call.arguments,
 					json2.DecoderOptions{}) or {
 					return error('Amazon Bedrock tool call arguments must be a JSON object')
 				}
@@ -304,7 +308,7 @@ fn convert_message(message schema.Message, mut total_image_bytes int, mut total_
 					'toolUse': json2.Any({
 						'toolUseId': json2.Any(part.id)
 						'name':      json2.Any(part.function_call.name)
-						'input':     json2.Any(arguments)
+						'input':     json2.Any(tool_arguments)
 					})
 				})
 			}
@@ -312,14 +316,14 @@ fn convert_message(message schema.Message, mut total_image_bytes int, mut total_
 				if message.role != .tool || part.call_id == '' {
 					return error('Amazon Bedrock tool results require tool-role messages and a call ID')
 				}
-				if part.content.len > max_message_content_bytes - total_content_bytes {
+				if part.content.len > max_message_content_bytes - limits.content_bytes {
 					return error('Amazon Bedrock message content exceeds 4 MiB')
 				}
-				total_content_bytes += part.content.len
+				limits.content_bytes += part.content.len
 				content << json2.Any({
-					'toolResult': json2.Any({
-						'toolUseId': part.call_id
-						'content':   json2.Any([json2.Any({
+					'toolResult': json2.Any(map[string]json2.Any{
+						'toolUseId': json2.Any(part.call_id)
+						'content':   json2.Any([json2.Any(map[string]json2.Any{
 							'text': json2.Any(part.content)
 						})])
 					})
@@ -465,13 +469,13 @@ fn valid_region(region string) bool {
 	if parts.len < 3 || parts[0].len != 2 || parts[parts.len - 1] == '' {
 		return false
 	}
-	for char in parts[0].bytes() {
-		if char < `a` || char > `z` {
+	for byte_value in parts[0].bytes() {
+		if byte_value < `a` || byte_value > `z` {
 			return false
 		}
 	}
-	for char in parts[parts.len - 1].bytes() {
-		if char < `0` || char > `9` {
+	for byte_value in parts[parts.len - 1].bytes() {
+		if byte_value < `0` || byte_value > `9` {
 			return false
 		}
 	}
@@ -479,8 +483,8 @@ fn valid_region(region string) bool {
 		if part == '' {
 			return false
 		}
-		for char in part.bytes() {
-			if char < `a` || char > `z` {
+		for byte_value in part.bytes() {
+			if byte_value < `a` || byte_value > `z` {
 				return false
 			}
 		}
@@ -492,9 +496,9 @@ fn valid_model_id(model_id string) bool {
 	if model_id == '' || model_id.len > 512 {
 		return false
 	}
-	for char in model_id.bytes() {
-		if !(char >= `a` && char <= `z`) && !(char >= `A` && char <= `Z`)
-			&& !(char >= `0` && char <= `9`) && char !in [`-`, `_`, `.`, `:`] {
+	for byte_value in model_id.bytes() {
+		if !(byte_value >= `a` && byte_value <= `z`) && !(byte_value >= `A` && byte_value <= `Z`)
+			&& !(byte_value >= `0` && byte_value <= `9`) && byte_value !in [`-`, `_`, `.`, `:`] {
 			return false
 		}
 	}
