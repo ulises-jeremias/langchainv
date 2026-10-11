@@ -1,4 +1,4 @@
-// Package anthropic implements bounded non-streaming Anthropic Messages.
+// Package anthropic implements bounded Anthropic Messages.
 module anthropic
 
 import context
@@ -49,6 +49,47 @@ struct Usage {
 	output_tokens int
 }
 
+struct StreamEvent {
+	event_type    string @[json: 'type']
+	index         int
+	delta         StreamDelta
+	content_block ContentBlock
+	message       StreamMessage
+	usage         Usage
+}
+
+struct StreamMessage {
+	usage Usage
+}
+
+struct StreamDelta {
+	delta_type   string @[json: 'type']
+	text         string
+	thinking     string
+	partial_json string
+	stop_reason  string
+}
+
+struct AnthropicStreamBlock {
+mut:
+	block_type   string
+	text         string
+	id           string
+	name         string
+	input        json2.Any
+	partial_json string
+}
+
+struct AnthropicStreamState {
+mut:
+	blocks         []AnthropicStreamBlock
+	input_tokens   int
+	output_tokens  int
+	stop_reason    string
+	received_bytes i64
+	error          string
+}
+
 // new_client constructs a client with default endpoint and model.
 pub fn new_client(api_key string, http_client httputil.HTTPClient) !Client {
 	return new_client_with_options(api_key, http_client, Options{})
@@ -84,7 +125,7 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 	return response.choices[0].content
 }
 
-// generate_content implements non-streaming Anthropic Messages.
+// generate_content implements streaming and non-streaming Anthropic Messages.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	llms.validate_messages(messages)!
@@ -95,6 +136,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		options.model.trim_space()
 	}
 	request := make_request(model, messages, options)!
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
 	body := json2.encode(request, json2.EncoderOptions{})
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
@@ -129,6 +176,170 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	}
 }
 
+fn (client Client) generate_stream(mut ctx context.Context, request map[string]json2.Any, options llms.CallOptions) !llms.Response {
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Anthropic HTTP transport does not support streaming responses')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut stream_request := map[string]json2.Any{}
+	for key, value in request {
+		stream_request[key] = value
+	}
+	stream_request['stream'] = json2.Any(true)
+	body := json2.encode(stream_request, json2.EncoderOptions{})
+	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
+	mut state := &AnthropicStreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, payload []u8) {
+		event := json2.decode[StreamEvent](payload.bytestr(), json2.DecoderOptions{}) or {
+			state.error = 'could not decode Anthropic streaming event'
+			return
+		}
+		match event.event_type {
+			'message_start' {
+				state.input_tokens = event.message.usage.input_tokens
+			}
+			'content_block_start' {
+				if event.index < 0 || event.index >= 128 {
+					state.error = 'Anthropic content block index is outside the supported range'
+					return
+				}
+				for state.blocks.len <= event.index {
+					state.blocks << AnthropicStreamBlock{}
+				}
+				block := event.content_block
+				state.blocks[event.index] = AnthropicStreamBlock{
+					block_type: block.block_type
+					text:       block.text
+					id:         block.id
+					name:       block.name
+					input:      block.input
+				}
+			}
+			'content_block_delta' {
+				if event.index < 0 || event.index >= state.blocks.len {
+					state.error = 'Anthropic content block delta has no matching start event'
+					return
+				}
+				mut block := state.blocks[event.index]
+				match event.delta.delta_type {
+					'text_delta' {
+						block.text += event.delta.text
+						if callback := options.streaming_func {
+							callback(mut callback_ctx, event.delta.text.bytes()) or {
+								state.error = 'Anthropic streaming callback failed: ${err.msg()}'
+								return
+							}
+						}
+						if callback := options.streaming_reasoning_func {
+							callback(mut callback_ctx, []u8{}, event.delta.text.bytes()) or {
+								state.error = 'Anthropic reasoning callback failed: ${err.msg()}'
+								return
+							}
+						}
+					}
+					'input_json_delta' {
+						block.partial_json += event.delta.partial_json
+					}
+					'thinking_delta' {
+						block.text += event.delta.thinking
+						if callback := options.streaming_reasoning_func {
+							callback(mut callback_ctx, event.delta.thinking.bytes(), []u8{}) or {
+								state.error = 'Anthropic reasoning callback failed: ${err.msg()}'
+								return
+							}
+						}
+					}
+					'signature_delta' {}
+					else {
+						state.error = 'Anthropic returned unsupported streaming delta `${event.delta.delta_type}`'
+						return
+					}
+				}
+				state.blocks[event.index] = block
+			}
+			'message_delta' {
+				if event.delta.stop_reason != '' {
+					state.stop_reason = event.delta.stop_reason
+				}
+				if event.usage.output_tokens > 0 {
+					state.output_tokens = event.usage.output_tokens
+				}
+			}
+			'content_block_stop', 'message_stop', 'ping' {}
+			'error' {
+				state.error = 'Anthropic returned an error event while streaming'
+			}
+			else {
+				state.error = 'Anthropic returned unsupported streaming event `${event.event_type}`'
+			}
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/messages'
+		headers: {
+			'x-api-key':         client.api_key
+			'anthropic-version': '2023-06-01'
+			'Content-Type':      'application/json'
+			'Accept':            'text/event-stream'
+		}
+		body:    body
+	}, fn [mut decoder, mut state, mut process_event] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Anthropic message response exceeds 16 MiB')
+		}
+		events := decoder.push(bytes) or {
+			return error(err.msg())
+		}
+		for payload in events {
+			process_event(mut callback_ctx, payload)
+			if state.error != '' {
+				return error(state.error)
+			}
+		}
+	}) or {
+		return error('Anthropic message stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Anthropic message request returned HTTP ${response.status_code}')
+	}
+	for payload in decoder.finish()! {
+		process_event(mut ctx, payload)
+		if state.error != '' {
+			return error(state.error)
+		}
+	}
+	mut content := []ContentBlock{cap: state.blocks.len}
+	for block in state.blocks {
+		mut input := block.input
+		if block.partial_json != '' {
+			input = json2.decode[json2.Any](block.partial_json, json2.DecoderOptions{}) or {
+				return error('Anthropic streamed tool input is not valid JSON')
+			}
+		}
+		content << ContentBlock{
+			block_type: block.block_type
+			text:       block.text
+			id:         block.id
+			name:       block.name
+			input:      input
+		}
+	}
+	choice := parse_choice(MessagesResponse{
+		content:     content
+		stop_reason: state.stop_reason
+	})!
+	return llms.Response{
+		choices: [choice]
+		usage:   llms.Usage{
+			prompt_tokens:     state.input_tokens
+			completion_tokens: state.output_tokens
+			total_tokens:      state.input_tokens + state.output_tokens
+		}
+	}
+}
+
 fn validate_options(options llms.CallOptions) ! {
 	if options.n > 1 || options.candidate_count > 1 {
 		return error('Anthropic Messages returns exactly one candidate')
@@ -146,12 +357,6 @@ fn validate_options(options llms.CallOptions) ! {
 	}
 	if options.tool_choice != none && options.tools.len == 0 {
 		return error('Anthropic tool_choice requires at least one tool definition')
-	}
-	if _ := options.streaming_func {
-		return error('Anthropic Messages streaming is not supported by this bounded transport')
-	}
-	if _ := options.streaming_reasoning_func {
-		return error('Anthropic Messages streaming is not supported by this bounded transport')
 	}
 }
 
@@ -341,6 +546,7 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 
 fn parse_choice(response MessagesResponse) !llms.Choice {
 	mut text_parts := []string{}
+	mut reasoning_parts := []string{}
 	mut tool_calls := []schema.ToolCall{}
 	mut parts := []schema.ContentPart{}
 	for block in response.content {
@@ -366,16 +572,23 @@ fn parse_choice(response MessagesResponse) !llms.Choice {
 				tool_calls << call
 				parts << schema.ContentPart(call)
 			}
+			'thinking' {
+				reasoning_parts << block.text
+				parts << schema.ContentPart(schema.ThinkingPart{
+					text: block.text
+				})
+			}
 			else {
 				return error('Anthropic returned unsupported content block `${block.block_type}`')
 			}
 		}
 	}
-	if text_parts.len == 0 && tool_calls.len == 0 {
-		return error('Anthropic returned no text or tool-use content')
+	if text_parts.len == 0 && reasoning_parts.len == 0 && tool_calls.len == 0 {
+		return error('Anthropic returned no text, reasoning, or tool-use content')
 	}
 	return llms.Choice{
 		content:     text_parts.join('')
+		reasoning:   reasoning_parts.join('')
 		stop_reason: response.stop_reason
 		tool_calls:  tool_calls
 		parts:       parts

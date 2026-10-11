@@ -17,9 +17,32 @@ mut:
 	response httputil.Response
 }
 
+struct StreamCapture {
+mut:
+	value string
+}
+
+struct ReasoningCapture {
+mut:
+	value string
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	return state.response
+}
+
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 11 < body.len { offset + 11 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
 	return state.response
 }
 
@@ -63,6 +86,56 @@ fn test_generate_content_sends_text_messages_and_maps_usage() {
 	assert state.requests[0].body.contains('"system":"Be concise."')
 	assert state.requests[0].body.contains('"stop_sequences":["STOP"]')
 	assert state.requests[0].body.contains('"role":"user"')
+}
+
+fn test_generate_content_streams_text_and_usage() {
+	mut ctx := context.background()
+	body := 'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":5}}}\n\nevent: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hel"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}\n\nevent: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n'
+	client, state := new_fixture_client(body, 200)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'end_turn'
+	assert response.usage.prompt_tokens == 5
+	assert response.usage.completion_tokens == 3
+	assert state.requests[0].body.contains('"stream":true')
+	assert (state.requests[0].headers['Accept'] or { '' }) == 'text/event-stream'
+}
+
+fn test_generate_content_streams_tool_use_json_fragments() {
+	mut ctx := context.background()
+	body := 'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":4}}}\n\nevent: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu-1","name":"lookup","input":{}}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"q\\":"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"v\\"}"}}\n\nevent: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n'
+	client, _ := new_fixture_client(body, 200)
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'lookup')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].id == 'toolu-1'
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments == '{"q":"v"}'
+	assert response.choices[0].stop_reason == 'tool_use'
+}
+
+fn test_generate_content_streams_reasoning_deltas() {
+	mut ctx := context.background()
+	body := 'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":2}}}\n\nevent: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"plan"}}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n'
+	client, _ := new_fixture_client(body, 200)
+	mut captured := &ReasoningCapture{}
+	stream := llms.ReasoningStreamFunc(fn [mut captured] (mut _ context.Context, reasoning []u8, _ []u8) ! {
+		captured.value += reasoning.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'reason')], llms.CallOptions{
+		streaming_reasoning_func: stream
+	}) or { panic(err) }
+	assert captured.value == 'plan'
+	assert response.choices[0].reasoning == 'plan'
 }
 
 fn test_generate_content_maps_tool_use_blocks() {
@@ -178,18 +251,19 @@ fn test_generate_content_replays_tool_results_as_user_content() {
 	assert state.requests[0].body.contains('"tool_use_id":"toolu-1"')
 }
 
-fn test_client_rejects_streaming_before_network() {
+fn test_client_rejects_unsupported_provider_options_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
-	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
 	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		streaming_func: stream
+		provider_options: {
+			'unsupported': json2.Any(true)
+		}
 	}) or {
-		assert err.msg().contains('streaming is not supported')
+		assert err.msg().contains('provider_options')
 		assert state.requests.len == 0
 		return
 	}
-	assert false, 'expected streaming option error'
+	assert false, 'expected unsupported provider options to fail'
 }
 
 fn test_generate_content_does_not_return_provider_error_body() {
