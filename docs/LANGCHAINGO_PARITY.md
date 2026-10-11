@@ -50,7 +50,7 @@ The inventory is based on upstream commit
 | Mistral | partial: OpenAI-compatible Chat Completions using the shared request/response implementation, with translation for Mistral's `max_tokens` and `random_seed` fields in regular and streamed requests, regional base URL/model configuration, and fake-transport tests; native Mistral options and provider-specific behavior beyond those field mappings remain outstanding |
 | Ollama | partial: streaming and non-streaming `/api/chat` with bounded NDJSON, text/reasoning callbacks, text and bounded inline images, tool definitions/results, JSON mode, common generation options, thinking replay, usage accounting, `/api/embed` client, and injectable offline-tested transports; pull/model management, schema-valued format, and provider options remain outstanding |
 | OpenAI | partial: Chat Completions streaming and non-streaming, completion adapter, text and image messages, function tools, usage, and reasoning fields; streaming requires a streaming-capable transport, while richer reasoning replay, response APIs and broader option parity remain outstanding |
-| IBM watsonx | not started |
+| IBM watsonx | partial: bounded text generation with IBM IAM bearer-token auth, project/model selection, supported sampling and stop options, token usage mapping, and offline tests; API-key exchange/token refresh, streaming, and chat-generation APIs remain outstanding |
 
 ## Embedding providers
 
