@@ -276,7 +276,7 @@ fn make_filter(metadata map[string]json2.Any) map[string]json2.Any {
 }
 
 fn valid_metadata_value(value json2.Any) bool {
-	match value {
+	return match value {
 		string, bool, int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
 		f64 { math.is_finite(value as f64) }
 		f32 { math.is_finite(f64(value as f32)) }
