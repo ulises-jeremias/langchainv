@@ -110,7 +110,6 @@ struct CohereStreamToolCall {
 	id        string
 	call_type string
 	name      string
-	mut:
 	arguments string
 }
 
@@ -288,9 +287,13 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 					state.error = 'Cohere tool call delta has no matching start event'
 					return
 				}
-				mut call := state.tool_calls[event.index]
-				call.arguments += event.delta.message.tool_calls.function.arguments
-				state.tool_calls[event.index] = call
+				call := state.tool_calls[event.index]
+				state.tool_calls[event.index] = CohereStreamToolCall{
+					id:        call.id
+					call_type: call.call_type
+					name:      call.name
+					arguments: call.arguments + event.delta.message.tool_calls.function.arguments
+				}
 			}
 			'message-end' {
 				state.finish_reason = event.delta.finish_reason
