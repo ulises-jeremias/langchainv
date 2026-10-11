@@ -144,8 +144,13 @@ fn (loader RecursiveDirectoryLoader) load_supported_file(path string, extension 
 			return error('directory output budget is exhausted before PDF extraction')
 		}
 		pdf_loader := new_pdf_loader(path, PDFLoaderOptions{
-			max_input_bytes:  loader.max_file_bytes
-			max_output_bytes: max_output_bytes
+			max_input_bytes:       loader.max_file_bytes
+			max_output_bytes:      max_output_bytes
+			max_documents:         if max_documents > default_pdf_max_documents {
+				default_pdf_max_documents
+			} else {
+				max_documents
+			}
 		})!
 		return pdf_loader.load(mut ctx)
 	}

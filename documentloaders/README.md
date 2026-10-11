@@ -4,15 +4,18 @@ The package provides bounded PDF, HTML, text-file, CSV, Notion page, AssemblyAI
 transcription, and recursive directory loaders. They return `schema.Document`
 values and check request cancellation while loading.
 
-`PDFLoader` extracts text from a local PDF with Poppler's `pdftotext` executable.
-Install `poppler-utils` and ensure `pdftotext` is on `PATH`, or set
-`PDFLoaderOptions.pdftotext_path`. Each PDF produces one document containing
-the extracted text and its path in `metadata['source']`. Input, combined
-extracted text and diagnostic output, and execution time are bounded to 16 MiB,
-16 MiB, and 30 seconds by default; configurable hard caps are 64 MiB and 120
-seconds. The loader rejects symbolic links, propagates context cancellation,
+`PDFLoader` extracts each page from a local PDF with Poppler's `pdftotext`
+executable. Install `poppler-utils` and ensure `pdftotext` is on `PATH`, or set
+`PDFLoaderOptions.pdftotext_path`. Documents include the source path and
+one-based page and total-page counts in metadata. `load_and_split` preserves
+those fields on each bounded chunk. Input, combined extracted text and
+diagnostic output, execution time, and page count are bounded to 16 MiB, 16 MiB,
+30 seconds, and 10,000 pages by default; configurable hard caps are 64 MiB and
+120 seconds. The loader rejects symbolic links, propagates context cancellation,
 and terminates the extractor process group on cancellation, timeout, or output
-overflow. It invokes the executable directly without a shell.
+overflow. It invokes the executable directly without a shell. Encrypted PDFs
+requiring a password are not supported; Poppler accepts passwords only as
+process arguments, which would expose them in process listings.
 
 `AssemblyAILoader` submits an HTTPS media URL to AssemblyAI's transcript API,
 polls until completion, and returns one document with the transcript text and

@@ -106,7 +106,7 @@ fn test_recursive_directory_loader_loads_pdf_with_source_metadata() {
 	defer {
 		os.rmdir_all(root) or {}
 	}
-	pdf_path := os.join_path(root, 'document.pdf')
+	pdf_path := os.join_path(root, 'document.PDF')
 	create_directory_pdf_fixture(pdf_path, 'PDF directory text') or { panic(err) }
 	loader := new_recursive_directory_loader(root: root, allowed_extensions: ['pdf']) or {
 		panic(err)
@@ -115,7 +115,9 @@ fn test_recursive_directory_loader_loads_pdf_with_source_metadata() {
 	documents := loader.load(mut ctx) or { panic(err) }
 	assert documents.len == 1
 	assert documents[0].page_content.contains('PDF directory text')
-	assert (documents[0].metadata['source'] or { panic('missing source metadata') }).str().ends_with('document.pdf')
+	assert (documents[0].metadata['source'] or { panic('missing source metadata') }).str().ends_with('document.PDF')
+	assert (documents[0].metadata['page'] or { panic('missing page metadata') }).str() == '1'
+	assert (documents[0].metadata['total_pages'] or { panic('missing total_pages metadata') }).str() == '1'
 }
 
 fn test_recursive_directory_loader_enforces_entry_limit() {
