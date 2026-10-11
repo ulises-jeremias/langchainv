@@ -20,3 +20,9 @@ fake transport.
 `tools/duckduckgo` searches DuckDuckGo's HTML endpoint with the bounded
 default HTTP transport or an injected `HTTPClient`. It caps queries at 4 KiB,
 limits results to 30, and returns plain-text titles, descriptions, and URLs.
+
+`tools/wikipedia` searches the MediaWiki REST API with the bounded default
+transport or an injected `HTTPClient`. Set a Wikipedia language code when
+constructing the tool; queries are capped at 4 KiB and results at 20. It
+returns article titles and plain-text excerpts without making live calls in
+tests.

@@ -3,7 +3,7 @@ module duckduckgo
 import context
 import ulises_jeremias.langchainv.httputil
 
-const duckduckgo_fixture = '<div class="web-result"><a class="result__a" href="/l/?uddg=https%3A%2F%2Fexample.com%2Fv">V &amp; tools</a><a class="result__snippet">Compiler <b>language</b></a></div><div class="web-result"><a class="result__a" href="https://example.org">Second</a><a class="result__snippet">More</a></div>'
+const duckduckgo_fixture = '<html><body><div class="web-result"><a class="result__a" href="/l/?uddg=https%3A%2F%2Fexample.com%2Fv">V &amp; tools</a><a class="result__snippet">Compiler <b>language</b></a></div><div class="web-result"><a class="result__a" href="https://example.org">Second</a><a class="result__snippet">More</a></div></body></html>'
 
 @[heap]
 struct DuckDuckGoFixtureState {
