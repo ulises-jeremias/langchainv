@@ -178,3 +178,18 @@ fn test_generate_content_streams_reasoning_with_associated_output() {
 	assert response.choices[0].reasoning == 'plan'
 	assert response.choices[0].content == 'answer'
 }
+
+fn test_generate_content_reassembles_streamed_tool_call_deltas() {
+	mut ctx := context.background()
+	response_body := 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"look","arguments":"{\\"q\\":"}}]}}]}\n\ndata: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"name":"up","arguments":"\\"v\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n'
+	client, _ := new_fixture_client(response_body, 200)
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'lookup')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].id == 'call-1'
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments == '{"q":"v"}'
+	assert response.choices[0].stop_reason == 'tool_calls'
+}
