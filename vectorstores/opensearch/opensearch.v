@@ -21,14 +21,14 @@ const max_embedding_values = 16000
 // Store connects to an existing OpenSearch index with a k-NN vector mapping.
 pub struct Store {
 pub:
-	base_url       string
-	index          string
-	api_key        string
-	username       string
-	password       string
-	vector_field   string
-	text_field     string
-	metadata_field string
+	base_url        string
+	index           string
+	api_key         string
+	username        string
+	password        string
+	vector_field    string
+	text_field      string
+	metadata_field  string
 	namespace_field string
 pub mut:
 	embedder    embeddings.Embedder
@@ -70,7 +70,11 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 	}
 	httputil.validate_url(base_url, '')!
 	parsed_url := urllib.parse(base_url) or { return error('OpenSearch base URL is invalid') }
-	if parsed_url.scheme.to_lower() == 'http' && parsed_url.host.to_lower() !in ['localhost', '127.0.0.1', '::1'] {
+	if parsed_url.scheme.to_lower() == 'http' && parsed_url.host.to_lower() !in [
+		'localhost',
+		'127.0.0.1',
+		'::1',
+	] {
 		return error('remote OpenSearch endpoints must use HTTPS')
 	}
 	if !valid_index(options.index) {
@@ -90,7 +94,8 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 	if (options.username == '') != (options.password == '') {
 		return error('OpenSearch basic authentication requires both username and password')
 	}
-	fields := [options.vector_field, options.text_field, options.metadata_field, options.namespace_field]
+	fields := [options.vector_field, options.text_field, options.metadata_field,
+		options.namespace_field]
 	for field in fields {
 		if !valid_field_name(field) {
 			return error('OpenSearch field names must be valid simple field names')
@@ -271,10 +276,10 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		})
 	}
 	body := json2.encode(map[string]json2.Any{
-		'size': json2.Any(limit)
+		'size':    json2.Any(limit)
 		'_source': json2.Any([json2.Any(store.text_field), json2.Any(store.metadata_field),
 			json2.Any(store.namespace_field)])
-		'query': json2.Any({
+		'query':   json2.Any({
 			'knn': json2.Any({
 				store.vector_field: json2.Any(knn)
 			})
@@ -450,7 +455,7 @@ fn valid_field_name(value string) bool {
 	}
 	for index, ch in value.bytes() {
 		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || ch == `_`
-			|| (index > 0 && ch >= `0` && ch <= `9')) {
+			|| (index > 0 && ch >= `0` && ch <= `9`)) {
 			return false
 		}
 	}

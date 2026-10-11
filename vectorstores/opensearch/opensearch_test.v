@@ -144,8 +144,8 @@ fn test_opensearch_rejects_unsafe_endpoint_and_invalid_index() {
 	}
 	assert false, 'expected an invalid index suffix to fail'
 	new_store(OpenSearchFixtureEmbedder{}, Options{
-		index:     'docs'
-	text_field: 'content.page'
+		index:      'docs'
+		text_field: 'content.page'
 	}) or {
 		assert err.msg().contains('simple field names')
 		return
