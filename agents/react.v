@@ -242,7 +242,7 @@ fn validate_react_prompt_size(template prompts.StringTemplate, values map[string
 			end_after := template.template.index_after('}', index + 1) or {
 				return error('unclosed ReAct prompt variable')
 			}
-			end := end_after - 1
+			end := end_after
 			name := template.template[index + 1..end].trim_space()
 			value := values[name] or { return error('missing prompt value `${name}`') }
 			value_bytes := value.str().len
