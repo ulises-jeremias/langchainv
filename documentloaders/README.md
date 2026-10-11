@@ -1,8 +1,17 @@
 # Document loaders
 
-The package provides bounded HTML, text-file, and CSV content loaders plus a
-recursive directory loader. They return `schema.Document` values and check
-request cancellation while loading.
+The package provides bounded HTML, text-file, CSV, Notion page, and recursive
+directory loaders. They return `schema.Document` values and check request
+cancellation while loading.
+
+`NotionLoader` fetches a page's block tree through the Notion Blocks API. Use
+`new_notion_loader` with an explicit API key and injectable `HTTPClient`, or
+`new_default_notion_loader` to read `NOTION_API_KEY` and use the bounded default
+transport. It follows pagination and nested blocks, records the page ID and URL
+as metadata, and limits requests, blocks, nesting depth, response bytes, and
+output size. The loader emits plain text and Markdown-style headings, quotes,
+lists, checkboxes, and code blocks. It does not download external files or
+media attached to Notion blocks. Tests use fake HTTP responses only.
 
 `new_html_loader` accepts an HTML string up to 16 MiB by default and returns
 one document containing parsed body text, or document text when no body exists.
