@@ -110,6 +110,7 @@ struct CohereStreamToolCall {
 	id        string
 	call_type string
 	name      string
+	mut:
 	arguments string
 }
 
