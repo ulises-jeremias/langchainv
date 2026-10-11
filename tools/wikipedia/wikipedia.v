@@ -131,7 +131,7 @@ fn format_results(document string, max_results int) !string {
 		if title == '' {
 			continue
 		}
-		dom := html.parse(excerpt_value as string)
+		dom := html.parse('<html><body>${excerpt_value as string}</body></html>')
 		excerpt := html_entities.unescape(dom.get_root().text().trim_space(), all: true)
 		formatted << 'Title: ${title}\nDescription: ${excerpt}'
 	}
