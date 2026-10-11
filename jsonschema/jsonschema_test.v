@@ -52,9 +52,11 @@ fn test_definition_encodes_standard_constraints() {
 		additional_properties: false
 		properties:            {
 			'count': Definition{
-				type_:   .integer
-				minimum: 1
-				maximum: 10
+				type_:             .integer
+				minimum:           1
+				maximum:           10
+				exclusive_minimum: 1.5
+				exclusive_maximum: 9.5
 			}
 			'name':  Definition{
 				type_:      .string
@@ -74,6 +76,8 @@ fn test_definition_encodes_standard_constraints() {
 	encoded := definition.encode() or { panic(err) }
 	assert encoded.contains('"minimum":1')
 	assert encoded.contains('"maximum":10')
+	assert encoded.contains('"exclusiveMinimum":1.5')
+	assert encoded.contains('"exclusiveMaximum":9.5')
 	assert encoded.contains('"minLength":2')
 	assert encoded.contains('"maxLength":40')
 	assert encoded.contains('"minItems":1')
@@ -109,6 +113,10 @@ fn test_definition_rejects_invalid_constraint_types_and_ranges() {
 			type_:   .number
 			minimum: 3
 			maximum: 2
+		},
+		Definition{
+			type_:             .string
+			exclusive_minimum: 1
 		},
 	]
 	for definition in invalid_definitions {
@@ -290,6 +298,22 @@ fn test_instance_validation_accepts_union_types_and_scopes_constraints() {
 		return
 	}
 	assert false, 'expected the string-specific constraint to reject an empty string'
+}
+
+fn test_instance_validation_applies_exclusive_numeric_bounds() {
+	definition := Definition{
+		type_:             .number
+		exclusive_minimum: 0.5
+		exclusive_maximum: 2.5
+	}
+	definition.validate_instance(json2.Any(1.5)) or { panic(err) }
+	for value in [0.5, 2.5] {
+		definition.validate_instance(json2.Any(value)) or {
+			assert err.msg().contains('exclusive')
+			continue
+		}
+		assert false, 'expected an exclusive bound to reject its boundary value'
+	}
 }
 
 fn test_definition_rejects_duplicate_or_ambiguous_type_declarations() {

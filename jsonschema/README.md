@@ -2,9 +2,9 @@
 
 `Definition` represents the schema subset used to describe tool parameters:
 one JSON type or a list of accepted types, descriptions, string enums, object
-properties and required names, array item definitions, numeric minimum/maximum,
-string minLength/maxLength, array minItems/maxItems, and the boolean form of
-`additionalProperties`. `to_any()` produces a validated `json2.Any` tree, and
+properties and required names, array item definitions, inclusive and exclusive
+numeric bounds, string minLength/maxLength, array minItems/maxItems, and the
+boolean form of `additionalProperties`. `to_any()` produces a validated `json2.Any` tree, and
 `encode()` serializes it. Empty `properties` maps are emitted as `{}` to match
 the upstream Definition shape.
 
@@ -14,7 +14,8 @@ property definitions, and empty names. `validate_instance(json2.Any)` checks
 the supported definition subset recursively and includes the failing instance
 path in errors. It covers type checks, string enums, object properties and
 required names, the boolean form of `additionalProperties`, array items,
-numeric minimum/maximum, string minLength/maxLength, and array minItems/maxItems.
+inclusive/exclusive numeric bounds, string minLength/maxLength, and array
+minItems/maxItems.
 Instances are capped at 10,000 nodes, 1 MiB of aggregate scalar/key bytes, and
 64 levels of nesting before schema evaluation.
 

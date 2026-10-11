@@ -50,6 +50,8 @@ pub:
 	items                 ?&Definition
 	minimum               ?f64
 	maximum               ?f64
+	exclusive_minimum     ?f64
+	exclusive_maximum     ?f64
 	min_length            ?int
 	max_length            ?int
 	min_items             ?int
@@ -87,6 +89,12 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	}
 	if maximum := definition.maximum {
 		result['maximum'] = json2.Any(maximum)
+	}
+	if exclusive_minimum := definition.exclusive_minimum {
+		result['exclusiveMinimum'] = json2.Any(exclusive_minimum)
+	}
+	if exclusive_maximum := definition.exclusive_maximum {
+		result['exclusiveMaximum'] = json2.Any(exclusive_maximum)
 	}
 	if min_length := definition.min_length {
 		result['minLength'] = json2.Any(min_length)
@@ -268,6 +276,16 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 				return error('JSON Schema number is above maximum at ${path}')
 			}
 		}
+		if exclusive_minimum := definition.exclusive_minimum {
+			if number <= exclusive_minimum {
+				return error('JSON Schema number must be above exclusiveMinimum at ${path}')
+			}
+		}
+		if exclusive_maximum := definition.exclusive_maximum {
+			if number >= exclusive_maximum {
+				return error('JSON Schema number must be below exclusiveMaximum at ${path}')
+			}
+		}
 	}
 }
 
@@ -338,8 +356,10 @@ fn (definition Definition) validate_depth(depth int) ! {
 		if data_type != .object && definition.properties.len > 0 {
 			return error('JSON Schema properties is only valid for object definitions')
 		}
-		if data_type !in [.number, .integer] && (definition.minimum != none || definition.maximum != none) {
-			return error('JSON Schema minimum and maximum are only valid for number or integer definitions')
+		if data_type !in [.number, .integer]
+			&& (definition.minimum != none || definition.maximum != none
+			|| definition.exclusive_minimum != none || definition.exclusive_maximum != none) {
+			return error('JSON Schema numeric bounds are only valid for number or integer definitions')
 		}
 		if data_type != .string && (definition.min_length != none || definition.max_length != none) {
 			return error('JSON Schema minLength and maxLength are only valid for string definitions')
@@ -369,9 +389,10 @@ fn (definition Definition) validate_depth(depth int) ! {
 			|| definition.additional_properties != none) && DataType.object !in definition.types {
 			return error('JSON Schema object constraints require object in types')
 		}
-		if (definition.minimum != none || definition.maximum != none)
+		if (definition.minimum != none || definition.maximum != none
+			|| definition.exclusive_minimum != none || definition.exclusive_maximum != none)
 			&& DataType.number !in definition.types && DataType.integer !in definition.types {
-			return error('JSON Schema minimum and maximum require number or integer in types')
+			return error('JSON Schema numeric bounds require number or integer in types')
 		}
 		if (definition.min_length != none || definition.max_length != none)
 			&& DataType.string !in definition.types {
@@ -393,6 +414,16 @@ fn (definition Definition) validate_depth(depth int) ! {
 	if maximum := definition.maximum {
 		if !math.is_finite(maximum) {
 			return error('JSON Schema maximum must be finite')
+		}
+	}
+	if exclusive_minimum := definition.exclusive_minimum {
+		if !math.is_finite(exclusive_minimum) {
+			return error('JSON Schema exclusiveMinimum must be finite')
+		}
+	}
+	if exclusive_maximum := definition.exclusive_maximum {
+		if !math.is_finite(exclusive_maximum) {
+			return error('JSON Schema exclusiveMaximum must be finite')
 		}
 	}
 	if minimum := definition.minimum {
