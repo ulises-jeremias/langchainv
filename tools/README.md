@@ -16,3 +16,7 @@ OpenAI-compatible Sonar API. Pass an explicit key and injectable `HTTPClient`
 with `new_tool`, or use `new_default_tool` to read `PERPLEXITY_API_KEY` and
 the bounded default transport. Queries are capped at 8 KiB; tests use only a
 fake transport.
+
+`tools/duckduckgo` searches DuckDuckGo's HTML endpoint with the bounded
+default HTTP transport or an injected `HTTPClient`. It caps queries at 4 KiB,
+limits results to 30, and returns plain-text titles, descriptions, and URLs.
