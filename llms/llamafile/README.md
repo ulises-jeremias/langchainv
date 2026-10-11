@@ -7,9 +7,10 @@ behavior. Configure a model and endpoint with `Options`; loopback HTTP and
 HTTPS endpoints are accepted, while remote cleartext endpoints are rejected.
 
 The adapter implements `llms.Model` and `llms.CompletionModel` through
-`generate_content` and `complete`. The shared OpenAI adapter currently rejects
-streaming callbacks and unsupported generation options explicitly. For
-embeddings, use `embeddings/openai` with the llamafile `/v1/embeddings` endpoint.
+`generate_content` and `complete`. It inherits the shared OpenAI streaming
+callbacks when the injected HTTP transport supports streaming, and rejects
+unsupported generation options explicitly. For embeddings, use
+`embeddings/openai` with the llamafile `/v1/embeddings` endpoint.
 
 The pinned LangChainGo llamafile adapter targets its legacy `/completion` and
 `/embedding` API and includes llama.cpp-specific options. Current llamafile

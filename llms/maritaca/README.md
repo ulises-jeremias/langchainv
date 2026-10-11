@@ -16,10 +16,11 @@ response := client.generate_content(mut ctx, [schema.text_message(.human, 'Olá'
 println(response.choices[0].content)
 ```
 
-The adapter inherits the OpenAI package's bounded non-streaming messages, tools,
-JSON mode, common options, transport limits, and response mapping. Tests use an
-injected fake HTTP transport and do not contact Maritaca. Responses API,
-streaming, and Maritaca-specific request options remain outside this adapter.
+The adapter inherits the OpenAI package's bounded messages, tools, JSON mode,
+common options, transport limits, streaming, and response mapping. Streaming
+requires a streaming-capable injected HTTP transport. Tests use an injected fake
+HTTP transport and do not contact Maritaca. The Responses API and
+Maritaca-specific request options remain outside this adapter.
 
 The provider documents Chat Completions compatibility and the
 `https://chat.maritaca.ai/api` base URL in its
