@@ -94,7 +94,7 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 	if vectors.len != documents.len {
 		return error('embedder returned ${vectors.len} vectors for ${documents.len} documents')
 	}
-	m := make([]map[string]json2.Any{}, 0, documents.len)
+	mut points := []map[string]json2.Any{cap: documents.len}
 	mut ids := []string{cap: documents.len}
 	mut dimension := -1
 	for index, document in documents {
@@ -119,14 +119,14 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 		if options.namespace != '' {
 			payload['namespace'] = json2.Any(options.namespace)
 		}
-		m << {
+		points << map[string]json2.Any{
 			'id':      json2.Any(id)
 			'vector':  json2.Any(wire_vector)
 			'payload': json2.Any(payload)
 		}
 	}
 	body := json2.encode(map[string]json2.Any{
-		'points': json2.Any(m)
+		'points': json2.Any(points)
 	}, json2.EncoderOptions{})
 	if body.len > max_payload_bytes {
 		return error('Qdrant write payload exceeds 4 MiB')
@@ -326,7 +326,7 @@ fn valid_collection(collection string) bool {
 	}
 	for value in collection.bytes() {
 		if !(value >= `a` && value <= `z`) && !(value >= `A` && value <= `Z`)
-			&& !(value >= `0` && value <= `9`) && value !in [`-`, `_`, '.'] {
+			&& !(value >= `0` && value <= `9`) && value != `-` && value != `_` && value != `.` {
 			return false
 		}
 	}

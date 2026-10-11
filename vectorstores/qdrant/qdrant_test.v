@@ -94,7 +94,7 @@ fn test_qdrant_search_maps_payload_filter_and_score() {
 	assert documents.len == 1
 	assert documents[0].page_content == 'answer'
 	assert documents[0].score == f32(0.875)
-	assert documents[0].metadata['kind'] == json2.Any('guide')
+	assert (documents[0].metadata['kind'] or { json2.Any('') }) == json2.Any('guide')
 	assert state.requests[0].url.ends_with('/points/query')
 	assert state.requests[0].body.contains('metadata.kind')
 	assert state.requests[0].body.contains('tenant-a')
