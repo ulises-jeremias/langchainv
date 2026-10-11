@@ -186,7 +186,33 @@ fn defined_map_schema[K, T](_values map[K]T, name string) !DefinedContainerSchem
 				nested_schema: defined_nested_struct_schema[T](name)!
 			}
 		} $else {
-			return error('maps must contain nested structs or supported scalar values')
+			$if T is string {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, string>'
+				}
+			} $else $if T is bool {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, boolean>'
+				}
+			} $else $if T is $int || T is $float {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, number>'
+				}
+			} $else $if T is ?string {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, string | null>'
+				}
+			} $else $if T is ?bool {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, boolean | null>'
+				}
+			} $else $if T is ?int || T is ?i64 || T is ?i32 || T is ?i16 || T is ?i8 || T is ?u64 || T is ?u32 || T is ?u16 || T is ?u8 || T is ?f32 || T is ?f64 {
+				return DefinedContainerSchema{
+					field_type: 'Record<string, number | null>'
+				}
+			} $else {
+				return error('maps must contain nested structs or supported scalar values')
+			}
 		}
 	} $else {
 		return error('maps must use string keys')

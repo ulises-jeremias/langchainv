@@ -96,6 +96,7 @@ struct DefinedExample {
 	fixed        [2]DefinedExampleChild
 	by_name      map[string]DefinedExampleChild
 	metadata     map[string]string
+	optional_map map[string]?string
 	labels       [2]string
 	active       [2]bool
 	scores       [3]int
@@ -119,8 +120,9 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert instructions.contains('"fixed": _Root_Fixed[];')
 	assert instructions.contains('"by_name": Record<string, _Root_By_name>;')
 	assert instructions.contains('"metadata": Record<string, string>;')
+	assert instructions.contains('"optional_map": Record<string, string | null>;')
 	assert !instructions.contains('"ignored"')
-	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3],"optional":["set",null],"flags":[true,null],"nullable":[7,null]}\n```') or {
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"by_name":{"primary":{"detail":"mapped"}},"metadata":{"source":"test"},"optional_map":{"present":"value","missing":null},"labels":["first","second"],"active":[true,false],"scores":[1,2,3],"optional":["set",null],"flags":[true,null],"nullable":[7,null]}\n```') or {
 		panic(err)
 	}
 	assert parsed.name == 'Ada'
@@ -131,6 +133,9 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert parsed.fixed[1].detail == 'fixed-b'
 	assert parsed.by_name['primary'].detail == 'mapped'
 	assert parsed.metadata['source'] == 'test'
+	map_value := parsed.optional_map['present'] or { panic('expected optional map value') }
+	assert map_value == 'value'
+	assert parsed.optional_map['missing'] == none
 	assert parsed.labels == ['first', 'second']
 	assert parsed.active == [true, false]!
 	assert parsed.scores == [1, 2, 3]!
