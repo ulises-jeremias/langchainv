@@ -43,9 +43,7 @@ pub fn new_tool(max_results int, user_agent string, http_client httputil.HTTPCli
 
 // new_default_tool uses the bounded default HTTP transport.
 pub fn new_default_tool(max_results int, user_agent string) !Tool {
-	mut client := httputil.new_default_client()
-	client.max_response_bytes = max_response_bytes
-	return new_tool(max_results, user_agent, httputil.HTTPClient(client))
+	return new_tool(max_results, user_agent, httputil.HTTPClient(httputil.new_default_client()))
 }
 
 // spec describes the search query expected by this tool.
