@@ -23,6 +23,24 @@ fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request
 	return state.response
 }
 
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 17 < body.len { offset + 17 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
+	return state.response
+}
+
+struct StreamCapture {
+mut:
+	value string
+}
+
 fn new_fixture_client(body string, status int) (Client, &FakeHTTPState) {
 	mut state := &FakeHTTPState{
 		response: httputil.Response{
@@ -105,6 +123,42 @@ fn test_generate_content_requires_candidate_response() {
 		return
 	}
 	assert false, 'expected empty candidates to fail'
+}
+
+fn test_generate_content_streams_sse_text_and_usage() {
+	mut ctx := context.background()
+	body := 'data: {"candidates":[{"content":{"parts":[{"text":"hel"}]}}]}\n\n' +
+		'data: {"candidates":[{"content":{"parts":[{"text":"lo"}]}}]}\n\n' +
+		'data: {"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2,"totalTokenCount":7}}\n\n'
+	client, state := new_fixture_client(body, 200)
+	mut streamed := &StreamCapture{}
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'STOP'
+	assert response.usage.prompt_tokens == 5
+	assert response.usage.completion_tokens == 2
+	assert response.usage.total_tokens == 7
+	assert state.requests[0].url.ends_with(':streamGenerateContent?alt=sse')
+	assert (state.requests[0].headers['Accept'] or { '' }) == 'text/event-stream'
+}
+
+fn test_generate_content_streams_function_calls() {
+	mut ctx := context.background()
+	client, _ := new_fixture_client('data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"lookup","args":{"q":"v"}}}]},"finishReason":"STOP"}]}\n\n', 200)
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'look this up')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert response.choices[0].tool_calls.len == 1
+	assert response.choices[0].tool_calls[0].id == 'gemini-0-0'
+	assert response.choices[0].tool_calls[0].function_call.name == 'lookup'
+	assert response.choices[0].tool_calls[0].function_call.arguments.contains('"q":"v"')
 }
 
 fn test_generate_content_hides_http_error_body() {

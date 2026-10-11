@@ -1,4 +1,4 @@
-// Package googleai implements non-streaming Gemini generateContent requests.
+// Package googleai implements Gemini generateContent requests.
 module googleai
 
 import context
@@ -44,6 +44,23 @@ struct UsageMetadata {
 	prompt_token_count     int @[json: 'promptTokenCount']
 	candidates_token_count int @[json: 'candidatesTokenCount']
 	total_token_count      int @[json: 'totalTokenCount']
+}
+
+struct GoogleStreamState {
+mut:
+	content        string
+	finish_reason  string
+	prompt_tokens  int
+	output_tokens  int
+	total_tokens   int
+	function_calls []GoogleStreamFunctionCall
+	received_bytes i64
+	error          string
+}
+
+struct GoogleStreamFunctionCall {
+	index int
+	call  GoogleFunctionCall
 }
 
 // Client generates Gemini content with an injected bounded transport.
@@ -106,7 +123,7 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 	return response.choices[0].content
 }
 
-// generate_content implements bounded non-streaming Gemini generateContent.
+// generate_content implements bounded streaming and non-streaming Gemini content generation.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	llms.validate_messages(messages)!
@@ -124,6 +141,12 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	body := json2.encode(request, json2.EncoderOptions{})
 	if body.len > max_request_bytes {
 		return error('Google AI request exceeds the 8 MiB size limit')
+	}
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, model, body, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, model, body, options)
 	}
 	ctx_error := ctx.err()
 	if ctx_error !is none {
@@ -199,6 +222,166 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	}
 }
 
+fn (client Client) generate_stream(mut ctx context.Context, model string, body string, options llms.CallOptions) !llms.Response {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Google AI HTTP transport does not support streaming responses')
+	}
+	if options.candidate_count > 1 || options.n > 1 {
+		return error('Google AI streaming supports one candidate because stream callbacks do not identify candidate indexes')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
+	mut state := &GoogleStreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, payload []u8) {
+		chunk := json2.decode[GenerateResponse](payload.bytestr(), json2.DecoderOptions{}) or {
+			state.error = 'could not decode Google AI streaming response'
+			return
+		}
+		if chunk.candidates.len > 1 {
+			state.error = 'Google AI streaming returned multiple candidates'
+			return
+		}
+		for candidate in chunk.candidates {
+			for part_index, part in candidate.content.parts {
+				if part.text != '' {
+					state.content += part.text
+					if callback := options.streaming_func {
+						callback(mut callback_ctx, part.text.bytes()) or {
+							state.error = 'Google AI streaming callback failed: ${err.msg()}'
+							return
+						}
+					}
+					if callback := options.streaming_reasoning_func {
+						callback(mut callback_ctx, []u8{}, part.text.bytes()) or {
+							state.error = 'Google AI reasoning callback failed: ${err.msg()}'
+							return
+						}
+					}
+				}
+				if function_call := part.function_call {
+					if function_call.name.trim_space() == '' {
+						state.error = 'Google AI returned a function call with an empty name'
+						return
+					}
+					mut found := -1
+					for call_index, streamed_call in state.function_calls {
+						if streamed_call.index == part_index {
+							found = call_index
+							break
+						}
+					}
+					if found < 0 {
+						state.function_calls << GoogleStreamFunctionCall{
+							index: part_index
+							call:  function_call
+						}
+					} else {
+						mut merged_args := state.function_calls[found].call.args.clone()
+						for key, value in function_call.args {
+							merged_args[key] = value
+						}
+						state.function_calls[found] = GoogleStreamFunctionCall{
+							index: part_index
+							call:  GoogleFunctionCall{
+								name: function_call.name
+								args: merged_args
+							}
+						}
+					}
+				}
+			}
+		}
+		if chunk.candidates.len > 0 && chunk.candidates[0].finish_reason != '' {
+			state.finish_reason = chunk.candidates[0].finish_reason
+		}
+		if chunk.usage_metadata.prompt_token_count > 0 {
+			state.prompt_tokens = chunk.usage_metadata.prompt_token_count
+		}
+		if chunk.usage_metadata.candidates_token_count > 0 {
+			state.output_tokens = chunk.usage_metadata.candidates_token_count
+		}
+		if chunk.usage_metadata.total_token_count > 0 {
+			state.total_tokens = chunk.usage_metadata.total_token_count
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/models/${model}:streamGenerateContent?alt=sse'
+		headers: {
+			'x-goog-api-key': client.api_key
+			'Content-Type':   'application/json'
+			'Accept':         'text/event-stream'
+		}
+		body:    body
+	}, fn [mut decoder, mut state, mut process_event] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Google AI response exceeds 16 MiB')
+		}
+		for payload in decoder.push(bytes)! {
+			process_event(mut callback_ctx, payload)
+			if state.error != '' {
+				return error(state.error)
+			}
+		}
+	}) or {
+		return error('Google AI streamGenerateContent request failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Google AI streamGenerateContent request returned HTTP ${response.status_code}')
+	}
+	for payload in decoder.finish()! {
+		process_event(mut ctx, payload)
+		if state.error != '' {
+			return error(state.error)
+		}
+	}
+	mut tool_calls := []schema.ToolCall{cap: state.function_calls.len}
+	for streamed_call in state.function_calls {
+		tool_calls << schema.ToolCall{
+			id:            'gemini-0-${streamed_call.index}'
+			call_type:     'function'
+			function_call: schema.FunctionCall{
+				name:      streamed_call.call.name
+				arguments: json2.encode(streamed_call.call.args, json2.EncoderOptions{})
+			}
+		}
+	}
+	mut parts := []schema.ContentPart{}
+	if state.content != '' {
+		parts << schema.ContentPart(schema.TextPart{
+			text: state.content
+		})
+	}
+	for call in tool_calls {
+		parts << schema.ContentPart(call)
+	}
+	if parts.len == 0 {
+		return error('Google AI returned an empty streaming response')
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:     state.content
+			stop_reason: state.finish_reason
+			tool_calls:  tool_calls
+			parts:       parts
+		}]
+		usage:   llms.Usage{
+			prompt_tokens:     state.prompt_tokens
+			completion_tokens: state.output_tokens
+			total_tokens:      if state.total_tokens > 0 {
+				state.total_tokens
+			} else {
+				state.prompt_tokens + state.output_tokens
+			}
+		}
+	}
+}
+
 fn validate_options(options llms.CallOptions) ! {
 	if options.candidate_count > max_candidates || options.n > max_candidates {
 		return error('Google AI candidate count must not exceed 8')
@@ -233,12 +416,6 @@ fn validate_options(options llms.CallOptions) ! {
 		if choice.mode.to_lower() !in ['auto', 'none', 'any', 'required', 'function', 'tool'] {
 			return error('Google AI tool_choice mode is not supported')
 		}
-	}
-	if _ := options.streaming_func {
-		return error('Google AI streaming is not supported by this bounded transport')
-	}
-	if _ := options.streaming_reasoning_func {
-		return error('Google AI streaming is not supported by this bounded transport')
 	}
 }
 
