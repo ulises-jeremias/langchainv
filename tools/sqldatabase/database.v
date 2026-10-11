@@ -162,7 +162,7 @@ pub fn (engine DriverEngine) query_params(mut ctx context.Context, statement str
 pub fn (engine DriverEngine) table_names(mut ctx context.Context) ![]string {
 	statement := match engine.state.dialect {
 		'sqlite', 'sqlite3' { "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name" }
-		'pgx', 'postgresql' { "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name" }
+		'pgx', 'postgresql' { "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name" }
 		'mysql' { 'SHOW TABLES' }
 		else { return error(err_unknown_dialect) }
 	}
@@ -191,7 +191,7 @@ pub fn (engine DriverEngine) table_info(mut ctx context.Context, table string) !
 	}
 	statement, parameter := match state.dialect {
 		'sqlite', 'sqlite3' { ('SELECT sql FROM sqlite_master WHERE type = ? AND name = ?', 'table') }
-		'pgx', 'postgresql' { ('SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = \'public\' AND table_name = \'${escape_sql_literal(table)}\' ORDER BY ordinal_position', '') }
+		'pgx', 'postgresql' { ('SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = \'public\' AND table_name = $1 ORDER BY ordinal_position', '') }
 		else { return error(err_unknown_dialect) }
 	}
 	mut result := QueryResult{}
@@ -217,7 +217,7 @@ pub fn (engine DriverEngine) table_info(mut ctx context.Context, table string) !
 			}
 		}
 	} else {
-		result = engine.query(mut ctx, statement)!
+		result = engine.query_params(mut ctx, statement, [table])!
 	}
 	if result.rows.len == 0 || result.rows[0].len == 0 {
 		return error(err_table_not_found)
@@ -516,10 +516,6 @@ fn validate_table_name(name string) ! {
 	if name.trim_space() == '' || name.len > max_table_name_bytes || name.contains('\0') {
 		return error('SQL table name must contain 1..${max_table_name_bytes} bytes and no NUL')
 	}
-}
-
-fn escape_sql_literal(value string) string {
-	return value.replace("'", "''")
 }
 
 fn quote_identifier(dialect string, identifier string) !string {

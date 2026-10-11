@@ -38,8 +38,9 @@ The current core packages include:
   sequential map-reduce, map-rerank and refine, constitutional critique and
   revision, retrieval QA, sequential composition, memory loading, bounded
   conversational retrieval QA, and input/output validation.
-- `agents`: tool-calling agent and bounded executor with tool dispatch,
-  callbacks, memory integration, and optional intermediate-step output.
+- `agents`: text-based MRKL/ReAct and model tool-calling agents, plus a bounded
+  executor with tool dispatch, callbacks, memory integration, and optional
+  intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Qdrant and Pinecone REST integrations.

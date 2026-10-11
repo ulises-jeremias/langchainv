@@ -1,0 +1,156 @@
+module agents
+
+import context
+import json2
+import ulises_jeremias.langchainv.llms
+import ulises_jeremias.langchainv.schema
+import ulises_jeremias.langchainv.tools
+
+struct ReactEchoTool {}
+
+fn (_tool ReactEchoTool) spec() tools.ToolSpec {
+	return tools.ToolSpec{
+		name:        'echo'
+		description: 'Returns the input unchanged'
+		parameters:  json2.Any(map[string]json2.Any{})
+	}
+}
+
+fn (_tool ReactEchoTool) call(mut _ctx context.Context, input string) !string {
+	return input
+}
+
+struct ReactFixtureModel {
+	state &ReactFixtureModelState
+}
+
+struct ReactFixtureModelState {
+mut:
+	outputs  []string
+	prompts  []string
+	options  []llms.CallOptions
+}
+
+fn (model ReactFixtureModel) complete(mut ctx context.Context, prompt string, options llms.CallOptions) !string {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	options.validate()!
+	mut state := model.state
+	if state.prompts.len >= state.outputs.len {
+		return error('unexpected ReAct model call')
+	}
+	state.prompts << prompt
+	state.options << options
+	return state.outputs[state.prompts.len - 1]
+}
+
+fn test_react_agent_parses_tool_action_and_final_answer() {
+	mut state := &ReactFixtureModelState{
+		outputs: [
+			'Thought: use echo\nAction: echo\nAction Input: hello',
+			'Thought: done\nFinal Answer: hello back',
+		]
+	}
+	agent := new_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{}) or { panic(err) }
+	mut ctx := context.background()
+	first := agent.plan(mut ctx, [], {
+		'input': 'say hello'
+	}, llms.CallOptions{}) or { panic(err) }
+	assert first.actions.len == 1
+	assert first.actions[0].tool == 'echo'
+	assert first.actions[0].tool_input == 'hello'
+	assert first.actions[0].log.contains('Thought: use echo')
+	assert state.options[0].stop_words == ['\nObservation:', '\n\tObservation:']
+	second := agent.plan(mut ctx, [schema.AgentStep{
+		action: schema.AgentAction{
+			tool:       'echo'
+			tool_input: 'hello'
+			log:        'Thought: use echo\nAction: echo\nAction Input: hello'
+		}
+		observation: 'hello'
+	}], {
+		'input': 'say hello'
+	}, llms.CallOptions{}) or { panic(err) }
+	if finish := second.finish {
+		answer := finish.return_values['output'] or { panic('missing ReAct final answer') }
+		assert answer == json2.Any('hello back')
+	} else {
+		assert false, 'expected ReAct agent to finish'
+	}
+	assert state.prompts[1].contains('Observation: hello')
+}
+
+fn test_react_agent_supports_case_insensitive_output_labels_and_custom_options() {
+	mut state := &ReactFixtureModelState{
+		outputs: ['The answer is: 42']
+	}
+	agent := new_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{
+		input_keys: ['question']
+		output_key: 'result'
+		call_options: llms.CallOptions{
+			max_tokens: 32
+			model:      'offline-model'
+		}
+	}) or { panic(err) }
+	mut ctx := context.background()
+	result := agent.plan(mut ctx, [], {
+		'question': 'life?'
+	}, llms.CallOptions{}) or { panic(err) }
+	if finish := result.finish {
+		answer := finish.return_values['result'] or { panic('missing custom output') }
+		assert answer == json2.Any('42')
+	} else {
+		assert false, 'expected ReAct answer finish'
+	}
+	assert agent.input_keys() == ['question']
+	assert agent.output_keys() == ['result']
+	assert state.options[0].max_tokens == 32
+	assert state.options[0].model == 'offline-model'
+}
+
+fn test_react_agent_runs_through_the_executor_with_tool_observation() {
+	mut state := &ReactFixtureModelState{
+		outputs: [
+			'Thought: call echo\nAction: echo\nAction Input: hello',
+			'Thought: the echo tool returned the answer\nFinal Answer: hello',
+		]
+	}
+	agent := new_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{}) or { panic(err) }
+	mut executor := new_default_executor(agent) or { panic(err) }
+	mut ctx := context.background()
+	outputs := executor.call(mut ctx, {
+		'input': json2.Any('say hello')
+	}) or { panic(err) }
+	answer := outputs['output'] or { panic('missing ReAct executor answer') }
+	assert answer == json2.Any('hello')
+	assert state.prompts.len == 2
+	assert state.prompts[1].contains('Observation: hello')
+}
+
+fn test_react_agent_rejects_malformed_output_and_prompt_bounds() {
+	parse_react_output('Thought: act\nAction: echo', 'output') or {
+		assert err.msg().contains('Action Input')
+		return
+	}
+	assert false, 'expected malformed ReAct output to fail'
+	mut state := &ReactFixtureModelState{
+		outputs: ['Final Answer: done']
+	}
+	new_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{
+		max_prompt_bytes: 128
+	}) or {
+		assert err.msg().contains('prompt byte limit')
+		return
+	}
+	assert false, 'expected undersized ReAct prompt bound to fail'
+}
