@@ -70,6 +70,16 @@ the `input` and `output` keys; use `new_llm_chain` for a custom prompt or keys.
 from the template. Set `memory_store` before calling the chain to load and save
 conversation state through `chains.call`.
 
+`new_constitutional_chain(chain, principles, options)` wraps an `LLMChain` with
+sequential critique and revision passes. Each principle has a unique name and
+non-empty critique and revision requests. The default prompts can be replaced
+with templates containing `critique_request`, `revision_request`,
+`input_prompt`, `response`, and `critique` as appropriate. The chain bounds the
+principle count and each formatted prompt/response size, checks cancellation
+between model calls, and can return `initial_output` plus
+`critiques_and_revisions` when `return_intermediate` is enabled. Conversation
+memory remains owned by the wrapped chain.
+
 `new_sequential_chain(children, input_keys, output_keys)` validates the key flow
 between ordered child chains. Each child receives the original inputs and all
 values produced by earlier children. The result contains only the selected
