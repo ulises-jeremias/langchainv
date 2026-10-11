@@ -253,6 +253,8 @@ pub fn new_conversation_window_buffer(window_size int, memory_key string, input_
 		memory_key: base.memory_key
 		input_key:  base.input_key
 		output_key: base.output_key
+		human_prefix: base.human_prefix
+		ai_prefix:    base.ai_prefix
 	}
 	return ConversationWindowBuffer{
 		buffer:      buffer
