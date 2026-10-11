@@ -7,9 +7,38 @@ struct FixtureHTTPClient {
 	state &FixtureHTTPClientState
 }
 
+struct FixtureStreamingHTTPClient {}
+
+fn (_client FixtureStreamingHTTPClient) do_stream(mut ctx context.Context, _request Request, handler StreamHandler) !Response {
+	handler(mut ctx, 'chunk'.bytes())!
+	return Response{
+		status_code: 200
+		body:        'chunk'
+	}
+}
+
 struct FixtureHTTPClientState {
 mut:
 	requests []Request
+}
+
+struct FixtureHTTPLoggerState {
+mut:
+	events []HTTPLogEvent
+}
+
+struct FixtureChunkState {
+mut:
+	chunks []string
+}
+
+struct FixtureHTTPLogger {
+	state &FixtureHTTPLoggerState
+}
+
+fn (logger FixtureHTTPLogger) log_http(event HTTPLogEvent) {
+	mut state := logger.state
+	state.events << event
 }
 
 fn (client FixtureHTTPClient) do(mut _ctx context.Context, request Request) !Response {
@@ -45,6 +74,55 @@ fn test_http_client_contract_is_fakeable_without_network() {
 	assert state.requests.len == 1
 	assert state.requests[0].method == .post
 	assert (state.requests[0].headers['Authorization'] or { '' }) == 'Bearer test-token'
+}
+
+fn test_logging_client_emits_redacted_request_metadata() {
+	mut ctx := context.background()
+	mut client_state := &FixtureHTTPClientState{}
+	mut logger_state := &FixtureHTTPLoggerState{}
+	client := new_logging_client(HTTPClient(FixtureHTTPClient{
+		state: client_state
+	}), HTTPLogger(FixtureHTTPLogger{
+		state: logger_state
+	}))
+	response := client.do(mut ctx, Request{
+		method:  .post
+		url:     'https://example.test/private/path?token=secret-query'
+		headers: {
+			'Authorization': 'Bearer secret-header'
+		}
+		body:    'secret-body'
+	}) or { panic(err) }
+	assert response.status_code == 200
+	assert logger_state.events.len == 1
+	event := logger_state.events[0]
+	assert event.method == 'POST'
+	assert event.host == 'example.test'
+	assert event.request_bytes == 'secret-body'.len
+	assert event.status_code == 200
+	assert event.response_bytes == '{"ok":true}'.len
+	assert !event.failed
+}
+
+fn test_logging_streaming_client_preserves_chunks_and_emits_one_event() {
+	mut ctx := context.background()
+	mut logger_state := &FixtureHTTPLoggerState{}
+	client := new_logging_streaming_client(StreamingHTTPClient(FixtureStreamingHTTPClient{}),
+		HTTPLogger(FixtureHTTPLogger{
+			state: logger_state
+		}))
+	mut chunk_state := &FixtureChunkState{}
+	response := client.do_stream(mut ctx, Request{
+		method: .post
+		url:    'https://example.test/v1/chat'
+		body:   'request'
+	}, fn [mut chunk_state] (mut _ctx context.Context, chunk []u8) ! {
+		chunk_state.chunks << chunk.bytestr()
+	}) or { panic(err) }
+	assert response.body == 'chunk'
+	assert chunk_state.chunks == ['chunk']
+	assert logger_state.events.len == 1
+	assert logger_state.events[0].response_bytes == 5
 }
 
 fn test_default_client_rejects_non_http_urls_before_network() {

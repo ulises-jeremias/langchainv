@@ -15,3 +15,8 @@ does not connect to the host.
 cancellation before and after a call and bounds an in-flight call with read and
 write timeouts. Provider tests should inject a deterministic `HTTPClient` and
 must not use live credentials or billable endpoints.
+
+`new_logging_client` and `new_logging_streaming_client` decorate HTTP clients
+with one completion event per exchange. Events include only the method, host,
+payload sizes, status, and failure flag. URL paths and query strings, headers,
+bodies, response content, and error text are never passed to the logger.
