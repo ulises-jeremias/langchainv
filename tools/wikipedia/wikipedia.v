@@ -25,15 +25,6 @@ mut:
 	http_client httputil.HTTPClient
 }
 
-struct SearchResponse {
-	pages []SearchPage
-}
-
-struct SearchPage {
-	title   string
-	excerpt string
-}
-
 // new_tool creates a Wikipedia search tool with an injectable transport.
 pub fn new_tool(max_results int, language string, http_client httputil.HTTPClient) !Tool {
 	if max_results < 0 || max_results > max_results_limit {
@@ -118,19 +109,29 @@ fn parse_query(input string) !string {
 }
 
 fn format_results(document string, max_results int) !string {
-	decoded := json2.decode[SearchResponse](document, json2.DecoderOptions{}) or {
+	decoded := json2.decode[map[string]json2.Any](document, json2.DecoderOptions{}) or {
 		return error('Wikipedia returned an invalid search response')
 	}
+	pages := decoded['pages'] or { return error('Wikipedia response is missing search results') }
+	if pages !is []json2.Any {
+		return error('Wikipedia response has an invalid search results field')
+	}
 	mut formatted := []string{}
-	for page in decoded.pages {
+	for page_value in pages as []json2.Any {
 		if formatted.len >= max_results {
 			break
 		}
-		title := page.title.trim_space()
+		page := page_value.as_map()
+		title_value := page['title'] or { continue }
+		excerpt_value := page['excerpt'] or { continue }
+		if title_value !is string || excerpt_value !is string {
+			continue
+		}
+		title := (title_value as string).trim_space()
 		if title == '' {
 			continue
 		}
-		dom := html.parse(page.excerpt)
+		dom := html.parse(excerpt_value as string)
 		excerpt := html_entities.unescape(dom.get_root().text().trim_space(), all: true)
 		formatted << 'Title: ${title}\nDescription: ${excerpt}'
 	}
