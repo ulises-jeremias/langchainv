@@ -444,9 +444,9 @@ fn valid_identifier(value string) bool {
 	if value.len == 0 || value.len > 128 {
 		return false
 	}
-	for index, char in value.bytes() {
-		if !((char >= `a` && char <= `z`) || (char >= `A` && char <= `Z`)
-			|| char == `_` || (index > 0 && char >= `0` && char <= `9`)) {
+	for index, ch in value.bytes() {
+		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`)
+			|| ch == `_` || (index > 0 && ch >= `0` && ch <= `9`)) {
 			return false
 		}
 	}

@@ -52,7 +52,11 @@ fn (client MilvusFixtureHTTP) do(mut _ctx context.Context, request httputil.Requ
 		if id_any !is string {
 			return error('fixture insert ID must be a string')
 		}
-		response.body = response.body.replace('__generated_id__', id_any as string)
+		response = httputil.Response{
+			status_code: response.status_code
+			headers:     response.headers
+			body:        response.body.replace('__generated_id__', id_any as string)
+		}
 	}
 	return response
 }
