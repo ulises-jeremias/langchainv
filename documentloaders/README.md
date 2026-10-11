@@ -1,8 +1,16 @@
 # Document loaders
 
-The package provides bounded HTML, text-file, CSV, Notion page, and recursive
-directory loaders. They return `schema.Document` values and check request
-cancellation while loading.
+The package provides bounded HTML, text-file, CSV, Notion page, AssemblyAI
+transcription, and recursive directory loaders. They return `schema.Document`
+values and check request cancellation while loading.
+
+`AssemblyAILoader` submits an HTTPS media URL to AssemblyAI's transcript API,
+polls until completion, and returns one document with the transcript text and
+the transcript ID in metadata. Use `new_assemblyai_loader` with an explicit
+API key and injectable `HTTPClient`, or `new_default_assemblyai_loader` to read
+`ASSEMBLYAI_API_KEY` and use the bounded default transport. Poll count, delay,
+response size, and transcript size are capped; errors omit provider response
+bodies. Tests use fake HTTP responses and never call the live API.
 
 `NotionLoader` fetches a page's block tree through the Notion Blocks API. Use
 `new_notion_loader` with an explicit API key and injectable `HTTPClient`, or
