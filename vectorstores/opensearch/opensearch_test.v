@@ -4,7 +4,6 @@ import context
 import encoding.base64
 import json2
 import net.http
-import ulises_jeremias.langchainv.embeddings
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.schema
 import ulises_jeremias.langchainv.vectorstores
@@ -155,10 +154,11 @@ fn test_opensearch_rejects_unsafe_endpoint_and_invalid_index() {
 
 fn test_opensearch_rejects_incomplete_basic_auth() {
 	new_store(OpenSearchFixtureEmbedder{}, Options{
+		base_url: 'https://search.example.test'
 		index:    'docs'
 		username: 'user'
 	}) or {
-		assert err.msg().contains('requires both')
+		assert err.msg().contains('authentication'), err.msg()
 		return
 	}
 	assert false, 'expected incomplete credentials to fail'
