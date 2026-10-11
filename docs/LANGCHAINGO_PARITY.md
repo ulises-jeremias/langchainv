@@ -81,12 +81,12 @@ wrapping training layers or downloading weights during ordinary checks.
 
 AlloyDB, Azure AI Search, Bedrock Knowledge Bases, Cloud SQL, Dolt, MariaDB,
 Milvus (including v2), MongoDB vector search, OpenSearch, pgvector, Redis, and
-Weaviate remain not started. Chroma — partial: v2 REST upsert/query/delete
-against a provisioned collection, injected embeddings and HTTP transport,
-loopback HTTP or remote HTTPS, token authentication, scalar equality filters,
-namespaces, score thresholds, and bounded payloads; collection management,
-array metadata, advanced filters, custom IDs, and returned vectors remain
-outstanding. Qdrant — partial: REST
+Weaviate remain not started. Chroma — partial: v2 REST create/get-or-create and
+delete collection management, upsert/query/delete, injected embeddings and
+HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
+equality filters, namespaces, score thresholds, and bounded payloads; custom
+collection configuration, array metadata, advanced filters, custom IDs, and
+returned vectors remain outstanding. Qdrant — partial: REST
 upsert/query/delete against existing single-vector collections, API-key or
 HTTPS authentication, payload metadata filters, namespaces, injected
 embeddings/transport, and bounded requests; collection management, named or

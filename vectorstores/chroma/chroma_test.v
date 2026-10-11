@@ -83,6 +83,62 @@ fn test_chroma_upserts_documents_with_namespace_and_injected_embedding() {
 	assert request.body.contains('[0.4,0.6]')
 }
 
+fn test_chroma_creates_named_collection_and_uses_returned_id() {
+	mut state := &ChromaFixtureState{
+		responses: [
+			chroma_response('{"id":"22222222-2222-4222-8222-222222222222","name":"guides"}'),
+			chroma_response('{}'),
+		]
+	}
+	mut ctx := context.background()
+	mut store := new_store_with_collection_and_client(mut ctx, ChromaFixtureEmbedder{}, Options{
+		base_url: 'https://chroma.example.test'
+		tenant:   'tenant-a'
+		database: 'database-a'
+		api_key:  'fixture-key'
+	}, 'guides', true, httputil.HTTPClient(ChromaFixtureHTTP{
+		state: state
+	})) or { panic(err) }
+	assert store.collection_id == '22222222-2222-4222-8222-222222222222'
+	assert state.requests.len == 1
+	assert state.requests[0].method == .post
+	assert state.requests[0].url.ends_with('/api/v2/tenants/tenant-a/databases/database-a/collections')
+	assert state.requests[0].body.contains('"name":"guides"')
+	assert state.requests[0].body.contains('"get_or_create":true')
+	store.add_documents(mut ctx, [schema.new_document('new collection document')],
+		vectorstores.StoreOptions{}) or { panic(err) }
+	assert state.requests.len == 2
+	assert state.requests[1].url.ends_with('/collections/22222222-2222-4222-8222-222222222222/upsert')
+}
+
+fn test_chroma_deletes_bound_collection() {
+	mut state := &ChromaFixtureState{
+		responses: [chroma_response('{}')]
+	}
+	mut store := chroma_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.delete_collection(mut ctx) or { panic(err) }
+	assert state.requests.len == 1
+	assert state.requests[0].method == .delete
+	assert state.requests[0].url.ends_with('/collections/11111111-1111-4111-8111-111111111111')
+}
+
+fn test_chroma_rejects_unsafe_server_collection_id() {
+	mut state := &ChromaFixtureState{
+		responses: [chroma_response('{"id":"../unsafe"}')]
+	}
+	mut ctx := context.background()
+	new_store_with_collection_and_client(mut ctx, ChromaFixtureEmbedder{}, Options{
+		base_url: 'https://chroma.example.test'
+	}, 'guides', false, httputil.HTTPClient(ChromaFixtureHTTP{
+		state: state
+	})) or {
+		assert err.msg().contains('invalid collection ID')
+		return
+	}
+	assert false, 'expected unsafe server collection ID to fail'
+}
+
 fn test_chroma_query_maps_distances_metadata_and_exact_filters() {
 	mut state := &ChromaFixtureState{
 		responses: [chroma_response('{"ids":[["id-1"]],"documents":[["answer"]],"metadatas":[[{"category":"guide","_langchainv_namespace":"tenant-1"}]],"distances":[[0.09]]}')]
@@ -136,7 +192,7 @@ fn test_chroma_rejects_unsafe_collection_and_oversized_writes() {
 		base_url:      'https://chroma.example.test'
 		collection_id: '../collection'
 	}) or {
-		assert err.msg().contains('safe path segments')
+		assert err.msg().contains('safe path segment')
 		return
 	}
 	assert false, 'expected unsafe collection ID to fail'

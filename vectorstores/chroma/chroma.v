@@ -32,7 +32,8 @@ pub mut:
 	http_client httputil.HTTPClient
 }
 
-// Options identifies a Chroma server, tenant, database, collection, and token.
+// Options identifies a Chroma server, tenant, database, optional collection ID,
+// and token. Leave collection_id blank only with new_store_with_collection.
 pub struct Options {
 pub:
 	base_url      string
@@ -43,9 +44,13 @@ pub:
 	namespace     string
 }
 
-// new_store creates an adapter for an existing collection. Collection
-// creation and embedding configuration stay with the Chroma server operator.
+// new_store creates an adapter for an existing collection by ID. Use
+// new_store_with_collection to create or get a collection by name.
 pub fn new_store(embedder embeddings.Embedder, options Options) !Store {
+	return new_store_config(embedder, options, true)
+}
+
+fn new_store_config(embedder embeddings.Embedder, options Options, require_collection bool) !Store {
 	base_url := if options.base_url.trim_space() == '' {
 		'http://127.0.0.1:8000'
 	} else {
@@ -73,9 +78,14 @@ pub fn new_store(embedder embeddings.Embedder, options Options) !Store {
 		options.database
 	}
 	namespace := if options.namespace == '' { 'langchain' } else { options.namespace }
-	if !valid_path_segment(tenant) || !valid_path_segment(database)
-		|| !valid_path_segment(options.collection_id) {
-		return error('Chroma tenant, database, and collection ID must be safe path segments')
+	if !valid_path_segment(tenant) || !valid_path_segment(database) {
+		return error('Chroma tenant and database must be safe path segments')
+	}
+	if options.collection_id != '' && !valid_path_segment(options.collection_id) {
+		return error('Chroma collection ID must be a safe path segment')
+	}
+	if require_collection && options.collection_id == '' {
+		return error('Chroma collection ID is required for an existing collection')
 	}
 	if options.api_key.len > 4096 || options.api_key.contains('\n') || options.api_key.contains('\r') {
 		return error('Chroma API key is invalid or exceeds 4096 bytes')
@@ -93,6 +103,65 @@ pub fn new_store(embedder embeddings.Embedder, options Options) !Store {
 			max_response_bytes: max_payload_bytes
 		}
 	}
+}
+
+// new_store_with_collection creates or gets a named collection and returns a
+// store bound to its server-assigned ID. Chroma's default L2 configuration is
+// used; callers can still provision collections independently with new_store.
+pub fn new_store_with_collection(mut ctx context.Context, embedder embeddings.Embedder, options Options, collection_name string, get_or_create bool) !Store {
+	client := httputil.HTTPClient(httputil.DefaultClient{
+		max_request_bytes:  max_payload_bytes
+		max_response_bytes: max_payload_bytes
+	})
+	return new_store_with_collection_and_client(mut ctx, embedder, options, collection_name,
+		get_or_create, client)
+}
+
+// new_store_with_collection_and_client creates or gets a named collection
+// using the supplied transport. It is useful for custom clients and offline tests.
+pub fn new_store_with_collection_and_client(mut ctx context.Context, embedder embeddings.Embedder, options Options, collection_name string, get_or_create bool, http_client httputil.HTTPClient) !Store {
+	if collection_name.trim_space() == '' || collection_name.len > 512
+		|| collection_name.contains('\n') || collection_name.contains('\r')
+		|| collection_name.contains('\0') {
+		return error('Chroma collection name must be non-empty, at most 512 bytes, and contain no line breaks')
+	}
+	if options.collection_id != '' {
+		return error('collection_id must be empty when creating a named Chroma collection')
+	}
+	mut base := new_store_config(embedder, options, false)!
+	base.http_client = http_client
+	body := json2.encode(map[string]json2.Any{
+		'name':          json2.Any(collection_name)
+		'get_or_create': json2.Any(get_or_create)
+	}, json2.EncoderOptions{})
+	url := '${base.base_url}/api/v2/tenants/${base.tenant}/databases/${base.database}/collections'
+	response := base.request_to(mut ctx, .post, url, body)!
+	decoded := json2.decode[map[string]json2.Any](response.body, json2.DecoderOptions{}) or {
+		return error('Chroma returned invalid collection JSON')
+	}
+	id_value := decoded['id'] or { return error('Chroma collection response is missing its ID') }
+	if id_value !is string || !valid_path_segment(id_value as string) {
+		return error('Chroma returned an invalid collection ID')
+	}
+	return Store{
+		base_url:      base.base_url
+		tenant:        base.tenant
+		database:      base.database
+		collection_id: id_value as string
+		api_key:       base.api_key
+		namespace:     base.namespace
+		embedder:      base.embedder
+		http_client:   base.http_client
+	}
+}
+
+// delete_collection deletes the collection bound to this store and its records.
+pub fn (store Store) delete_collection(mut ctx context.Context) ! {
+	if !valid_path_segment(store.collection_id) {
+		return error('Chroma collection ID is required for collection deletion')
+	}
+	url := '${store.base_url}/api/v2/tenants/${store.tenant}/databases/${store.database}/collections/${store.collection_id}'
+	store.request_to(mut ctx, .delete, url, '')!
 }
 
 // add_documents embeds and upserts at most 64 documents to Chroma.
@@ -290,6 +359,11 @@ pub fn (store Store) delete(mut ctx context.Context, ids []string, options vecto
 }
 
 fn (store Store) request(mut ctx context.Context, method http.Method, operation string, body string) !httputil.Response {
+	url := '${store.base_url}/api/v2/tenants/${store.tenant}/databases/${store.database}/collections/${store.collection_id}/${operation}'
+	return store.request_to(mut ctx, method, url, body)
+}
+
+fn (store Store) request_to(mut ctx context.Context, method http.Method, url string, body string) !httputil.Response {
 	if body.len > max_payload_bytes {
 		return error('Chroma request exceeds 4 MiB')
 	}
@@ -300,7 +374,6 @@ fn (store Store) request(mut ctx context.Context, method http.Method, operation 
 	if store.api_key != '' {
 		headers['x-chroma-token'] = store.api_key
 	}
-	url := '${store.base_url}/api/v2/tenants/${store.tenant}/databases/${store.database}/collections/${store.collection_id}/${operation}'
 	response := store.http_client.do(mut ctx, httputil.Request{
 		method:  method
 		url:     url
