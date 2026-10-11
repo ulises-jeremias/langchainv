@@ -34,9 +34,10 @@ mut:
 @[heap]
 struct MCPState {
 mut:
-	initialized bool
-	session_id  string
-	next_id     int = 1
+	initialized       bool
+	protocol_negotiated bool
+	session_id        string
+	next_id            int = 1
 }
 
 // ToolInfo describes one server-provided tool and its JSON input schema.
@@ -184,6 +185,7 @@ fn (client Client) initialize(mut ctx context.Context) ! {
 	if protocol_value !is string || (protocol_value as string) != mcp_protocol_version {
 		return error('Zapier MCP server selected an unsupported protocol version')
 	}
+	state.protocol_negotiated = true
 	client.notification(mut ctx, 'notifications/initialized')!
 	state.initialized = true
 }
@@ -223,7 +225,7 @@ fn (client Client) send(mut ctx context.Context, body string) !httputil.Response
 		'Accept':       'application/json, text/event-stream'
 		'Content-Type': 'application/json'
 	}
-	if client.state.initialized {
+	if client.state.protocol_negotiated {
 		headers['MCP-Protocol-Version'] = mcp_protocol_version
 	}
 	if client.access_token != '' {
