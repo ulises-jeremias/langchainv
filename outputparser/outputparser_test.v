@@ -92,6 +92,9 @@ struct DefinedExample {
 	display_name string @[json: 'display_name']
 	ignored      string @[skip]
 	child        DefinedExampleChild
+	children     []DefinedExampleChild
+	fixed        [2]DefinedExampleChild
+	metadata     map[string]string
 	labels       [2]string
 	active       [2]bool
 	scores       [3]int
@@ -105,13 +108,20 @@ fn test_defined_parser_generates_schema_and_decodes_typed_struct() {
 	assert instructions.contains('"active": boolean[];')
 	assert instructions.contains('"scores": number[];')
 	assert instructions.contains('interface _Root_Child')
+	assert instructions.contains('"children": _Root_Children[];')
+	assert instructions.contains('"fixed": _Root_Fixed[];')
+	assert instructions.contains('"metadata": Record<string, string>;')
 	assert !instructions.contains('"ignored"')
-	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3]}\n```') or {
+	parsed := parser.parse('```json\n{"name":"Ada","display_name":"A.","child":{"detail":"V"},"children":[{"detail":"nested"}],"fixed":[{"detail":"fixed-a"},{"detail":"fixed-b"}],"metadata":{"source":"test"},"labels":["first","second"],"active":[true,false],"scores":[1,2,3]}\n```') or {
 		panic(err)
 	}
 	assert parsed.name == 'Ada'
 	assert parsed.display_name == 'A.'
 	assert parsed.child.detail == 'V'
+	assert parsed.children.len == 1
+	assert parsed.children[0].detail == 'nested'
+	assert parsed.fixed[1].detail == 'fixed-b'
+	assert parsed.metadata['source'] == 'test'
 	assert parsed.labels == ['first', 'second']
 	assert parsed.active == [true, false]!
 	assert parsed.scores == [1, 2, 3]!

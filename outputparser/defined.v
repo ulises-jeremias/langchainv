@@ -105,9 +105,20 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = 'boolean[]'
 			} $else $if field.typ is []int || field.typ is []i64 || field.typ is []i32 || field.typ is []i16 || field.typ is []i8 || field.typ is []u64 || field.typ is []u32 || field.typ is []u16 || field.typ is []u8 || field.typ is []f32 || field.typ is []f64 {
 				field_type = 'number[]'
+			} $else $if field.typ is $array {
+				nested_name := '${name}_${field.name.capitalize()}'
+				container_schema := defined_container_schema(source.$(field.name), nested_name)!
+				field_type = container_schema.field_type
+				if container_schema.nested_schema != '' {
+					nested_schemas << container_schema.nested_schema
+				}
 			} $else $if field.typ is $array_fixed {
-				array_schema := defined_array_element_schema(source.$(field.name)[..])!
-				field_type = '${array_schema}[]'
+				nested_name := '${name}_${field.name.capitalize()}'
+				container_schema := defined_container_schema(source.$(field.name)[..], nested_name)!
+				field_type = container_schema.field_type
+				if container_schema.nested_schema != '' {
+					nested_schemas << container_schema.nested_schema
+				}
 			} $else $if field.typ is map[string]string {
 				field_type = 'Record<string, string>'
 			} $else $if field.typ is map[string]bool {
@@ -139,6 +150,25 @@ fn defined_struct_schema[T](source T, name string) !string {
 		definition += '\n' + nested_schemas.join('\n')
 	}
 	return definition
+}
+
+struct DefinedContainerSchema {
+	field_type    string
+	nested_schema string
+}
+
+fn defined_container_schema[T](_values []T, name string) !DefinedContainerSchema {
+	$if T is $struct {
+		// The type is enough to build this schema, even when the input slice is empty.
+		return DefinedContainerSchema{
+			field_type:    '${name}[]'
+			nested_schema: defined_struct_schema(T{}, name)!
+		}
+	} $else {
+		return DefinedContainerSchema{
+			field_type: '${defined_array_element_schema(_values)!}[]'
+		}
+	}
 }
 
 fn defined_array_element_schema[T](_values []T) !string {
