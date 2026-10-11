@@ -125,24 +125,24 @@ fn clone_json_value(value json2.Any) json2.Any {
 // ConversationBuffer stores input/output turns and exposes their transcript.
 pub struct ConversationBuffer {
 pub:
-	history         schema.ChatMessageHistory
-	memory_key      string
-	input_key       string
-	output_key      string
-	human_prefix    string
-	ai_prefix       string
+	history      schema.ChatMessageHistory
+	memory_key   string
+	input_key    string
+	output_key   string
+	human_prefix string
+	ai_prefix    string
 }
 
 // ConversationBufferOptions configures a conversation buffer. Empty memory_key
 // selects `history`; empty input/output keys are inferred when the respective
 // map contains exactly one value.
 pub struct ConversationBufferOptions {
-	pub:
-	memory_key      string
-	input_key       string
-	output_key      string
-	human_prefix    string
-	ai_prefix       string
+pub:
+	memory_key   string
+	input_key    string
+	output_key   string
+	human_prefix string
+	ai_prefix    string
 }
 
 // new_conversation_buffer creates a buffer with explicit key names.
@@ -164,15 +164,19 @@ pub fn new_conversation_buffer(memory_key string, input_key string, output_key s
 // buffer. Blank prefix values select the standard `Human` and `AI` labels.
 pub fn new_conversation_buffer_with_options(options ConversationBufferOptions) !ConversationBuffer {
 	memory_key := if options.memory_key.trim_space() == '' { 'history' } else { options.memory_key }
-	human_prefix := if options.human_prefix.trim_space() == '' { 'Human' } else { options.human_prefix }
+	human_prefix := if options.human_prefix.trim_space() == '' {
+		'Human'
+	} else {
+		options.human_prefix
+	}
 	ai_prefix := if options.ai_prefix.trim_space() == '' { 'AI' } else { options.ai_prefix }
 	return ConversationBuffer{
-		history:         new_in_memory_chat_message_history()
-		memory_key:      memory_key
-		input_key:       options.input_key
-		output_key:      options.output_key
-		human_prefix:    human_prefix
-		ai_prefix:       ai_prefix
+		history:      new_in_memory_chat_message_history()
+		memory_key:   memory_key
+		input_key:    options.input_key
+		output_key:   options.output_key
+		human_prefix: human_prefix
+		ai_prefix:    ai_prefix
 	}
 }
 
@@ -249,10 +253,10 @@ pub fn new_conversation_window_buffer(window_size int, memory_key string, input_
 	}
 	base := new_conversation_buffer(memory_key, input_key, output_key)!
 	buffer := ConversationBuffer{
-		history:    new_in_memory_chat_message_history_with_limit(actual_window_size * 2)
-		memory_key: base.memory_key
-		input_key:  base.input_key
-		output_key: base.output_key
+		history:      new_in_memory_chat_message_history_with_limit(actual_window_size * 2)
+		memory_key:   base.memory_key
+		input_key:    base.input_key
+		output_key:   base.output_key
 		human_prefix: base.human_prefix
 		ai_prefix:    base.ai_prefix
 	}
