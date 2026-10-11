@@ -37,3 +37,10 @@ successor to upstream LangChainGo's Metaphor tool. Pass an explicit key to
 `new_tool` or use `new_default_tool` to read `EXA_API_KEY`; both support an
 injected transport. It returns bounded title, URL, and highlight/text excerpts
 and uses fake HTTP fixtures in tests.
+
+`tools/scraper` reads HTTPS pages through the bounded default transport or an
+injected `HTTPClient`. It extracts titles, descriptions, headings, paragraphs,
+and same-origin links. Crawling is sequential, defaults to depth 1 and at most
+10 pages, and caps per-page, aggregate-response, output, URL, and blacklist
+limits. External-origin links, non-HTTPS links, and blacklisted paths are not
+followed. Tests use deterministic fake responses.
