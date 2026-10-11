@@ -362,24 +362,26 @@ fn (definition Definition) validate_depth(depth int) ! {
 			}
 			seen_types[data_type] = true
 		}
-		if definition.items != none && .array !in definition.types {
+		if definition.items != none && DataType.array !in definition.types {
 			return error('JSON Schema items requires array in types')
 		}
 		if (definition.required.len > 0 || definition.properties.len > 0
-			|| definition.additional_properties != none) && .object !in definition.types {
+			|| definition.additional_properties != none) && DataType.object !in definition.types {
 			return error('JSON Schema object constraints require object in types')
 		}
 		if (definition.minimum != none || definition.maximum != none)
-			&& .number !in definition.types && .integer !in definition.types {
+			&& DataType.number !in definition.types && DataType.integer !in definition.types {
 			return error('JSON Schema minimum and maximum require number or integer in types')
 		}
-		if (definition.min_length != none || definition.max_length != none) && .string !in definition.types {
+		if (definition.min_length != none || definition.max_length != none)
+			&& DataType.string !in definition.types {
 			return error('JSON Schema minLength and maxLength require string in types')
 		}
-		if (definition.min_items != none || definition.max_items != none) && .array !in definition.types {
+		if (definition.min_items != none || definition.max_items != none)
+			&& DataType.array !in definition.types {
 			return error('JSON Schema minItems and maxItems require array in types')
 		}
-		if definition.enum_values.len > 0 && .string !in definition.types {
+		if definition.enum_values.len > 0 && DataType.string !in definition.types {
 			return error('JSON Schema string enum requires string in types')
 		}
 	}
