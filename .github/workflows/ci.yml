@@ -37,6 +37,11 @@ jobs:
           echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
           ./vlang/v version
 
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y poppler-utils
+
       - name: Install under the V module path
         run: |
           mkdir -p "$HOME/.vmodules/ulises_jeremias"

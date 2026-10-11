@@ -44,8 +44,9 @@ The current core packages include:
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Qdrant, and Pinecone REST integrations.
-- `documentloaders`: size-bounded HTML, text-file, and CSV content loaders plus a
-  bounded recursive directory loader for text, Markdown, CSV, and HTML files.
+- `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders
+  plus a bounded recursive directory loader for those file types. PDF extraction
+  requires Poppler's `pdftotext` executable.
 - `textsplitter`: recursive character and tokenizer-injected token chunks, plus
   Markdown-aware heading, paragraph, fenced-code, table-row, and optional
   reference-link splitting.

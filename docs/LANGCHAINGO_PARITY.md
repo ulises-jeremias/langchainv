@@ -100,7 +100,7 @@ vector return remain outstanding.
 
 ## Document loaders and tools
 
-- Loaders still outstanding: PDF. AssemblyAI provides bounded HTTPS URL submission and status polling with injectable HTTP and offline tests. HTML uses V's standard-library parser; full browser-style parsing and network fetching are outside its scope.
+- PDF loading is implemented with Poppler `pdftotext`, bounded input/output and timeout settings, cancellation, and recursive-directory integration. CI installs `poppler-utils`; consumers need `pdftotext` on `PATH` or may configure its executable path. AssemblyAI provides bounded HTTPS URL submission and status polling with injectable HTTP and offline tests. HTML uses V's standard-library parser; full browser-style parsing and network fetching are outside its scope.
 - SQLDatabase exposes SQLite by default and PostgreSQL/MySQL through V's
   compile-time database drivers; test environments verify the SQLite backend
   with in-memory fixtures. Zapier's retired NLA API is replaced by the current

@@ -75,6 +75,26 @@ fn test_recursive_directory_loader_loads_html_and_htm_with_source_metadata() {
 	}
 }
 
+fn test_recursive_directory_loader_loads_pdf_with_source_metadata() {
+	root := create_directory_loader_fixture() or { panic(err) }
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	pdf_path := create_pdf_loader_fixture('PDF directory text') or { panic(err) }
+	defer {
+		os.rm(pdf_path) or {}
+	}
+	os.mv(pdf_path, os.join_path(root, 'document.pdf')) or { panic(err) }
+	loader := new_recursive_directory_loader(root: root, allowed_extensions: ['pdf']) or {
+		panic(err)
+	}
+	mut ctx := context.background()
+	documents := loader.load(mut ctx) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].page_content.contains('PDF directory text')
+	assert (documents[0].metadata['source'] or { panic('missing source metadata') }).str().ends_with('document.pdf')
+}
+
 fn test_recursive_directory_loader_enforces_entry_limit() {
 	root := create_directory_loader_fixture() or { panic(err) }
 	defer {

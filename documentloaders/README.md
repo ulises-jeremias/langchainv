@@ -1,8 +1,18 @@
 # Document loaders
 
-The package provides bounded HTML, text-file, CSV, Notion page, AssemblyAI
+The package provides bounded PDF, HTML, text-file, CSV, Notion page, AssemblyAI
 transcription, and recursive directory loaders. They return `schema.Document`
 values and check request cancellation while loading.
+
+`PDFLoader` extracts text from a local PDF with Poppler's `pdftotext` executable.
+Install `poppler-utils` and ensure `pdftotext` is on `PATH`, or set
+`PDFLoaderOptions.pdftotext_path`. Each PDF produces one document containing
+the extracted text and its path in `metadata['source']`. Input, combined
+extracted text and diagnostic output, and execution time are bounded to 16 MiB,
+16 MiB, and 30 seconds by default; configurable hard caps are 64 MiB and 120
+seconds. The loader rejects symbolic links, propagates context cancellation,
+and terminates the extractor process group on cancellation, timeout, or output
+overflow. It invokes the executable directly without a shell.
 
 `AssemblyAILoader` submits an HTTPS media URL to AssemblyAI's transcript API,
 polls until completion, and returns one document with the transcript text and
@@ -56,8 +66,8 @@ are rejected. See the [parity ledger](../docs/LANGCHAINGO_PARITY.md) for
 loaders that remain to be implemented.
 
 `RecursiveDirectoryLoader` walks the root and, by default, its immediate
-subdirectories in sorted order. It reads `.txt`, `.md`, `.csv`, `.html`, and
-`.htm` files,
+subdirectories in sorted order. It reads `.txt`, `.md`, `.csv`, `.html`, `.htm`,
+and `.pdf` files,
 skips symlinks and unsupported extensions, and adds each file path as
 `metadata['source']`. HTML files use `HTMLLoader`; `allowed_extensions` can
 narrow that set. Traversal is
