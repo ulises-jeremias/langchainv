@@ -101,3 +101,44 @@ fn test_default_client_enforces_request_size_before_network() {
 	}
 	assert false, 'expected oversized request body to fail'
 }
+
+fn test_sse_decoder_handles_arbitrary_chunks_multiline_data_and_crlf() {
+	mut decoder := new_sse_decoder(128) or { panic(err) }
+	first := decoder.push(':keepalive\r\ndata: {"text":'.bytes()) or { panic(err) }
+	assert first.len == 0
+	second := decoder.push('"hello"}\r\ndata: second\r\n\r\ndata: [DONE]\n\n'.bytes()) or {
+		panic(err)
+	}
+	assert second.len == 2
+	assert second[0].bytestr() == '{"text":"hello"}\nsecond'
+	assert second[1].bytestr() == '[DONE]'
+}
+
+fn test_sse_decoder_enforces_line_and_event_limits() {
+	mut decoder := new_sse_decoder(8) or { panic(err) }
+	decoder.push('data: 12345678\n'.bytes()) or { panic(err) }
+	decoder.push('data: x\n'.bytes()) or {
+		assert err.msg().contains('event limit')
+		return
+	}
+	assert false, 'expected an oversized SSE event to fail'
+	mut line_decoder := new_sse_decoder(8) or { panic(err) }
+	line_decoder.push('123456789'.bytes()) or {
+		assert err.msg().contains('line exceeds')
+		return
+	}
+	assert false, 'expected an oversized SSE line to fail'
+}
+
+fn test_default_http_client_implements_streaming_transport() {
+	mut ctx := context.background()
+	client := StreamingHTTPClient(new_default_client())
+	client.do_stream(mut ctx, Request{
+		url: 'file:///etc/passwd'
+	}, fn (mut _ context.Context, _ []u8) ! {
+	}) or {
+		assert err.msg().contains('http or https')
+		return
+	}
+	assert false, 'expected invalid URL rejection before opening a connection'
+}

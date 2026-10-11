@@ -65,6 +65,43 @@ struct ChatUsage {
 	total_tokens      int
 }
 
+struct ChatStreamResponse {
+	choices []ChatStreamChoice
+	usage   ChatUsage
+}
+
+struct ChatStreamChoice {
+	index         int
+	delta         ChatStreamDelta
+	finish_reason ?string
+}
+
+struct ChatStreamDelta {
+	content    ?string
+	reasoning  ?string @[json: 'reasoning_content']
+	tool_calls []ChatStreamToolCall
+}
+
+struct ChatStreamToolCall {
+	index     int
+	id        string
+	call_type string @[json: 'type']
+	function  ChatStreamFunction
+}
+
+struct ChatStreamFunction {
+	name      string
+	arguments string
+}
+
+struct StreamToolAccumulator {
+mut:
+	id        string
+	call_type string
+	name      string
+	arguments string
+}
+
 // new_client constructs an OpenAI client with the default model and endpoint.
 pub fn new_client(api_key string, http_client httputil.HTTPClient) !Client {
 	return new_client_with_options(api_key, http_client, Options{})
@@ -111,18 +148,18 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	if options.provider_options.len > 0 {
 		return error('OpenAI provider_options are not supported yet; use typed call options')
 	}
-	if _ := options.streaming_func {
-		return error('OpenAI Chat Completions streaming is not supported by this bounded transport')
-	}
-	if _ := options.streaming_reasoning_func {
-		return error('OpenAI Chat Completions streaming is not supported by this bounded transport')
-	}
 	model := if options.model.trim_space() == '' {
 		client.model
 	} else {
 		options.model.trim_space()
 	}
 	request := make_request(model, messages, options)!
+	if _ := options.streaming_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
+	if _ := options.streaming_reasoning_func {
+		return client.generate_stream(mut ctx, request, options)
+	}
 	body := json2.encode(request, json2.EncoderOptions{})
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
@@ -159,6 +196,165 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 			completion_tokens: decoded.usage.completion_tokens
 			total_tokens:      decoded.usage.total_tokens
 		}
+	}
+}
+
+fn (client Client) generate_stream(mut ctx context.Context, request map[string]json2.Any, options llms.CallOptions) !llms.Response {
+	if options.candidate_count > 1 || options.n > 1 {
+		return error('OpenAI streaming supports one candidate because stream callbacks do not identify candidate indexes')
+	}
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured HTTP transport does not support streaming responses')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut stream_request := map[string]json2.Any{}
+	for key, value in request {
+		stream_request[key] = value
+	}
+	stream_request['stream'] = json2.Any(true)
+	headers := {
+		'Authorization': 'Bearer ${client.api_key}'
+		'Content-Type':  'application/json'
+		'Accept':        'text/event-stream'
+	}
+	body := json2.encode(stream_request, json2.EncoderOptions{})
+	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
+	mut content := ''
+	mut reasoning := ''
+	mut finish_reason := ''
+	mut usage := llms.Usage{}
+	mut tool_accumulators := []StreamToolAccumulator{}
+	mut saw_done := false
+	mut event_error := ''
+	mut process_event := fn [options, mut content, mut reasoning, mut finish_reason, mut usage, mut saw_done, mut event_error, mut tool_accumulators] (mut callback_ctx context.Context, event []u8) {
+		if event.bytestr() == '[DONE]' {
+			saw_done = true
+			return
+		}
+		chunk := json2.decode[ChatStreamResponse](event.bytestr(), json2.DecoderOptions{}) or {
+			event_error = 'could not decode OpenAI streaming response'
+			return
+		}
+		if chunk.usage.total_tokens > 0 {
+			usage = llms.Usage{
+				prompt_tokens:     chunk.usage.prompt_tokens
+				completion_tokens: chunk.usage.completion_tokens
+				total_tokens:      chunk.usage.total_tokens
+			}
+		}
+		if chunk.choices.len > 1 {
+			event_error = 'OpenAI streaming supports one candidate because stream callbacks do not identify candidate indexes'
+			return
+		}
+		for choice in chunk.choices {
+			if choice.index != 0 {
+				event_error = 'OpenAI streaming returned an unexpected candidate index'
+				return
+			}
+			if delta := choice.delta.content {
+				content += delta
+				if callback := options.streaming_func {
+					callback(mut callback_ctx, delta.bytes()) or {
+						event_error = 'OpenAI streaming callback failed: ${err.msg()}'
+						return
+					}
+				}
+			}
+			if delta := choice.delta.reasoning {
+				reasoning += delta
+				if callback := options.streaming_reasoning_func {
+					callback(mut callback_ctx, delta.bytes(), []u8{}) or {
+						event_error = 'OpenAI reasoning callback failed: ${err.msg()}'
+						return
+					}
+				}
+			}
+			if reason := choice.finish_reason {
+				finish_reason = reason
+			}
+			for tool_delta in choice.delta.tool_calls {
+				if tool_delta.index < 0 || tool_delta.index >= 128 {
+					event_error = 'OpenAI streamed tool-call index is outside the supported range'
+					return
+				}
+				for tool_accumulators.len <= tool_delta.index {
+					tool_accumulators << StreamToolAccumulator{}
+				}
+				mut accumulator := tool_accumulators[tool_delta.index]
+				if tool_delta.id != '' { accumulator.id += tool_delta.id }
+				if tool_delta.call_type != '' { accumulator.call_type = tool_delta.call_type }
+				accumulator.name += tool_delta.function.name
+				accumulator.arguments += tool_delta.function.arguments
+				tool_accumulators[tool_delta.index] = accumulator
+			}
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/chat/completions'
+		headers: headers
+		body:    body
+	}, fn [mut decoder, mut process_event, mut event_error, mut saw_done] (mut callback_ctx context.Context, bytes []u8) ! {
+		events := decoder.push(bytes) or {
+			return error(err.msg())
+		}
+		for event in events {
+			process_event(mut callback_ctx, event)
+			if event_error != '' {
+				return error(event_error)
+			}
+			if saw_done {
+				break
+			}
+		}
+	}) or {
+		return error('OpenAI chat completion stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('OpenAI chat completion request returned HTTP ${response.status_code}')
+	}
+	if event_error != '' {
+		return error(event_error)
+	}
+	if !saw_done {
+		for event in decoder.finish()! {
+			process_event(mut ctx, event)
+			if event_error != '' { return error(event_error) }
+		}
+	}
+	mut tool_calls := []schema.ToolCall{cap: tool_accumulators.len}
+	mut parts := []schema.ContentPart{}
+	if content != '' {
+		parts << schema.ContentPart(schema.TextPart{ text: content })
+	}
+	for accumulator in tool_accumulators {
+		if accumulator.name == '' {
+			return error('OpenAI returned a streamed tool call without a function name')
+		}
+		call := schema.ToolCall{
+			id:            accumulator.id
+			call_type:     if accumulator.call_type == '' {
+				'function'
+			} else {
+				accumulator.call_type
+			}
+			function_call: schema.FunctionCall{
+				name:      accumulator.name
+				arguments: accumulator.arguments
+			}
+		}
+		tool_calls << call
+		parts << schema.ContentPart(call)
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:     content
+			reasoning:   reasoning
+			stop_reason: finish_reason
+			tool_calls:  tool_calls
+			parts:       parts
+		}]
+		usage:   usage
 	}
 }
 

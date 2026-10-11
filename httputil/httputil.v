@@ -11,6 +11,14 @@ pub interface HTTPClient {
 	do(mut ctx context.Context, request Request) !Response
 }
 
+// StreamHandler receives each response body chunk while the connection is open.
+pub type StreamHandler = fn (mut context.Context, []u8) !
+
+// StreamingHTTPClient supports bounded incremental response handling.
+pub interface StreamingHTTPClient {
+	do_stream(mut ctx context.Context, request Request, handler StreamHandler) !Response
+}
+
 // Request describes one HTTP exchange without exposing credentials in logs.
 pub struct Request {
 pub:
@@ -107,6 +115,89 @@ pub fn (client DefaultClient) do(mut ctx context.Context, request Request) !Resp
 		write_timeout:        timeout
 		stop_copying_limit:   read_limit
 		stop_receiving_limit: read_limit
+	)!
+	if i64(response.body.len) > client.max_response_bytes {
+		return error('HTTP response body exceeds the configured byte limit')
+	}
+	ctx_error_after := ctx.err()
+	if ctx_error_after !is none {
+		return ctx_error_after
+	}
+	return Response{
+		status_code: response.status_code
+		headers:     response.header
+		body:        response.body
+	}
+}
+
+@[heap]
+struct StreamState {
+mut:
+	ctx context.Context
+pub:
+	handler StreamHandler @[required]
+}
+
+fn progress_stream(request &http.Request, chunk []u8, _body_read_so_far u64, _body_expected_size u64, _status_code int) ! {
+	mut state := unsafe { &StreamState(request.user_ptr) }
+	mut ctx := state.ctx
+	state.handler(mut ctx, chunk)!
+	state.ctx = ctx
+}
+
+// do_stream delivers bounded response chunks as they arrive, and also returns
+// the bounded complete response after the handler accepts every chunk.
+pub fn (client DefaultClient) do_stream(mut ctx context.Context, request Request, handler StreamHandler) !Response {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	if client.timeout_ms <= 0 {
+		return error('HTTP timeout must be greater than zero')
+	}
+	if client.max_request_bytes <= 0 || client.max_request_bytes > i64(64 * 1024 * 1024) {
+		return error('maximum HTTP request size must be between 1 byte and 64 MiB')
+	}
+	if client.max_response_bytes <= 0 || client.max_response_bytes > i64(1024 * 1024 * 1024) {
+		return error('maximum HTTP response size must be between 1 byte and 1 GiB')
+	}
+	if i64(request.body.len) > client.max_request_bytes {
+		return error('HTTP request body exceeds the configured byte limit')
+	}
+	if request.headers.len > 32 {
+		return error('HTTP request has more than 32 custom headers')
+	}
+	validate_url(request.url, '')!
+	mut headers := http.Header{}
+	mut user_agent := client.user_agent
+	for key, value in request.headers {
+		if key.to_lower() == 'user-agent' {
+			user_agent = '${value} ${client.user_agent}'
+			continue
+		}
+		headers.set_custom(key, value)!
+	}
+	mut state := &StreamState{
+		ctx:     ctx
+		handler: handler
+	}
+	timeout := i64(client.timeout_ms) * time.millisecond
+	read_limit := client.max_response_bytes + 1
+	response := http.fetch(
+		method:               request.method
+		url:                  request.url
+		header:               headers
+		data:                 request.body
+		user_agent:           user_agent
+		validate:             true
+		allow_redirect:       false
+		max_retries:          0
+		read_timeout:         timeout
+		write_timeout:        timeout
+		stop_copying_limit:   read_limit
+		stop_receiving_limit: read_limit
+		on_progress_body:     progress_stream
+		user_ptr:             voidptr(state)
 	)!
 	if i64(response.body.len) > client.max_response_bytes {
 		return error('HTTP response body exceeds the configured byte limit')

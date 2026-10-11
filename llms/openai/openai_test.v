@@ -23,6 +23,19 @@ fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request
 	return state.response
 }
 
+fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	mut state := client.state
+	state.requests << request
+	body := state.response.body.bytes()
+	mut offset := 0
+	for offset < body.len {
+		end := if offset + 11 < body.len { offset + 11 } else { body.len }
+		handler(mut ctx, body[offset..end])!
+		offset = end
+	}
+	return state.response
+}
+
 fn new_fixture_client(body string, status int) (Client, &FakeHTTPState) {
 	mut state := &FakeHTTPState{
 		response: httputil.Response{
@@ -104,16 +117,35 @@ fn test_complete_uses_user_message() {
 	assert state.requests[0].body.contains('"role":"user"')
 }
 
-fn test_client_rejects_streaming_and_unsupported_options_before_network() {
+fn test_client_rejects_unsupported_options_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
-	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
 	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		streaming_func: stream
+		top_k: 3
 	}) or {
-		assert err.msg().contains('streaming is not supported')
+		assert err.msg().contains('does not support')
 		assert state.requests.len == 0
 		return
 	}
-	assert false, 'expected streaming option error'
+	assert false, 'expected unsupported option error'
+}
+
+fn test_generate_content_streams_text_and_maps_usage() {
+	mut ctx := context.background()
+	response_body := 'data: {"choices":[{"index":0,"delta":{"content":"hel"}}]}\n\ndata: {"choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}}\n\ndata: [DONE]\n\n'
+	client, state := new_fixture_client(response_body, 200)
+	mut streamed := ''
+	stream := llms.StreamFunc(fn [mut streamed] (mut _ context.Context, chunk []u8) ! {
+		streamed += chunk.bytestr()
+	})
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	assert streamed == 'hello'
+	assert response.choices.len == 1
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'stop'
+	assert response.usage.total_tokens == 4
+	assert state.requests[0].headers['Accept'] == 'text/event-stream'
+	assert state.requests[0].body.contains('"stream":true')
 }
