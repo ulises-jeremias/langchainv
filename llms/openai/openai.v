@@ -102,6 +102,17 @@ mut:
 	arguments string
 }
 
+struct OpenAIStreamState {
+mut:
+	content           string
+	reasoning         string
+	finish_reason     string
+	usage             llms.Usage
+	tool_accumulators []StreamToolAccumulator
+	saw_done          bool
+	error             string
+}
+
 // new_client constructs an OpenAI client with the default model and endpoint.
 pub fn new_client(api_key string, http_client httputil.HTTPClient) !Client {
 	return new_client_with_options(api_key, http_client, Options{})
@@ -219,73 +230,67 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 	}
 	body := json2.encode(stream_request, json2.EncoderOptions{})
 	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
-	mut content := ''
-	mut reasoning := ''
-	mut finish_reason := ''
-	mut usage := llms.Usage{}
-	mut tool_accumulators := []StreamToolAccumulator{}
-	mut saw_done := false
-	mut event_error := ''
-	mut process_event := fn [options, mut content, mut reasoning, mut finish_reason, mut usage, mut saw_done, mut event_error, mut tool_accumulators] (mut callback_ctx context.Context, event []u8) {
+	mut state := &OpenAIStreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, event []u8) {
 		if event.bytestr() == '[DONE]' {
-			saw_done = true
+			state.saw_done = true
 			return
 		}
 		chunk := json2.decode[ChatStreamResponse](event.bytestr(), json2.DecoderOptions{}) or {
-			event_error = 'could not decode OpenAI streaming response'
+			state.error = 'could not decode OpenAI streaming response'
 			return
 		}
 		if chunk.usage.total_tokens > 0 {
-			usage = llms.Usage{
+			state.usage = llms.Usage{
 				prompt_tokens:     chunk.usage.prompt_tokens
 				completion_tokens: chunk.usage.completion_tokens
 				total_tokens:      chunk.usage.total_tokens
 			}
 		}
 		if chunk.choices.len > 1 {
-			event_error = 'OpenAI streaming supports one candidate because stream callbacks do not identify candidate indexes'
+			state.error = 'OpenAI streaming supports one candidate because stream callbacks do not identify candidate indexes'
 			return
 		}
 		for choice in chunk.choices {
 			if choice.index != 0 {
-				event_error = 'OpenAI streaming returned an unexpected candidate index'
+				state.error = 'OpenAI streaming returned an unexpected candidate index'
 				return
 			}
 			if delta := choice.delta.content {
-				content += delta
+				state.content += delta
 				if callback := options.streaming_func {
 					callback(mut callback_ctx, delta.bytes()) or {
-						event_error = 'OpenAI streaming callback failed: ${err.msg()}'
+						state.error = 'OpenAI streaming callback failed: ${err.msg()}'
 						return
 					}
 				}
 			}
 			if delta := choice.delta.reasoning {
-				reasoning += delta
+				state.reasoning += delta
 				if callback := options.streaming_reasoning_func {
 					callback(mut callback_ctx, delta.bytes(), []u8{}) or {
-						event_error = 'OpenAI reasoning callback failed: ${err.msg()}'
+						state.error = 'OpenAI reasoning callback failed: ${err.msg()}'
 						return
 					}
 				}
 			}
 			if reason := choice.finish_reason {
-				finish_reason = reason
+				state.finish_reason = reason
 			}
 			for tool_delta in choice.delta.tool_calls {
 				if tool_delta.index < 0 || tool_delta.index >= 128 {
-					event_error = 'OpenAI streamed tool-call index is outside the supported range'
+					state.error = 'OpenAI streamed tool-call index is outside the supported range'
 					return
 				}
-				for tool_accumulators.len <= tool_delta.index {
-					tool_accumulators << StreamToolAccumulator{}
+				for state.tool_accumulators.len <= tool_delta.index {
+					state.tool_accumulators << StreamToolAccumulator{}
 				}
-				mut accumulator := tool_accumulators[tool_delta.index]
+				mut accumulator := state.tool_accumulators[tool_delta.index]
 				if tool_delta.id != '' { accumulator.id += tool_delta.id }
 				if tool_delta.call_type != '' { accumulator.call_type = tool_delta.call_type }
 				accumulator.name += tool_delta.function.name
 				accumulator.arguments += tool_delta.function.arguments
-				tool_accumulators[tool_delta.index] = accumulator
+				state.tool_accumulators[tool_delta.index] = accumulator
 			}
 		}
 	}
@@ -294,16 +299,16 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		url:     '${client.base_url}/chat/completions'
 		headers: headers
 		body:    body
-	}, fn [mut decoder, mut process_event, mut event_error, mut saw_done] (mut callback_ctx context.Context, bytes []u8) ! {
+	}, fn [mut decoder, mut process_event, mut state] (mut callback_ctx context.Context, bytes []u8) ! {
 		events := decoder.push(bytes) or {
 			return error(err.msg())
 		}
 		for event in events {
 			process_event(mut callback_ctx, event)
-			if event_error != '' {
-				return error(event_error)
+			if state.error != '' {
+				return error(state.error)
 			}
-			if saw_done {
+			if state.saw_done {
 				break
 			}
 		}
@@ -313,21 +318,21 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 	if response.status_code < 200 || response.status_code >= 300 {
 		return error('OpenAI chat completion request returned HTTP ${response.status_code}')
 	}
-	if event_error != '' {
-		return error(event_error)
+	if state.error != '' {
+		return error(state.error)
 	}
-	if !saw_done {
+	if !state.saw_done {
 		for event in decoder.finish()! {
 			process_event(mut ctx, event)
-			if event_error != '' { return error(event_error) }
+			if state.error != '' { return error(state.error) }
 		}
 	}
-	mut tool_calls := []schema.ToolCall{cap: tool_accumulators.len}
+	mut tool_calls := []schema.ToolCall{cap: state.tool_accumulators.len}
 	mut parts := []schema.ContentPart{}
-	if content != '' {
-		parts << schema.ContentPart(schema.TextPart{ text: content })
+	if state.content != '' {
+		parts << schema.ContentPart(schema.TextPart{ text: state.content })
 	}
-	for accumulator in tool_accumulators {
+	for accumulator in state.tool_accumulators {
 		if accumulator.name == '' {
 			return error('OpenAI returned a streamed tool call without a function name')
 		}
@@ -348,13 +353,13 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 	}
 	return llms.Response{
 		choices: [llms.Choice{
-			content:     content
-			reasoning:   reasoning
-			stop_reason: finish_reason
+			content:     state.content
+			reasoning:   state.reasoning
+			stop_reason: state.finish_reason
 			tool_calls:  tool_calls
 			parts:       parts
 		}]
-		usage:   usage
+		usage:   state.usage
 	}
 }
 
