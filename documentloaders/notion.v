@@ -30,12 +30,12 @@ pub struct NotionLoader {
 pub:
 	page_id string
 mut:
-	api_key         string
-	max_blocks      int
-	max_depth       int
-	max_requests    int
+	api_key          string
+	max_blocks       int
+	max_depth        int
+	max_requests     int
 	max_output_bytes i64
-	http_client     httputil.HTTPClient
+	http_client      httputil.HTTPClient
 }
 
 struct NotionLoadState {
@@ -127,7 +127,7 @@ fn (loader NotionLoader) load_block_children(block_id string, depth int, mut ctx
 			url += '&start_cursor=${urllib.query_escape(cursor)}'
 		}
 		response := loader.http_client.do(mut ctx, httputil.Request{
-			url: url
+			url:     url
 			headers: {
 				'Authorization':  'Bearer ${loader.api_key}'
 				'Accept':         'application/json'
@@ -218,7 +218,11 @@ fn (loader NotionLoader) append_block_text(block_type string, block_data map[str
 		'numbered_list_item' { text = '1. ${text}' }
 		'to_do' {
 			checked_value := block_data['checked'] or { json2.Any(false) }
-			text = if checked_value is bool && (checked_value as bool) { '- [x] ${text}' } else { '- [ ] ${text}' }
+			text = if checked_value is bool && (checked_value as bool) {
+				'- [x] ${text}'
+			} else {
+				'- [ ] ${text}'
+			}
 		}
 		'quote' { text = '> ${text}' }
 		'code' { text = '```\n${text}\n```' }

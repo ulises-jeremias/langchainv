@@ -33,9 +33,9 @@ fn (client NotionFixtureHTTP) do(mut _ctx context.Context, request httputil.Requ
 fn test_notion_loader_formats_text_and_records_source_metadata() {
 	mut state := &NotionFixtureState{}
 	http := NotionFixtureHTTP{
-		state: state
+		state:     state
 		responses: [
-			'{"has_more":false,"results":[{"id":"${notion_nested_block_id}","type":"heading_1","has_children":false,"heading_1":{"rich_text":[{"plain_text":"Project notes"}]}},{"id":"b13","type":"paragraph","has_children":false,"paragraph":{"rich_text":[{"plain_text":"First "},{"plain_text":"paragraph."}]}}]}'
+			'{"has_more":false,"results":[{"id":"${notion_nested_block_id}","type":"heading_1","has_children":false,"heading_1":{"rich_text":[{"plain_text":"Project notes"}]}},{"id":"b13","type":"paragraph","has_children":false,"paragraph":{"rich_text":[{"plain_text":"First "},{"plain_text":"paragraph."}]}}]}',
 		]
 	}
 	loader := new_notion_loader(notion_page_id, 'integration-secret', httputil.HTTPClient(http),
@@ -55,7 +55,7 @@ fn test_notion_loader_formats_text_and_records_source_metadata() {
 fn test_notion_loader_paginates_and_recurses_with_global_bounds() {
 	mut state := &NotionFixtureState{}
 	http := NotionFixtureHTTP{
-		state: state
+		state:     state
 		responses: [
 			'{"has_more":true,"next_cursor":"e6cc1a0a-9773-4c87-ae79-7bdc7d02077d","results":[{"id":"${notion_nested_block_id}","type":"toggle","has_children":true,"toggle":{"rich_text":[{"plain_text":"Details"}]}}]}',
 			'{"has_more":false,"results":[{"id":"b14","type":"paragraph","has_children":false,"paragraph":{"rich_text":[{"plain_text":"Nested text"}]}}]}',
@@ -63,8 +63,8 @@ fn test_notion_loader_paginates_and_recurses_with_global_bounds() {
 		]
 	}
 	loader := new_notion_loader(notion_page_id, 'test-token', httputil.HTTPClient(http), NotionLoaderOptions{
-		max_blocks:  3
-		max_depth:   2
+		max_blocks: 3
+		max_depth:  2
 	}) or { panic(err) }
 	mut ctx := context.background()
 	documents := loader.load(mut ctx) or { panic(err) }
@@ -77,7 +77,7 @@ fn test_notion_loader_paginates_and_recurses_with_global_bounds() {
 fn test_notion_loader_rejects_bad_page_id_and_redacts_http_errors() {
 	mut state := &NotionFixtureState{}
 	new_notion_loader('invalid/uuid', 'test-token', httputil.HTTPClient(NotionFixtureHTTP{
-		state: state
+		state:     state
 		responses: []
 	}), NotionLoaderOptions{}) or {
 		assert err.msg() == 'Notion page ID must be a UUID'
