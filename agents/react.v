@@ -13,6 +13,8 @@ const default_react_input_key = 'input'
 const default_react_max_prompt_bytes = 65536
 const max_react_prompt_bytes = 1048576
 const max_react_tools = 64
+const max_react_input_keys = 64
+const max_react_key_bytes = 128
 
 // ReactOptions configures MRKL-style ReAct prompts and request bounds.
 pub struct ReactOptions {
@@ -40,8 +42,8 @@ pub fn new_react_agent(model llms.CompletionModel, agent_tools []tools.Tool, opt
 	if agent_tools.len == 0 || agent_tools.len > max_react_tools {
 		return error('ReAct agent requires between 1 and ${max_react_tools} tools')
 	}
-	if options.output_key.trim_space() == '' {
-		return error('ReAct agent output key cannot be empty')
+	if options.output_key.trim_space() == '' || options.output_key.len > max_react_key_bytes {
+		return error('ReAct output key must contain 1..${max_react_key_bytes} bytes')
 	}
 	max_prompt_bytes := if options.max_prompt_bytes == 0 {
 		default_react_max_prompt_bytes
@@ -51,10 +53,17 @@ pub fn new_react_agent(model llms.CompletionModel, agent_tools []tools.Tool, opt
 	if max_prompt_bytes < 256 || max_prompt_bytes > max_react_prompt_bytes {
 		return error('ReAct prompt byte limit must be between 256 and ${max_react_prompt_bytes}')
 	}
-	keys := if options.input_keys.len == 0 { [default_react_input_key] } else { options.input_keys.clone() }
+	keys := if options.input_keys.len == 0 {
+		[default_react_input_key]
+	} else {
+		options.input_keys.clone()
+	}
+	if keys.len > max_react_input_keys {
+		return error('ReAct agent supports at most ${max_react_input_keys} input keys')
+	}
 	mut seen_inputs := map[string]bool{}
 	for key in keys {
-		if key.trim_space() == '' || key in seen_inputs || key == 'agent_scratchpad'
+		if key.trim_space() == '' || key.len > max_react_key_bytes || key in seen_inputs || key == 'agent_scratchpad'
 			|| key == 'tool_names' || key == 'tools' || key == options.output_key {
 			return error('ReAct agent input keys must be distinct, non-empty, and not reserved')
 		}
@@ -72,7 +81,7 @@ pub fn new_react_agent(model llms.CompletionModel, agent_tools []tools.Tool, opt
 		if spec.description.len > 8192 || spec.description.contains('\0') {
 			return error('ReAct tool descriptions must be at most 8192 bytes and contain no NUL')
 		}
-		tool_bytes += name.len + spec.description.len
+		tool_bytes += name.len + spec.description.len + 5
 		if tool_bytes > max_prompt_bytes {
 			return error('ReAct tool descriptions exceed the configured prompt limit')
 		}
@@ -88,6 +97,9 @@ pub fn new_react_agent(model llms.CompletionModel, agent_tools []tools.Tool, opt
 		configured.prompt = prompts.StringTemplate{
 			template: 'Answer the following question as best you can. You have access to these tools:\n{tools}\n\nUse this exact format:\nQuestion:\n${question_lines.join('\n')}\nThought: think about what to do\nAction: one of [{tool_names}]\nAction Input: the tool input\nObservation: the tool result\n... (repeat Thought/Action/Action Input/Observation as needed)\nThought: I now know the final answer\nFinal Answer: the answer\n\nPrevious steps:\n{agent_scratchpad}'
 		}
+	}
+	if configured.prompt.template.len > max_prompt_bytes {
+		return error('ReAct prompt template exceeds the configured byte limit')
 	}
 	prompt_keys := configured.prompt.input_variables()!
 	for key in keys {
@@ -119,12 +131,14 @@ pub fn (agent ReactAgent) plan(mut ctx context.Context, steps []schema.AgentStep
 		}
 	}
 	mut values := map[string]json2.Any{}
-	for key, value in inputs {
-		values[key] = json2.Any(value)
+	for key in agent.keys {
+		values[key] = json2.Any(inputs[key])
 	}
 	values['tools'] = json2.Any(react_tool_descriptions(agent.agent_tools))
 	values['tool_names'] = json2.Any(react_tool_names(agent.agent_tools))
-	values['agent_scratchpad'] = json2.Any(react_scratchpad(steps))
+	values['agent_scratchpad'] = json2.Any(react_scratchpad(steps,
+		agent.options.max_prompt_bytes)!)
+	validate_react_prompt_size(agent.options.prompt, values, agent.options.max_prompt_bytes)!
 	prompt := agent.options.prompt.format(values)!
 	if prompt.len > agent.options.max_prompt_bytes {
 		return error('formatted ReAct prompt exceeds the configured byte limit')
@@ -177,28 +191,81 @@ fn react_tool_descriptions(agent_tools []tools.Tool) string {
 	return descriptions.join('\n')
 }
 
-fn react_scratchpad(steps []schema.AgentStep) string {
+fn react_scratchpad(steps []schema.AgentStep, max_bytes int) !string {
+	if steps.len > hard_max_iterations {
+		return error('ReAct scratchpad exceeds the ${hard_max_iterations}-step limit')
+	}
 	mut parts := []string{cap: steps.len * 2}
+	mut size := 0
 	for step in steps {
+		if step.action.log.len + 1 > max_bytes - size {
+			return error('ReAct scratchpad exceeds the configured prompt byte limit')
+		}
+		size += step.action.log.len + 1
 		parts << step.action.log
-		parts << 'Observation: ${step.observation}'
+		observation_prefix := 'Observation: '
+		observation_len := observation_prefix.len + step.observation.len
+		if observation_len + 1 > max_bytes - size {
+			return error('ReAct scratchpad exceeds the configured prompt byte limit')
+		}
+		size += observation_len + 1
+		parts << observation_prefix + step.observation
 	}
 	if parts.len > 0 {
 		parts << 'Thought:'
+		size += 'Thought:'.len + 1
+	}
+	if size > max_bytes {
+		return error('ReAct scratchpad exceeds the configured prompt byte limit')
 	}
 	return parts.join('\n')
 }
 
-fn parse_react_output(output string, output_key string) !PlanResult {
-	if answer := parse_react_final_answer(output) {
-		mut return_values := map[string]json2.Any{}
-		return_values[output_key] = json2.Any(answer)
-		return PlanResult{
-			finish: schema.AgentFinish{
-				return_values: return_values
+fn validate_react_prompt_size(template prompts.StringTemplate, values map[string]json2.Any, max_bytes int) ! {
+	mut size := 0
+	mut index := 0
+	for index < template.template.len {
+		if template.template[index] == `{` {
+			if index + 1 < template.template.len && template.template[index + 1] == `{` {
+				if size >= max_bytes {
+					return error('formatted ReAct prompt exceeds the configured byte limit')
+				}
+				size++
+				index += 2
+				continue
 			}
+			end_after := template.template.index_after('}', index + 1) or {
+				return error('unclosed ReAct prompt variable')
+			}
+			end := end_after - 1
+			name := template.template[index + 1..end].trim_space()
+			value := values[name] or { return error('missing prompt value `${name}`') }
+			value_bytes := value.str().len
+			if value_bytes > max_bytes - size {
+				return error('formatted ReAct prompt exceeds the configured byte limit')
+			}
+			size += value_bytes
+			index = end + 1
+			continue
 		}
+		if template.template[index] == `}` && index + 1 < template.template.len
+			&& template.template[index + 1] == `}` {
+			if size >= max_bytes {
+				return error('formatted ReAct prompt exceeds the configured byte limit')
+			}
+			size++
+			index += 2
+			continue
+		}
+		if size >= max_bytes {
+			return error('formatted ReAct prompt exceeds the configured byte limit')
+		}
+		size++
+		index++
 	}
+}
+
+fn parse_react_output(output string, output_key string) !PlanResult {
 	lines := output.split_into_lines()
 	for index, line in lines {
 		trimmed := line.trim_space()
@@ -212,6 +279,9 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 		for input_index in index + 1 .. lines.len {
 			input_line := lines[input_index].trim_space()
 			lower_input_line := input_line.to_lower()
+			if lower_input_line.starts_with('action:') {
+				return error('ReAct output has Action but no Action Input field')
+			}
 			if !lower_input_line.starts_with('action input:') {
 				continue
 			}
@@ -233,17 +303,27 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 		}
 		return error('ReAct output has Action but no Action Input field')
 	}
+	if answer := parse_react_final_answer(output) {
+		if answer == '' {
+			return error('ReAct output has an empty Final Answer field')
+		}
+		mut return_values := map[string]json2.Any{}
+		return_values[output_key] = json2.Any(answer)
+		return PlanResult{
+			finish: schema.AgentFinish{
+				return_values: return_values
+			}
+		}
+	}
 	return error('ReAct output contains neither a final answer nor an action')
 }
 
 fn parse_react_final_answer(output string) ?string {
-	lower_output := output.to_lower()
 	for marker in ['final answer:', 'final answer :', 'the final answer is:', 'the answer is:'] {
-		if index := lower_output.index(marker) {
-			answer_start := index + marker.len
-			answer := output[answer_start..].trim_space()
-			if !answer.to_lower().contains('\naction:') {
-				return answer
+		for line in output.split_into_lines() {
+			trimmed := line.trim_space()
+			if trimmed.to_lower().starts_with(marker) {
+				return trimmed[marker.len..].trim_space()
 			}
 		}
 	}

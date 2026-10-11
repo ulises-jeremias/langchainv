@@ -62,6 +62,17 @@ fn test_sql_database_rejects_unknown_tables_oversized_results_and_bad_options() 
 	database.close() or { panic(err) }
 }
 
+fn test_sql_database_caps_table_inventory_before_materializing_catalog() {
+	engine := new_seeded_test_engine() or { panic(err) }
+	new_database(engine, [], Options{
+		max_tables: 1
+	}) or {
+		assert err.msg().contains('table count exceeds')
+		return
+	}
+	assert false, 'expected the bounded catalog query to reject too many tables'
+}
+
 fn test_sql_database_closes_idempotently_and_rejects_use_after_close() {
 	mut database := new_test_database(Options{}) or { panic(err) }
 	database.close() or { panic(err) }

@@ -35,7 +35,8 @@ pub interface Engine {
 	dialect() string
 	query(mut ctx context.Context, statement string) !QueryResult
 	query_params(mut ctx context.Context, statement string, params []string) !QueryResult
-	table_names(mut ctx context.Context) ![]string
+	// Return at most max_tables + 1 names so the caller can detect overflow.
+	table_names(mut ctx context.Context, max_tables int) ![]string
 	table_info(mut ctx context.Context, table string) !string
 	close() !
 }
@@ -58,12 +59,12 @@ pub struct SQLDatabase {
 @[heap]
 struct SQLDatabaseState {
 mut:
-	mutex      sync.Mutex
-	engine     Engine
-	dialect    string
-	tables     []string
-	options    Options
-	closed     bool
+	mutex   sync.Mutex
+	engine  Engine
+	dialect string
+	tables  []string
+	options Options
+	closed  bool
 }
 
 // DriverEngine adapts V's common db.Driver interface to Engine.
@@ -74,10 +75,10 @@ pub struct DriverEngine {
 @[heap]
 struct DriverEngineState {
 mut:
-	mutex  sync.Mutex
-	driver &db.Driver
+	mutex   sync.Mutex
+	driver  &db.Driver
 	dialect string
-	closed bool
+	closed  bool
 }
 
 // new_driver_engine wraps an already-open V database driver.
@@ -159,11 +160,21 @@ pub fn (engine DriverEngine) query_params(mut ctx context.Context, statement str
 }
 
 // table_names lists visible base tables for the selected SQL dialect.
-pub fn (engine DriverEngine) table_names(mut ctx context.Context) ![]string {
+pub fn (engine DriverEngine) table_names(mut ctx context.Context, max_tables int) ![]string {
+	if max_tables <= 0 || max_tables > max_tables_limit {
+		return error('SQL table inventory limit must be between 1 and ${max_tables_limit}')
+	}
+	query_limit := max_tables + 1
 	statement := match engine.state.dialect {
-		'sqlite', 'sqlite3' { "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name" }
-		'pgx', 'postgresql' { "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name" }
-		'mysql' { 'SHOW TABLES' }
+		'sqlite', 'sqlite3' {
+			"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT ${query_limit}"
+		}
+		'pgx', 'postgresql' {
+			"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT ${query_limit}"
+		}
+		'mysql' {
+			'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name LIMIT ${query_limit}'
+		}
 		else { return error(err_unknown_dialect) }
 	}
 	result := engine.query(mut ctx, statement)!
@@ -190,8 +201,12 @@ pub fn (engine DriverEngine) table_info(mut ctx context.Context, table string) !
 		return result.rows[0][1]
 	}
 	statement, parameter := match state.dialect {
-		'sqlite', 'sqlite3' { ('SELECT sql FROM sqlite_master WHERE type = ? AND name = ?', 'table') }
-		'pgx', 'postgresql' { ('SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = \'public\' AND table_name = $1 ORDER BY ordinal_position', '') }
+		'sqlite', 'sqlite3' {
+			('SELECT sql FROM sqlite_master WHERE type = ? AND name = ?'), 'table'
+		}
+		'pgx', 'postgresql' {
+			("SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position"), ''
+		}
 		else { return error(err_unknown_dialect) }
 	}
 	mut result := QueryResult{}
@@ -259,7 +274,7 @@ pub fn new_database(engine Engine, ignored_tables []string, options Options) !SQ
 		return err
 	}
 	mut ctx := context.background()
-	table_names := engine.table_names(mut ctx) or {
+	table_names := engine.table_names(mut ctx, configured.max_tables) or {
 		engine.close() or {}
 		return error('could not list SQL database tables')
 	}
@@ -311,7 +326,7 @@ pub fn new_sql_database(config db.DriverConfig, ignored_tables []string, options
 		.mssql { return error('SQL database adapter does not support MSSQL') }
 	}
 	engine := new_driver_engine(driver, dialect) or {
-	driver.close() or {}
+		driver.close() or {}
 		return err
 	}
 	return new_database(engine, ignored_tables, options)

@@ -26,9 +26,9 @@ struct ReactFixtureModel {
 
 struct ReactFixtureModelState {
 mut:
-	outputs  []string
-	prompts  []string
-	options  []llms.CallOptions
+	outputs []string
+	prompts []string
+	options []llms.CallOptions
 }
 
 fn (model ReactFixtureModel) complete(mut ctx context.Context, prompt string, options llms.CallOptions) !string {
@@ -66,7 +66,7 @@ fn test_react_agent_parses_tool_action_and_final_answer() {
 	assert first.actions[0].log.contains('Thought: use echo')
 	assert state.options[0].stop_words == ['\nObservation:', '\n\tObservation:']
 	second := agent.plan(mut ctx, [schema.AgentStep{
-		action: schema.AgentAction{
+		action:      schema.AgentAction{
 			tool:       'echo'
 			tool_input: 'hello'
 			log:        'Thought: use echo\nAction: echo\nAction Input: hello'
@@ -91,8 +91,8 @@ fn test_react_agent_supports_case_insensitive_output_labels_and_custom_options()
 	agent := new_react_agent(ReactFixtureModel{
 		state: state
 	}, [ReactEchoTool{}], ReactOptions{
-		input_keys: ['question']
-		output_key: 'result'
+		input_keys:   ['question']
+		output_key:   'result'
 		call_options: llms.CallOptions{
 			max_tokens: 32
 			model:      'offline-model'
@@ -135,12 +135,50 @@ fn test_react_agent_runs_through_the_executor_with_tool_observation() {
 	assert state.prompts[1].contains('Observation: hello')
 }
 
-fn test_react_agent_rejects_malformed_output_and_prompt_bounds() {
+fn test_react_agent_rejects_missing_action_input() {
 	parse_react_output('Thought: act\nAction: echo', 'output') or {
 		assert err.msg().contains('Action Input')
 		return
 	}
 	assert false, 'expected malformed ReAct output to fail'
+}
+
+fn test_react_agent_rejects_second_action_before_input() {
+	parse_react_output('Action: echo\nAction: echo\nAction Input: value', 'output') or {
+		assert err.msg().contains('Action Input')
+		return
+	}
+	assert false, 'expected a second action header to invalidate the first action'
+}
+
+fn test_react_agent_preserves_control_text_inside_tool_input() {
+	parsed_action := parse_react_output("Action: echo\nAction Input: SELECT 'Final Answer: done'",
+		'output') or { panic(err) }
+	assert parsed_action.actions.len == 1
+	assert parsed_action.actions[0].tool_input == "SELECT 'Final Answer: done'"
+}
+
+fn test_react_agent_rejects_empty_final_answer() {
+	parse_react_output('Final Answer:', 'output') or {
+		assert err.msg().contains('empty Final Answer')
+		return
+	}
+	assert false, 'expected an empty final answer to fail'
+}
+
+fn test_react_agent_parses_final_answer_after_unicode_text() {
+	parsed_unicode_answer := parse_react_output('café\nFinal Answer: listo', 'output') or {
+		panic(err)
+	}
+	if finish := parsed_unicode_answer.finish {
+		answer := finish.return_values['output'] or { panic('missing unicode-prefixed answer') }
+		assert answer == json2.Any('listo')
+	} else {
+		assert false, 'expected unicode-prefixed answer finish'
+	}
+}
+
+fn test_react_agent_rejects_prompt_bound_below_minimum() {
 	mut state := &ReactFixtureModelState{
 		outputs: ['Final Answer: done']
 	}
@@ -153,4 +191,22 @@ fn test_react_agent_rejects_malformed_output_and_prompt_bounds() {
 		return
 	}
 	assert false, 'expected undersized ReAct prompt bound to fail'
+}
+
+fn test_react_agent_rejects_oversized_input_before_model_call() {
+	mut state := &ReactFixtureModelState{
+		outputs: ['Final Answer: done']
+	}
+	bounded_agent := new_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{}) or { panic(err) }
+	mut ctx := context.background()
+	bounded_agent.plan(mut ctx, [], {
+		'input': 'x'.repeat(70000)
+	}, llms.CallOptions{}) or {
+		assert err.msg().contains('byte limit')
+		assert state.prompts.len == 0
+		return
+	}
+	assert false, 'expected oversized input to be rejected before calling the model'
 }
