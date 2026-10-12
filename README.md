@@ -31,7 +31,7 @@ import ulises_jeremias.langchainv
 The current core packages include:
 
 - `schema`: documents, multimodal messages, and shared interfaces.
-- `llms`: model contracts, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, Gemini text/image/function-tool generation, Vertex AI Gemini generation with explicit OAuth access tokens, and watsonx.ai text generation with IBM API-key exchange or explicit IAM tokens.
+- `llms`: model contracts, provider-neutral lifecycle middleware, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, Gemini text/image/function-tool generation, Vertex AI Gemini generation with explicit OAuth access tokens, and watsonx.ai text generation with IBM API-key exchange or explicit IAM tokens.
 - `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
 - `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
 - `tools`: agent tool contract, bounded arithmetic calculator, search and web tools, Zapier MCP, and SQL database inspection/query helpers.
@@ -48,7 +48,7 @@ The current core packages include:
 - `agents`: text-based MRKL/ReAct and model tool-calling agents, plus a bounded
   executor with tool dispatch, callbacks, memory integration, and optional
   intermediate-step output.
-- `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
+- `callbacks`: chat/completion lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
 - `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders

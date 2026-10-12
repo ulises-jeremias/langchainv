@@ -8,11 +8,13 @@ supported options, streaming behavior, limits, authentication, and errors.
 ## Lifecycle callbacks
 
 Adapters that do not expose a callback field can be wrapped with
-`llms/middleware.CallbackModel`. The wrapper dispatches `llm_generate_content_start`
-before calling the model, then either `llm_generate_content_end` or `llm_error`.
-It returns the model response or error unchanged. This wrapper observes the
-request boundary; streaming chunks still come from the provider's
-`CallOptions.streaming_func` or `streaming_reasoning_func` callbacks.
+`llms/middleware.CallbackModel` or `CallbackCompletionModel`. The chat wrapper
+dispatches `llm_generate_content_start` before the call, then either
+`llm_generate_content_end` or `llm_error`. The completion wrapper dispatches
+`llm_start` and then either `llm_complete_end` or `llm_error`. Both wrappers
+return the model response or error unchanged. Streaming chunks still come from
+the provider's `CallOptions.streaming_func` or `streaming_reasoning_func`
+callbacks.
 
 ```v
 import context
