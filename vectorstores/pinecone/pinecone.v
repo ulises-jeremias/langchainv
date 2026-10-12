@@ -215,12 +215,12 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			if values_any !is []json2.Any {
 				return error('Pinecone match values must be an array')
 			}
-			values := values_any as []json2.Any
-			if values.len == 0 || values.len > max_embedding_values {
+			match_values := values_any as []json2.Any
+			if match_values.len == 0 || match_values.len > max_embedding_values {
 				return error('Pinecone returned an empty or oversized vector')
 			}
-			embedding = []f32{cap: values.len}
-			for value in values {
+			embedding = []f32{cap: match_values.len}
+			for value in match_values {
 				embedding << pinecone_vector_float(value)!
 			}
 		}
