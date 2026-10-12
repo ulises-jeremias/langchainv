@@ -17,6 +17,7 @@ layout_class: home
   <article class="card"><h3>New to LangChainV</h3><p>Install the module and run a dependency-free text splitting example.</p><a href="{{ '/getting-started/' | relative_url }}">Quick start →</a></article>
   <article class="card"><h3>Learn by building</h3><p>Follow the tutorials from prompts and models to retrieval and production checks.</p><a href="{{ '/tutorials/' | relative_url }}">Tutorial track →</a></article>
   <article class="card"><h3>Find a component</h3><p>Browse package responsibilities and their focused reference documentation.</p><a href="{{ '/components/' | relative_url }}">Component map →</a></article>
+  <article class="card"><h3>Search the V API</h3><p>Browse public symbols and module documentation generated from the current source.</p><a href="{{ '/api/' | relative_url }}">API reference →</a></article>
   <article class="card"><h3>Choose an integration</h3><p>Browse model, embedding, and vector store adapters and open their setup guides.</p><a href="{{ '/providers/' | relative_url }}">Integration catalog →</a></article>
   <article class="card"><h3>Check compatibility</h3><p>See what is implemented, partial, verified, or still outstanding.</p><a href="{{ '/reference/' | relative_url }}">Parity and project status →</a></article>
 </div>
@@ -27,6 +28,7 @@ layout_class: home
 - **Bounded work:** network payloads, outputs, batches and iterative agents expose limits.
 - **Offline-first tests:** provider clients accept injectable transports; CI uses deterministic fixtures rather than live credentials.
 - **Honest compatibility:** the [parity ledger]({{ '/reference/' | relative_url }}) tracks scope and remaining gaps.
+- **Source-linked API docs:** the API reference is generated from public V symbols with the pinned compiler during each Pages build.
 
 ## Current project status
 

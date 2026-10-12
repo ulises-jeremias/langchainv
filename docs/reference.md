@@ -8,6 +8,11 @@ permalink: /reference/
 
 LangChainV's API is documented at the package boundary in each README and V source comments. Browse the [component map](../components/) for package guides.
 
+Browse the [generated API reference](../api/) for public symbols, module
+navigation, and symbol search. Pages builds regenerate it from the same pinned
+V compiler used by CI. This page tracks compatibility and project status; the
+generated reference describes the current source API.
+
 ## LangChainGo compatibility
 
 The [parity ledger](https://github.com/ulises-jeremias/langchainv/blob/main/docs/LANGCHAINGO_PARITY.md) compares public package scope and records partial or missing behavior. Its upstream snapshot was recorded in that document; upstream changes over time, so the snapshot date matters. Do not interpret a provider or package existing as full compatibility.
