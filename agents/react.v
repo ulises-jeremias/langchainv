@@ -274,7 +274,11 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 	lower_output := output.to_lower()
 	action_marker := lower_output.index('action:')
 	if answer_marker := find_react_final_answer_marker(output) {
-		if action_marker == none || answer_marker.index < action_marker {
+		mut final_answer_first := true
+		if action_index := action_marker {
+			final_answer_first = answer_marker.index < action_index
+		}
+		if final_answer_first {
 			answer := output[answer_marker.index + answer_marker.value.len..].trim_space()
 			if answer.to_lower().contains('\naction:') {
 				return error('ReAct output contains a final answer followed by another action')
@@ -288,9 +292,10 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 		input_relative := remainder.index('action input:') or {
 			return error('ReAct output has Action but no Action Input field')
 		}
-		second_action := remainder.index('action:')
-		if second_action != none && second_action < input_relative {
-			return error('ReAct output has Action but no Action Input field')
+		if second_action := remainder.index('action:') {
+			if second_action < input_relative {
+				return error('ReAct output has Action but no Action Input field')
+			}
 		}
 		input_index := after_action + input_relative
 		action_name := output[after_action..input_index].trim_space()
