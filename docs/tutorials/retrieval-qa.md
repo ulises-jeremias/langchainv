@@ -53,4 +53,4 @@ small local backend, not a substitute for persistent or distributed storage.
 ## Next
 
 - Test provider-neutral model code with the [offline mock model tutorial](../offline-model-tests/).
-- Compare backend limits in the [parity reference](../reference/).
+- Compare backend limits in the [parity reference]({{ '/reference/' | relative_url }}).
