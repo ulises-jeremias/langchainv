@@ -12,7 +12,9 @@ only when its implementation and documented validation are complete.
 ## Documentation
 
 Visit the [LangChainV documentation site](https://ulises-jeremias.github.io/langchainv/)
-for the quick start, tutorials, component map, and compatibility reference.
+for the quick start, tutorials, component map, searchable generated
+[API reference](https://ulises-jeremias.github.io/langchainv/api/), and
+compatibility reference.
 The [`examples/`](examples/) directory contains standalone programs; the
 [example catalog](examples/README.md) lists their requirements.
 

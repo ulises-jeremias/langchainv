@@ -27,6 +27,10 @@ on:
 permissions:
   contents: read
 
+env:
+  VJOBS: '2'
+  V_COMPILER_REF: 03e12f368ad5061756d523891e12cd759053f486
+
 concurrency:
   group: pages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -38,18 +42,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          path: langchainv
           persist-credentials: false
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+      - name: Check out pinned V compiler
+        uses: actions/checkout@v7
+        with:
+          repository: vlang/v
+          ref: ${{ env.V_COMPILER_REF }}
+          path: vlang
+          persist-credentials: false
+      - name: Cache pinned V compiler
+        id: v-compiler-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            vlang/v
+            vlang/thirdparty/tcc/lib/libgc.a
+          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}-with-libgc
+      - name: Build V compiler
+        if: steps.v-compiler-cache.outputs.cache-hit != 'true'
+        run: make -C vlang
+      - name: Add V compiler to PATH
+        run: |
+          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
+          ./vlang/v version
+      - name: Generate searchable API reference
+        run: |
+          cd langchainv
+          mkdir -p docs/api
+          v doc -f html -m -readme -no-timestamp -o docs/api .
       - name: Build site
         uses: actions/jekyll-build-pages@v1
         with:
-          source: ./docs
+          source: ./langchainv/docs
           destination: ./_site
       - name: Check provider catalog
-        run: python3 scripts/check_provider_catalog.py
+        run: python3 langchainv/scripts/check_provider_catalog.py
+      - name: Check generated API reference
+        run: |
+          test -s _site/api/index.html
+          test -s _site/api/search_index.js
       - name: Check generated site links
-        run: python3 scripts/check_site_links.py _site --baseurl /langchainv
+        run: python3 langchainv/scripts/check_site_links.py _site --baseurl /langchainv
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
