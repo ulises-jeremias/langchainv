@@ -32,6 +32,40 @@ struct ConcurrentMapModel {
 	delay_ms int
 }
 
+@[heap]
+struct ConcurrentMapReducerState {
+mut:
+	documents []json2.Any
+}
+
+struct ConcurrentMapReducer {
+	state &ConcurrentMapReducerState
+}
+
+fn (reducer ConcurrentMapReducer) call(mut _ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	value := inputs['input_documents'] or { return error('missing mapped documents') }
+	if value !is []json2.Any {
+		return error('expected mapped documents array')
+	}
+	mut state := reducer.state
+	state.documents = (value as []json2.Any).clone()
+	return {
+		'answer': json2.Any('reduced')
+	}
+}
+
+fn (_ ConcurrentMapReducer) memory() ?schema.Memory {
+	return none
+}
+
+fn (_ ConcurrentMapReducer) input_keys() []string {
+	return ['input_documents']
+}
+
+fn (_ ConcurrentMapReducer) output_keys() []string {
+	return ['answer']
+}
+
 fn (model ConcurrentMapModel) complete(mut ctx context.Context, prompt string, _options llms.CallOptions) !string {
 	mut state := model.state
 	state.mutex.lock()
@@ -96,8 +130,8 @@ fn test_map_reduce_uses_bounded_concurrency_and_preserves_input_order() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	mut reducer_state := &MapReduceCaptureState{}
-	chain := new_map_reduce_documents_chain(map_chain, MapReduceCaptureReducer{
+	mut reducer_state := &ConcurrentMapReducerState{}
+	chain := new_map_reduce_documents_chain(map_chain, ConcurrentMapReducer{
 		state: reducer_state
 	}, MapReduceDocumentsOptions{
 		max_concurrency: 3
@@ -164,8 +198,8 @@ fn test_map_documents_reports_the_first_input_error_after_parallel_work() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	chain := new_map_reduce_documents_chain(map_chain, MapReduceCaptureReducer{
-		state: &MapReduceCaptureState{}
+	chain := new_map_reduce_documents_chain(map_chain, ConcurrentMapReducer{
+		state: &ConcurrentMapReducerState{}
 	}, MapReduceDocumentsOptions{
 		max_concurrency: 2
 	}) or { panic(err) }
@@ -191,8 +225,8 @@ fn test_map_reduce_does_not_start_another_batch_after_output_limit_error() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	chain := new_map_reduce_documents_chain(map_chain, MapReduceCaptureReducer{
-		state: &MapReduceCaptureState{}
+	chain := new_map_reduce_documents_chain(map_chain, ConcurrentMapReducer{
+		state: &ConcurrentMapReducerState{}
 	}, MapReduceDocumentsOptions{
 		max_concurrency:    2
 		max_document_bytes: 10
@@ -248,8 +282,8 @@ fn test_parallel_mapping_observes_parent_context_deadline() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	chain := new_map_reduce_documents_chain(map_chain, MapReduceCaptureReducer{
-		state: &MapReduceCaptureState{}
+	chain := new_map_reduce_documents_chain(map_chain, ConcurrentMapReducer{
+		state: &ConcurrentMapReducerState{}
 	}, MapReduceDocumentsOptions{
 		max_concurrency: 2
 	}) or { panic(err) }
@@ -276,8 +310,8 @@ fn test_document_map_concurrency_is_bounded_by_options() {
 	}, prompts.StringTemplate{
 		template: '{context}'
 	}, 'mapped') or { panic(err) }
-	reducer := MapReduceCaptureReducer{
-		state: &MapReduceCaptureState{}
+	reducer := ConcurrentMapReducer{
+		state: &ConcurrentMapReducerState{}
 	}
 	new_map_reduce_documents_chain(map_chain, reducer, MapReduceDocumentsOptions{
 		max_concurrency: 6
