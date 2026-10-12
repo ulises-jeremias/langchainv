@@ -13,14 +13,17 @@ concurrency:
   group: langchainv-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  VJOBS: '2'
+  V_COMPILER_REF: 03e12f368ad5061756d523891e12cd759053f486
+
 jobs:
-  v-checks:
+  v-static:
+    name: V format and Markdown
     runs-on: ubuntu-24.04
-    env:
-      VJOBS: '2'
-      V_COMPILER_REF: 03e12f368ad5061756d523891e12cd759053f486
+    timeout-minutes: 45
     steps:
-      - name: Checkout
+      - name: Checkout LangChainV
         uses: actions/checkout@v7
         with:
           path: langchainv
@@ -45,8 +48,77 @@ jobs:
 
       - name: Build V compiler
         if: steps.v-compiler-cache.outputs.cache-hit != 'true'
+        run: make -C vlang
+
+      - name: Add V compiler to PATH
         run: |
-          make -C vlang
+          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
+          ./vlang/v version
+
+      - name: Install under the V module path
+        run: |
+          mkdir -p "$HOME/.vmodules/ulises_jeremias"
+          mv langchainv "$HOME/.vmodules/ulises_jeremias/langchainv"
+
+      - name: Verify V formatting
+        run: |
+          cd "$HOME/.vmodules/ulises_jeremias/langchainv"
+          v fmt -verify .
+
+      - name: Compile Markdown examples
+        run: |
+          cd "$HOME/.vmodules/ulises_jeremias/langchainv"
+          v check-md -hide-warnings -skip-line-length-check .
+
+  v-checks:
+    name: V ${{ matrix.group }}
+    needs: v-static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - group: core and framework packages
+            packages: 'schema jsonschema llms llms/middleware callbacks chains agents prompts outputparser memory memory/sqlite testing/llmtest'
+          - group: LLM providers
+            packages: 'llms/openai llms/llamafile llms/local llms/bedrock llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai llms/vertex llms/watsonx'
+          - group: embedding providers
+            packages: 'embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock'
+          - group: vector stores
+            packages: 'vectorstores vectorstores/chroma vectorstores/milvus vectorstores/opensearch vectorstores/pgvector vectorstores/redis vectorstores/qdrant vectorstores/pinecone vectorstores/weaviate'
+          - group: tools and document processing
+            packages: 'tools tools/duckduckgo tools/perplexity tools/serpapi tools/wikipedia tools/exa tools/scraper tools/sqldatabase tools/zapier documentloaders textsplitter httputil'
+          - group: standalone examples
+            packages: ''
+    steps:
+      - name: Checkout LangChainV
+        uses: actions/checkout@v7
+        with:
+          path: langchainv
+          persist-credentials: false
+
+      - name: Check out pinned V compiler
+        uses: actions/checkout@v7
+        with:
+          repository: vlang/v
+          ref: ${{ env.V_COMPILER_REF }}
+          path: vlang
+          persist-credentials: false
+
+      - name: Cache pinned V compiler
+        id: v-compiler-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            vlang/v
+            vlang/thirdparty/tcc/lib/libgc.a
+          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}-with-libgc
+
+      - name: Build V compiler
+        if: steps.v-compiler-cache.outputs.cache-hit != 'true'
+        run: make -C vlang
 
       - name: Add V compiler to PATH
         run: |
@@ -54,6 +126,7 @@ jobs:
           ./vlang/v version
 
       - name: Install PDF text extractor
+        if: contains(matrix.packages, 'documentloaders')
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y poppler-utils
@@ -63,16 +136,26 @@ jobs:
           mkdir -p "$HOME/.vmodules/ulises_jeremias"
           mv langchainv "$HOME/.vmodules/ulises_jeremias/langchainv"
 
-      - name: Format and test implemented packages
+      - name: Test package group
+        if: matrix.packages != ''
+        env:
+          PACKAGES: ${{ matrix.packages }}
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-          v fmt -verify .
-          v check-md -hide-warnings -skip-line-length-check .
-          for package in schema jsonschema llms llms/middleware llms/openai llms/llamafile llms/local llms/bedrock llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai llms/vertex llms/watsonx embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock tools tools/duckduckgo tools/perplexity tools/serpapi tools/wikipedia tools/exa tools/scraper tools/sqldatabase tools/zapier callbacks chains agents vectorstores vectorstores/chroma vectorstores/milvus vectorstores/opensearch vectorstores/pgvector vectorstores/redis vectorstores/qdrant vectorstores/pinecone vectorstores/weaviate prompts outputparser memory memory/sqlite documentloaders textsplitter testing/llmtest httputil; do
+          for package in $PACKAGES; do
+            echo "::group::v test ./$package"
             v test "./$package"
+            echo "::endgroup::"
           done
+
+      - name: Compile and run standalone examples
+        if: matrix.group == 'standalone examples'
+        run: |
+          cd "$HOME/.vmodules/ulises_jeremias/langchainv"
           for example in examples/*/main.v; do
+            echo "::group::Compile and run $example"
             output="/tmp/langchainv-example-$(basename "$(dirname "$example")")"
             v -o "$output" "$example"
             env -u LANGCHAINV_ALLOW_LIVE_EXAMPLES "$output"
+            echo "::endgroup::"
           done
