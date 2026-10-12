@@ -88,7 +88,7 @@ fn test_redis_search_parses_score_metadata_and_escapes_filter_values() {
 	store := fixture_store(state) or { panic(err) }
 	mut ctx := context.background()
 	mut options := vectorstores.SearchOptions{
-		namespace: 'tenant-1'
+		namespace: 'ténant-1'
 	}
 	options.filter['kind'] = json2.Any('guide / *')
 	documents := store.similarity_search(mut ctx, 'question', 4, options) or { panic(err) }
