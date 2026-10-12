@@ -151,7 +151,8 @@ Milvus — partial: REST v2 insert/search/delete against an existing collection,
 bearer-token auth, scalar metadata equality filters, namespaces, COSINE/IP/L2
 metric selection, injected embeddings/transport, and bounded requests; schema
 management, collection administration, advanced filters, minimum-score
-filtering for L2, and vector return remain outstanding.
+filtering for L2 remain outstanding; `SearchOptions.include_vectors` returns
+validated vectors when requested.
 OpenSearch — partial: bulk index/search/delete against an existing k-NN index,
 API-key or basic authentication, scalar metadata equality filters, namespaces,
 cosine scores, injected embeddings/transport, and bounded requests; index
