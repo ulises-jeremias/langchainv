@@ -33,7 +33,9 @@ fn (engine PgvectorFixtureEngine) dialect() string {
 	return if engine.dialect_name == '' { 'pgx' } else { engine.dialect_name }
 }
 
-fn (engine PgvectorFixtureEngine) query(mut _ctx context.Context, _statement string) !sqldatabase.QueryResult {
+fn (engine PgvectorFixtureEngine) query(mut _ctx context.Context, statement string) !sqldatabase.QueryResult {
+	mut state := engine.state
+	state.statements << statement
 	return sqldatabase.QueryResult{}
 }
 
@@ -60,6 +62,62 @@ fn fixture_store(state &PgvectorFixtureState) !Store {
 	}, Options{
 		table: 'documents'
 	})
+}
+
+fn test_pgvector_initializes_a_missing_table_without_overwrite() {
+	mut state := &PgvectorFixtureState{}
+	engine := PgvectorFixtureEngine{
+		state: state
+	}
+	mut ctx := context.background()
+	initialize_table(mut ctx, engine, Options{
+		table: 'documents'
+	}, 1536) or { panic(err) }
+	assert state.statements == ['CREATE TABLE IF NOT EXISTS "documents" ("id" text PRIMARY KEY, "page_content" text NOT NULL, "metadata" jsonb NOT NULL DEFAULT \'{}\'::jsonb, "namespace" text NOT NULL DEFAULT \'\', "embedding" vector(1536) NOT NULL)']
+}
+
+fn test_pgvector_table_initialization_rejects_unsafe_identifiers() {
+	mut state := &PgvectorFixtureState{}
+	engine := PgvectorFixtureEngine{
+		state: state
+	}
+	mut ctx := context.background()
+	initialize_table(mut ctx, engine, Options{
+		table: 'documents; DROP TABLE users'
+	}, 1536) or {
+		assert err.msg().contains('simple SQL identifiers')
+		assert state.statements.len == 0
+		return
+	}
+	assert false, 'expected an unsafe table identifier to fail'
+}
+
+fn test_pgvector_table_initialization_rejects_invalid_dimensions() {
+	mut state := &PgvectorFixtureState{}
+	engine := PgvectorFixtureEngine{
+		state: state
+	}
+	mut ctx := context.background()
+	initialize_table(mut ctx, engine, Options{}, 0) or {
+		assert err.msg().contains('dimension must be between')
+		assert state.statements.len == 0
+		return
+	}
+	assert false, 'expected an invalid vector dimension to fail'
+}
+
+fn test_pgvector_table_initialization_rejects_non_postgres_dialect() {
+	mut state := &PgvectorFixtureState{}
+	mut ctx := context.background()
+	initialize_table(mut ctx, PgvectorFixtureEngine{
+		state:        state
+		dialect_name: 'sqlite3'
+	}, Options{}, 3) or {
+		assert err.msg().contains('PostgreSQL')
+		assert state.statements.len == 0
+		return
+	}
+	assert false, 'expected non-PostgreSQL engine to fail'
 }
 
 fn test_pgvector_adds_documents_with_parameterized_bulk_insert() {
