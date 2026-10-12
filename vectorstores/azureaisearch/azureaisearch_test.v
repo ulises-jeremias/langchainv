@@ -97,6 +97,43 @@ fn test_azure_search_queries_vector_and_maps_result_fields() {
 	assert state.requests[0].body.contains("namespace eq 'tenant-''a'")
 }
 
+fn test_azure_search_returns_stored_vector_only_when_requested() {
+	mut state := &AzureFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"value":[{"id":"doc-1","content":"answer","metadata":"{}","namespace":"tenant-a","contentVector":[0.25,0.75],"@search.score":0.875}]}'
+		}]
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 3, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.25), 0.75]
+	assert state.requests[0].body.contains('"select":"id,content,metadata,namespace,contentVector"')
+}
+
+fn test_azure_search_rejects_returned_vectors_with_wrong_dimensions() {
+	mut state := &AzureFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"value":[{"id":"doc-1","content":"answer","metadata":"{}","namespace":"tenant-a","contentVector":[0.25],"@search.score":0.875}]}'
+		}]
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 3, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('invalid dimension')
+		return
+	}
+	assert false, 'expected an Azure vector with the wrong dimensions to fail'
+}
+
 fn test_azure_search_deletes_document_keys_and_rejects_partial_batch_failure() {
 	mut state := &AzureFixtureState{
 		responses: [httputil.Response{

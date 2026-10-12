@@ -170,9 +170,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if options.namespace.len > 65536 {
 		return error('Azure AI Search namespace exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Azure AI Search adapter does not expose stored vectors through schema.Document')
-	}
 	if options.filter.len > 0 {
 		return error('Azure AI Search metadata filters are not supported by this adapter')
 	}
@@ -193,6 +190,11 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		}
 		wire_vector << json2.Any(value)
 	}
+	select_fields := if options.include_vectors {
+		'${store.key_field},${store.content_field},${store.metadata_field},${store.namespace_field},${store.vector_field}'
+	} else {
+		'${store.key_field},${store.content_field},${store.metadata_field},${store.namespace_field}'
+	}
 	mut request := map[string]json2.Any{
 		'vectorQueries': json2.Any([json2.Any(map[string]json2.Any{
 			'kind':   json2.Any('vector')
@@ -200,7 +202,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			'fields': json2.Any(store.vector_field)
 			'k':      json2.Any(limit)
 		})])
-		'select':        json2.Any('${store.key_field},${store.content_field},${store.metadata_field},${store.namespace_field}')
+		'select':        json2.Any(select_fields)
 		'top':           json2.Any(limit)
 	}
 	filter := make_namespace_filter(store.namespace_field, options.namespace)
@@ -248,10 +250,28 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 				return error('Azure AI Search metadata field must be a JSON object string')
 			}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			vector_any := fields[store.vector_field] or {
+				return error('Azure AI Search result is missing the requested vector field')
+			}
+			if vector_any !is []json2.Any {
+				return error('Azure AI Search returned an unsupported vector shape')
+			}
+			vector_values := vector_any as []json2.Any
+			if vector_values.len == 0 || vector_values.len > max_embedding_values || vector_values.len != vector.len {
+				return error('Azure AI Search returned a vector with an invalid dimension')
+			}
+			embedding = []f32{cap: vector_values.len}
+			for value in vector_values {
+				embedding << azure_vector_float(value)!
+			}
+		}
 		documents << schema.Document{
 			page_content: content_any as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents
@@ -345,6 +365,23 @@ fn finite_number(value json2.Any) !f32 {
 		return f32(value as int)
 	}
 	return error('Azure AI Search score must be a finite number')
+}
+
+fn azure_vector_float(value json2.Any) !f32 {
+	if value is f64 {
+		number := value as f64
+		converted := f32(number)
+		if math.is_finite(number) && math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	if value is int {
+		converted := f32(value as int)
+		if math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	return error('Azure AI Search vector values must be finite numbers')
 }
 
 fn valid_index_name(name string) bool {

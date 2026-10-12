@@ -17,7 +17,8 @@ match the selected embedding model:
 - `id`: `Edm.String`, key field.
 - `content`: retrievable `Edm.String`.
 - `contentVector`: `Collection(Edm.Single)` with the embedding
-  model's exact dimensions and a cosine vector-search profile.
+  model's exact dimensions and a cosine vector-search profile. Set
+  `retrievable: true` when callers will request returned vectors.
 - `metadata`: retrievable `Edm.String`; the adapter stores a JSON object in
   this field.
 - `namespace`: `Edm.String`, retrievable and filterable.
@@ -79,11 +80,15 @@ secret manager. Remote endpoints must use HTTPS. Tests inject an
   error.
 - Search embeds one query and issues a vector query against the configured
   vector field. Namespace equality is escaped as an OData string literal.
+  `SearchOptions.include_vectors` adds the vector field to `select` and returns
+  its validated values in `schema.Document.embedding`; the index field must be
+  retrievable and match the query embedding's dimension. The default search
+  omits the vector field from `select`.
 - Search limits are 0–1,000; queries are limited to 64 KiB; request and response
   bodies are capped at 4 MiB; vectors are limited to 65,536 finite values.
 - Metadata is serialized into one string field and parsed on retrieval. Exact
-  metadata filters, hybrid text search, custom index lifecycle, returned
-  vectors, and other distance strategies are not implemented. Requests asking
-  for metadata filters or vectors fail explicitly.
+  metadata filters, hybrid text search, custom index lifecycle, and other
+  distance strategies are not implemented. Requests asking for metadata
+  filters fail explicitly.
 - Azure indexing can partially accept a batch. The adapter reports any failed
   action but does not roll back actions already accepted by the service.
