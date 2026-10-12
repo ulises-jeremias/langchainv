@@ -8,6 +8,8 @@ permalink: /components/
 
 Use this map to find the package guide. Package READMEs describe constructors, supported options, resource limits, and known gaps.
 
+Browse the [provider and backend catalog](../providers/) to find adapter guides by integration name.
+
 | Area | Packages | Purpose |
 |---|---|---|
 | Contracts and schemas | [`schema`](https://github.com/ulises-jeremias/langchainv/blob/main/schema/README.md), [`jsonschema`](https://github.com/ulises-jeremias/langchainv/blob/main/jsonschema/README.md) | Shared documents/messages and bounded JSON schema validation. |
