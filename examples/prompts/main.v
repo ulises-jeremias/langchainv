@@ -8,7 +8,7 @@ fn main() {
 		template: 'Explain {topic} for a {audience} audience in {style}.'
 	}
 	variables := template.input_variables() or { panic(err) }
-	println('Inputs: ${variables.join(", ")}')
+	println('Inputs: ${variables.join(', ')}')
 
 	prompt := template.format({
 		'topic':    json2.Any('V modules')
