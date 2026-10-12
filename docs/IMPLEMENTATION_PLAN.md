@@ -105,8 +105,10 @@ change, and keep completed, partial, and unavailable behavior distinct.
 ## Evidence snapshot
 
 - LangChainGo source tree inspected at commit
-  `039fbb6c6469a8ffcdae615ec7bdc465c83abadc` (`main`, GitHub tree returned on
-  2026-10-09; 1,500 entries in the tree).
+  `6351d0d03286ba1f8be78b572d88c9b43ed6b869` (`main`, GitHub tree returned on
+  2026-10-12; 1,501 entries in the tree). Notable upstream deltas since the
+  previous snapshot and the corresponding LangChainV gaps are recorded in the
+  parity ledger.
 - V standard library inspected at V commit
   `5bd67093f97f3574b36bc1a9f19f56a9c0a4ad07`, matching the installed V 0.5.2
   compiler (`/tmp/v-5bd67093f97f3574b36bc1a9f19f56a9c0a4ad07/vlib`).
