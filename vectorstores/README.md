@@ -13,5 +13,7 @@ dimension mismatches.
 
 The `chroma`, `milvus`, `opensearch`, `pgvector`, `qdrant`, `pinecone`, and `weaviate` subpackages provide
 bounded REST adapters for existing remote collections or indexes. Each accepts
-an injected embedder and HTTP client for offline tests. See the package README
-files for supported filters, limits, authentication, and server setup.
+an injected embedder and HTTP client for offline tests. The `redis` subpackage
+uses the V standard Redis client with an injected command interface and a
+preconfigured Redis Stack HASH index. See package README files for supported
+filters, limits, authentication, and server setup.

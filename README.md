@@ -43,7 +43,7 @@ The current core packages include:
   intermediate-step output.
 - `callbacks`: lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
-- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, OpenSearch, pgvector, Qdrant, Pinecone, and Weaviate integrations.
+- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
 - `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders
   plus a bounded recursive directory loader for those file types. PDF extraction
   requires Poppler's `pdftotext` executable.
@@ -149,6 +149,8 @@ the OpenSearch k-NN REST adapter and index mapping requirements.
 
 See [`vectorstores/pgvector/README.md`](vectorstores/pgvector/README.md) for the
 PostgreSQL pgvector adapter and existing table schema requirements.
+See [`vectorstores/redis/README.md`](vectorstores/redis/README.md) for Redis
+Stack index setup, HASH fields, and adapter limits.
 
 ## Compatibility
 
