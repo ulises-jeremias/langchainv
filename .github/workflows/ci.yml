@@ -152,7 +152,7 @@ jobs:
         if: matrix.group == 'standalone examples'
         run: |
           cd "$HOME/.vmodules/ulises_jeremias/langchainv"
-          for example in examples/*/main.v; do
+          for example in examples/*/main.v docs/_includes/tutorials/*.v; do
             echo "::group::Compile and run $example"
             output="/tmp/langchainv-example-$(basename "$(dirname "$example")")"
             v -o "$output" "$example"
