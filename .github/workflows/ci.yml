@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: langchainv
+          persist-credentials: false
 
       - name: Check out pinned V compiler
         uses: actions/checkout@v7
@@ -31,6 +32,7 @@ jobs:
           repository: vlang/v
           ref: ${{ env.V_COMPILER_REF }}
           path: vlang
+          persist-credentials: false
 
       - name: Cache pinned V compiler
         id: v-compiler-cache
