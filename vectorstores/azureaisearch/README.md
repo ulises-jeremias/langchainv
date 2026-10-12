@@ -34,7 +34,7 @@ curl --fail-with-body --request PUT \
   "fields": [
     { "name": "id", "type": "Edm.String", "key": true },
     { "name": "content", "type": "Edm.String", "searchable": true, "retrievable": true },
-    { "name": "contentVector", "type": "Collection(Edm.Single)", "searchable": true, "dimensions": 1536, "vectorSearchProfile": "knowledge-vector-profile" },
+    { "name": "contentVector", "type": "Collection(Edm.Single)", "searchable": true, "retrievable": true, "dimensions": 1536, "vectorSearchProfile": "knowledge-vector-profile" },
     { "name": "metadata", "type": "Edm.String", "retrievable": true },
     { "name": "namespace", "type": "Edm.String", "filterable": true, "retrievable": true }
   ],
