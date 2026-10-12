@@ -8,10 +8,13 @@ configure indexes.
 
 The adapter supports upserts of up to 64 documents per request, vector query,
 namespace isolation, metadata equality filters, minimum-score filtering, and
-deletion by ID. Request and response bodies are capped at 4 MiB. Content and
-metadata are checked before embedding. Pinecone metadata values are limited to
-JSON scalars and string arrays; page content is stored under a reserved key and
-removed when documents are returned. Tests use an injected HTTP transport.
+deletion by ID. Set `SearchOptions.include_vectors` to request returned values
+in `schema.Document.embedding`; the default omits vector payloads. Returned
+vectors are validated for numeric values and size. Request and response bodies
+are capped at 4 MiB. Content and metadata are checked before embedding. Pinecone
+metadata values are limited to JSON scalars and string arrays; page content is
+stored under a reserved key and removed when documents are returned. Tests use
+an injected HTTP transport.
 
 ```v wip
 mut store := pinecone.new_store(embedder, pinecone.Options{
@@ -21,5 +24,5 @@ mut store := pinecone.new_store(embedder, pinecone.Options{
 ```
 
 Index creation and administration, text-search integrated inference, sparse or
-hybrid vectors, metadata-filter operators beyond equality, and returning stored
-vector values remain unsupported.
+hybrid vectors, and metadata-filter operators beyond equality remain
+unsupported.

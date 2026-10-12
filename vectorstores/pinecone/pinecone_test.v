@@ -103,6 +103,43 @@ fn test_pinecone_query_restores_content_filters_and_score() {
 	assert state.requests[0].body.contains('tenant-1')
 }
 
+fn test_pinecone_query_returns_vectors_when_requested() {
+	mut state := &PineconeFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"matches":[{"id":"vec-1","score":0.91,"metadata":{"_langchainv_page_content":"answer"},"values":[0.4,0.6]}]}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 3, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.4), f32(0.6)]
+	assert state.requests[0].body.contains('"includeValues":true')
+}
+
+fn test_pinecone_rejects_non_numeric_returned_vector_values() {
+	mut state := &PineconeFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"matches":[{"id":"vec-1","score":0.91,"metadata":{"_langchainv_page_content":"answer"},"values":[0.4,"bad"]}]}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('finite numbers')
+		return
+	}
+	assert false, 'expected malformed Pinecone vector to fail'
+}
+
 fn test_pinecone_deletes_ids_from_namespace() {
 	mut state := &PineconeFixtureState{
 		responses: [httputil.Response{
