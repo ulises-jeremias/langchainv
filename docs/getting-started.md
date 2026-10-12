@@ -44,10 +44,10 @@ import ulises_jeremias.langchainv.textsplitter
 
 fn main() {
 	text := 'First paragraph.\n\nSecond paragraph with more detail.'
-		splitter := textsplitter.new_recursive_character_text_splitter(
-			chunk_size:    32
-			chunk_overlap: 6
-		) or { panic(err) }
+	splitter := textsplitter.new_recursive_character_text_splitter(
+		chunk_size:    32
+		chunk_overlap: 6
+	) or { panic(err) }
 	for chunk in splitter.split_text(text) or { panic(err) } {
 		println(chunk)
 	}

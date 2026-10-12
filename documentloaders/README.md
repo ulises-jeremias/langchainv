@@ -87,7 +87,7 @@ import ulises_jeremias.langchainv.documentloaders
 
 mut ctx := context.background()
 loader := documentloaders.new_recursive_directory_loader(
-	root: 'docs'
+	root:               'docs'
 	allowed_extensions: ['md', 'txt']
 )!
 documents := loader.load(mut ctx)!
