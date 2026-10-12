@@ -57,7 +57,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 | MariaDB Vector | [MariaDB](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/mariadb/README.md) |
 | Milvus | [Milvus](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/milvus/README.md) |
 | OpenSearch | [OpenSearch](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/opensearch/README.md) |
-| PostgreSQL with pgvector | [pgvector](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/pgvector/README.md) |
+| PostgreSQL, Cloud SQL for PostgreSQL, or AlloyDB with pgvector | [pgvector](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/pgvector/README.md) |
 | Pinecone | [Pinecone](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/pinecone/README.md) |
 | Redis Stack | [Redis](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/redis/README.md) |
 | Qdrant | [Qdrant](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/qdrant/README.md) |

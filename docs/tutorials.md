@@ -41,6 +41,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Generate chat completions | [OpenAI](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md), [Ollama](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md), or another provider README | Provider options and streaming support differ. |
 | Embed documents | [embeddings](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) | Select a provider and inspect its batch and input limits. |
 | Retrieve from a vector database | [vectorstores](https://github.com/ulises-jeremias/langchainv/tree/main/vectorstores) | Several adapters require an existing index or collection. |
+| Use Cloud SQL for PostgreSQL or AlloyDB for vectors | [pgvector adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/pgvector/README.md#cloud-sql-and-alloydb) | Supply a compatible PostgreSQL engine and provision the vector schema; Cloud-specific connection, auth, and embedding features are outside the adapter. |
 | Load files | [documentloaders](https://github.com/ulises-jeremias/langchainv/blob/main/documentloaders/README.md) | Limits and external runtime requirements are documented per loader. |
 | Add SQL tools | [SQL database tools](https://github.com/ulises-jeremias/langchainv/blob/main/tools/sqldatabase/README.md) | Use parameterized queries and least-privilege credentials. |
 

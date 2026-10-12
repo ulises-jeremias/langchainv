@@ -25,6 +25,24 @@ CREATE INDEX langchainv_documents_embedding_hnsw
     ON langchainv_documents USING hnsw (embedding vector_cosine_ops);
 ```
 
+## Cloud SQL and AlloyDB
+
+This same adapter can use a PostgreSQL-compatible `sqldatabase.Engine` that
+connects to Cloud SQL for PostgreSQL or AlloyDB, provided the database has the
+`vector` extension enabled and the table follows the schema above. Google
+documents `pgvector` support in [Cloud SQL for PostgreSQL](https://docs.cloud.google.com/sql/docs/postgres/generate-manage-vector-embeddings)
+and the [AlloyDB vector extension](https://docs.cloud.google.com/alloydb/docs/ai/store-embeddings).
+
+Connection setup, network configuration, and database/index provisioning remain
+the application's responsibility; follow the official [Cloud SQL connection
+guide](https://cloud.google.com/sql/docs/postgres/connect-overview) or
+[AlloyDB connection overview](https://docs.cloud.google.com/alloydb/docs/connection-overview).
+This adapter does not invoke Cloud SQL's
+`google_ml_integration` or AlloyDB AI embedding functions; provide an
+`embeddings.Embedder` and an already-connected SQL engine. It uses pgvector
+cosine operators and does not expose provider-specific indexing or query
+features.
+
 Choose the vector dimension to match the embedder. Field and table names are
 configurable simple SQL identifiers; they are quoted in generated SQL. Writes
 use parameterized multi-row inserts, searches use the pgvector cosine-distance
