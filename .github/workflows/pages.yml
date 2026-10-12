@@ -5,14 +5,22 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'llms/**'
+      - 'embeddings/**'
+      - 'vectorstores/**'
       - 'README.md'
       - 'examples/README.md'
+      - 'scripts/check_provider_catalog.py'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'docs/**'
+      - 'llms/**'
+      - 'embeddings/**'
+      - 'vectorstores/**'
       - 'README.md'
       - 'examples/README.md'
+      - 'scripts/check_provider_catalog.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -36,6 +44,8 @@ jobs:
         with:
           source: ./docs
           destination: ./_site
+      - name: Check provider catalog
+        run: python3 scripts/check_provider_catalog.py
       - name: Check generated site links
         run: python3 scripts/check_site_links.py _site --baseurl /langchainv
       - name: Upload Pages artifact
