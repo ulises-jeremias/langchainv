@@ -138,8 +138,9 @@ embeddings on similarity queries. Qdrant — partial: REST
 create/delete and upsert/query/delete for single-vector cosine collections,
 API-key or HTTPS authentication, payload metadata filters, namespaces, injected
 embeddings/transport, and bounded requests with preflight embedding-dimension
-validation for newly created collections; named or multi-vector search, the
-full filter DSL, custom point IDs, and vector return remain outstanding.
+validation for newly created collections; `SearchOptions.include_vectors`
+returns validated vectors from single-vector collections. Named or multi-vector
+search, the full filter DSL, and custom point IDs remain outstanding.
 Pinecone — partial: HTTPS upsert/query/delete against
 provisioned index hosts, API-key auth, namespaces, scalar metadata equality
 filters, injected embeddings/transport, and bounded requests; index management,

@@ -15,6 +15,7 @@ import ulises_jeremias.langchainv.vectorstores
 const max_documents_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
+const max_embedding_values = 65536
 
 // Store writes embeddings and payloads to one Qdrant collection.
 pub struct Store {
@@ -192,9 +193,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('Qdrant query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Qdrant adapter does not expose stored vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy != 'cosine' {
 		return error('Qdrant score filtering currently supports cosine similarity only')
 	}
@@ -219,6 +217,9 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		'query':        json2.Any(query_values)
 		'limit':        json2.Any(limit)
 		'with_payload': json2.Any(true)
+	}
+	if options.include_vectors {
+		request['with_vector'] = json2.Any(true)
 	}
 	filter := make_filter(options.filter, options.namespace)
 	if filter.len > 0 {
@@ -265,10 +266,26 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			vector_any := fields['vector'] or { return error('Qdrant point is missing vector') }
+			if vector_any !is []json2.Any {
+				return error('Qdrant returned an unsupported vector shape')
+			}
+			vector_values := vector_any as []json2.Any
+			if vector_values.len == 0 || vector_values.len > max_embedding_values {
+				return error('Qdrant returned an empty or oversized vector')
+			}
+			embedding = []f32{cap: vector_values.len}
+			for value in vector_values {
+				embedding << qdrant_vector_float(value)!
+			}
+		}
 		documents << schema.Document{
 			page_content: content_any as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents
@@ -411,4 +428,21 @@ fn any_float(value json2.Any) !f32 {
 		return f32(value as int)
 	}
 	return error('Qdrant score must be a finite number')
+}
+
+fn qdrant_vector_float(value json2.Any) !f32 {
+	if value is f64 {
+		number := value as f64
+		converted := f32(number)
+		if math.is_finite(number) && math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	if value is int {
+		converted := f32(value as int)
+		if math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	return error('Qdrant vector values must be finite numbers')
 }
