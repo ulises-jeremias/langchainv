@@ -109,6 +109,43 @@ fn test_tool_calling_agent_maps_text_to_finish() {
 	}
 }
 
+fn test_openai_functions_agent_uses_default_keys_and_custom_messages() {
+	mut state := &FixtureModelState{
+		responses: [llms.Response{
+			choices: [llms.Choice{
+				content: 'final answer'
+			}]
+		}]
+	}
+	agent := new_openai_functions_agent(FixtureModel{
+		state: state
+	}, [ToolCallingEchoTool{}], OpenAIFunctionsAgentOptions{
+		system_prompt:  'Use the available functions when needed.'
+		extra_messages: [schema.text_message(.ai, 'Earlier assistant guidance.')]
+		call_options:   llms.CallOptions{
+			max_tokens: 32
+		}
+	}) or { panic(err) }
+	assert agent.input_keys() == ['input']
+	assert agent.output_keys() == ['output']
+	assert agent.get_tools().len == 1
+	mut ctx := context.background()
+	result := agent.plan(mut ctx, [], {
+		'input': 'say hello'
+	}, llms.CallOptions{}) or { panic(err) }
+	assert state.messages[0].len == 3
+	assert state.messages[0][0].text().contains('Use the available functions')
+	assert state.messages[0][1].text() == 'Earlier assistant guidance.'
+	assert state.messages[0][2].text() == 'input: say hello'
+	assert state.options[0].tools.len == 1
+	assert state.options[0].max_tokens == 32
+	if finish := result.finish {
+		assert (finish.return_values['output'] or { panic('missing output') }) == json2.Any('final answer')
+	} else {
+		assert false, 'expected a final answer'
+	}
+}
+
 fn test_tool_calling_agent_replays_tool_history_through_executor() {
 	mut state := &FixtureModelState{
 		responses: [

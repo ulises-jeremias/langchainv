@@ -13,6 +13,13 @@ tool results. Single-string calls encoded as `{"__arg1":"..."}` are passed
 to the tool as the inner string. Its tests use a fake model and never make
 provider requests.
 
+`new_openai_functions_agent` is a preset over the same provider-neutral model
+contract. Its default keys are `input` and `output`; configure other keys,
+system instructions, fixed extra messages, and model options through
+`OpenAIFunctionsAgentOptions`. Tool schemas come from each `ToolSpec`, so the
+preset preserves structured parameters instead of reducing every tool to a
+single string argument. Provider adapters must support function/tool calls.
+
 `new_react_agent` creates a text-based MRKL/ReAct agent around an
 `llms.CompletionModel`. Its prompt lists registered tools and prior
 Thought/Action/Observation steps. It parses either an Action/Action Input pair
@@ -34,6 +41,6 @@ agent can recover. Cancellation is checked between planning and tool calls.
 Callbacks receive agent actions/finishes and tool start/end/error events.
 
 Set `return_intermediate_steps` to add an `intermediate_steps` JSON value to
-the result. Agent setup remains explicit: there is no provider-specific OpenAI
-functions preset or automatic tool discovery. Tests use deterministic fake
-agents, models, and tools; no provider API is called.
+the result. Agent setup remains explicit; there is no automatic tool
+discovery. Tests use deterministic fake agents, models, and tools; no provider
+API is called.

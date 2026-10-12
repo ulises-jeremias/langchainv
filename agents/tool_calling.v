@@ -9,21 +9,23 @@ import ulises_jeremias.langchainv.tools
 // ToolCallingAgent turns model tool-call responses into executor actions.
 pub struct ToolCallingAgent {
 pub:
-	model        llms.Model
-	agent_tools  []tools.Tool
-	keys         []string
-	result_key   string
-	instructions string
-	call_options llms.CallOptions
+	model          llms.Model
+	agent_tools    []tools.Tool
+	keys           []string
+	result_key     string
+	instructions   string
+	extra_messages []schema.Message
+	call_options   llms.CallOptions
 }
 
 // ToolCallingAgentOptions configures prompts, inputs, output, and model options.
 pub struct ToolCallingAgentOptions {
 pub:
-	input_keys    []string
-	output_key    string = 'output'
-	system_prompt string
-	call_options  llms.CallOptions
+	input_keys     []string
+	output_key     string = 'output'
+	system_prompt  string
+	extra_messages []schema.Message
+	call_options   llms.CallOptions
 }
 
 // new_tool_calling_agent validates and constructs a provider-neutral tool agent.
@@ -50,12 +52,13 @@ pub fn new_tool_calling_agent(model llms.Model, agent_tools []tools.Tool, option
 		seen_tools[name.to_lower()] = true
 	}
 	return ToolCallingAgent{
-		model:        model
-		agent_tools:  agent_tools.clone()
-		keys:         options.input_keys.clone()
-		result_key:   options.output_key.trim_space()
-		instructions: options.system_prompt
-		call_options: options.call_options
+		model:          model
+		agent_tools:    agent_tools.clone()
+		keys:           options.input_keys.clone()
+		result_key:     options.output_key.trim_space()
+		instructions:   options.system_prompt
+		extra_messages: options.extra_messages.clone()
+		call_options:   options.call_options
 	}
 }
 
@@ -72,6 +75,9 @@ pub fn (agent ToolCallingAgent) plan(mut ctx context.Context, steps []schema.Age
 		instruction += '\n- ${spec.name}: ${spec.description}'
 	}
 	messages << schema.text_message(.system, instruction)
+	for message in agent.extra_messages {
+		messages << message
+	}
 	mut input_keys := inputs.keys()
 	input_keys.sort()
 	mut prompt_lines := []string{}

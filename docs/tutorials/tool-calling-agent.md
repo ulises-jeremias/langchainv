@@ -6,10 +6,12 @@ permalink: /tutorials/tool-calling-agent/
 
 # Build a tool-calling agent
 
-A tool-calling model proposes a named tool and JSON arguments. The executor
+A function-calling model proposes a named tool and JSON arguments. The executor
 looks up that tool, runs it, sends the result back to the model, and stops when
 the model returns text. The example uses the bounded calculator and a staged
-fake model, so it runs offline and never calls a provider.
+fake model with `new_openai_functions_agent`, so it runs offline and never
+calls a provider. The preset accepts any `llms.Model` adapter that supports
+function/tool calls.
 
 ## Run the example
 
@@ -25,7 +27,7 @@ uses the public `llms.Model` contract as a provider adapter.
 
 ## Understand the boundaries
 
-- `new_tool_calling_agent` supplies the model with the tool name, description,
+- `new_openai_functions_agent` supplies the model with the tool name, description,
   parameter schema, input question, and previous tool results. When a model
   requests several tools in one response, the next model request replays the
   grouped calls before their corresponding results.

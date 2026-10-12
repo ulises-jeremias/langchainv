@@ -56,7 +56,7 @@ fn main() {
 	model := DemoModel{
 		state: &DemoModelState{}
 	}
-	agent := agents.new_tool_calling_agent(model, [tools.new_calculator()], agents.ToolCallingAgentOptions{
+	agent := agents.new_openai_functions_agent(model, [tools.new_calculator()], agents.OpenAIFunctionsAgentOptions{
 		input_keys:    ['question']
 		system_prompt: 'Use the calculator when a question needs arithmetic.'
 	}) or { panic(err) }
