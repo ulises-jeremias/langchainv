@@ -23,17 +23,19 @@ inventory before a release.
   that key in its conversational retrieval chain output contract.
 - Anthropic now emits its generation-end callback on successful legacy and
   Messages API responses. LangChainV has lifecycle event contracts and
-  streaming callbacks, but its provider adapters are not yet wired to dispatch
-  the full model start/end/error lifecycle through `callbacks`.
+  streaming callbacks. Its provider adapters do not all expose lifecycle
+  callbacks, but `llms/middleware.CallbackModel` can dispatch start/end/error
+  events around any `llms.Model` implementation.
 - Mistral now returns distinct empty/multiple-choice errors, invokes the
   configured callback handler, and exposes usage through the same token-count
   keys as other providers. LangChainV normalizes token usage into
-  `llms.Usage`; callback lifecycle wiring remains a cross-provider gap.
+  `llms.Usage`; its generic model middleware provides lifecycle events when an
+  adapter does not expose its own callback configuration.
 - The upstream compliance helper recognizes more provider usage key spellings
   and integer types; its reusable `MockLLM` is now concurrency-safe. LangChainV
-  currently has opt-in live model contract checks and deterministic fixtures
-  in package tests, but no exported, concurrency-safe mock model in
-  `testing/llmtest`.
+  has opt-in live model contract checks and `testing/llmtest.MockModel`, a
+  reusable, concurrency-safe fake that snapshots responses and can supply
+  deterministic errors and streaming output.
 - The remaining changes in this range are mainly dependency/example refreshes,
   replay-fixture adjustments, and test robustness fixes; they do not add a new
   upstream framework package.
