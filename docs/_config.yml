@@ -1,0 +1,11 @@
+title: LangChainV
+description: Build composable LLM applications in V.
+url: https://ulises-jeremias.github.io
+baseurl: /langchainv
+markdown: kramdown
+permalink: pretty
+exclude:
+  - README.md
+  - IMPLEMENTATION_PLAN.md
+  - LANGCHAINGO_PARITY.md
+  - VLIB_CATALOG.md

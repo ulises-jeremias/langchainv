@@ -9,6 +9,13 @@ matrix in [`docs/LANGCHAINGO_PARITY.md`](docs/LANGCHAINGO_PARITY.md) is the
 source of truth for supported and outstanding features. A package is supported
 only when its implementation and documented validation are complete.
 
+## Documentation
+
+Visit the [LangChainV documentation site](https://ulises-jeremias.github.io/langchainv/)
+for the quick start, tutorials, component map, and compatibility reference.
+The [`examples/`](examples/) directory contains standalone programs; the
+[example catalog](examples/README.md) lists their requirements.
+
 ## Install
 
 ```sh
