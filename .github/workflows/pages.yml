@@ -42,6 +42,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          path: langchainv
           persist-credentials: false
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -69,21 +70,22 @@ jobs:
           ./vlang/v version
       - name: Generate searchable API reference
         run: |
+          cd langchainv
           mkdir -p docs/api
           v doc -f html -m -readme -no-timestamp -o docs/api .
       - name: Build site
         uses: actions/jekyll-build-pages@v1
         with:
-          source: ./docs
+          source: ./langchainv/docs
           destination: ./_site
       - name: Check provider catalog
-        run: python3 scripts/check_provider_catalog.py
+        run: python3 langchainv/scripts/check_provider_catalog.py
       - name: Check generated API reference
         run: |
           test -s _site/api/index.html
           test -s _site/api/search_index.js
       - name: Check generated site links
-        run: python3 scripts/check_site_links.py _site --baseurl /langchainv
+        run: python3 langchainv/scripts/check_site_links.py _site --baseurl /langchainv
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
