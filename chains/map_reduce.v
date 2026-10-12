@@ -10,6 +10,7 @@ const default_map_reduce_map_variable = 'context'
 const default_map_reduce_reduce_variable = 'input_documents'
 const default_map_reduce_max_documents = 128
 const default_map_reduce_max_bytes = 1048576
+const default_map_reduce_max_concurrency = 1
 const map_reduce_intermediate_steps_key = 'intermediate_steps'
 
 // MapReduceDocumentsOptions configures the inputs, limits, memory and outputs.
@@ -20,6 +21,7 @@ pub:
 	reduce_document_variable  string = default_map_reduce_reduce_variable
 	max_documents             int    = 16
 	max_document_bytes        int    = 65536
+	max_concurrency           int    = default_map_reduce_max_concurrency
 	return_intermediate_steps bool
 	memory                    ?schema.Memory
 }
@@ -45,6 +47,9 @@ pub fn new_map_reduce_documents_chain(map_chain LLMChain, reduce_chain Chain, op
 	}
 	if options.max_documents <= 0 || options.max_documents > default_map_reduce_max_documents {
 		return error('map-reduce max_documents must be between 1 and 128')
+	}
+	if options.max_concurrency <= 0 || options.max_concurrency > max_document_map_concurrency {
+		return error('map-reduce max_concurrency must be between 1 and 5')
 	}
 	if options.max_document_bytes <= 0 || options.max_document_bytes > default_map_reduce_max_bytes {
 		return error('map-reduce max_document_bytes must be between 1 and 1048576')
@@ -162,7 +167,7 @@ fn read_map_reduce_documents(value json2.Any, max_documents int, max_bytes int) 
 	return documents
 }
 
-// call maps documents in order, then passes the mapped documents to the reducer.
+// call maps documents, then passes ordered mapped results to the reducer.
 pub fn (chain MapReduceDocumentsChain) call(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
 	document_value := inputs[chain.options.input_key] or {
 		return error('missing map-reduce input `${chain.options.input_key}`')
@@ -172,33 +177,35 @@ pub fn (chain MapReduceDocumentsChain) call(mut ctx context.Context, inputs map[
 	mut mapped_documents := []schema.Document{cap: documents.len}
 	mut intermediate_steps := []json2.Any{cap: documents.len}
 	mut mapped_bytes := 0
-	for document in documents {
-		ctx_error := ctx.err()
-		if ctx_error !is none {
-			return ctx_error
+	mut first_index := 0
+	for first_index < documents.len {
+		map_results := map_document_batch(mut ctx, chain.map_chain, inputs,
+			chain.options.input_key, chain.map_variable, documents, first_index,
+			chain.options.max_concurrency)!
+		for offset, map_result in map_results {
+			index := first_index + offset
+			document := documents[index]
+			map_outputs := map_result.outputs
+			mapped_value := map_outputs[chain.map_chain.output_key] or {
+				return error('map-reduce map chain did not produce `${chain.map_chain.output_key}`')
+			}
+			if mapped_value !is string {
+				return error('map-reduce map chain output must be a string')
+			}
+			mapped_content := mapped_value as string
+			if mapped_content.len > chain.options.max_document_bytes - mapped_bytes {
+				return error('map-reduce outputs exceed the configured byte limit')
+			}
+			mapped_bytes += mapped_content.len
+			mapped_documents << schema.Document{
+				page_content: mapped_content
+				metadata:     document.metadata.clone()
+			}
+			if chain.options.return_intermediate_steps {
+				intermediate_steps << json2.Any(map_outputs)
+			}
 		}
-		mut map_inputs := copy_chain_values(inputs)
-		map_inputs.delete(chain.options.input_key)
-		map_inputs[chain.map_variable] = json2.Any(document.page_content)
-		map_outputs := chain.map_chain.call(mut ctx, map_inputs)!
-		mapped_value := map_outputs[chain.map_chain.output_key] or {
-			return error('map-reduce map chain did not produce `${chain.map_chain.output_key}`')
-		}
-		if mapped_value !is string {
-			return error('map-reduce map chain output must be a string')
-		}
-		mapped_content := mapped_value as string
-		if mapped_content.len > chain.options.max_document_bytes - mapped_bytes {
-			return error('map-reduce outputs exceed the configured byte limit')
-		}
-		mapped_bytes += mapped_content.len
-		mapped_documents << schema.Document{
-			page_content: mapped_content
-			metadata:     document.metadata.clone()
-		}
-		if chain.options.return_intermediate_steps {
-			intermediate_steps << json2.Any(map_outputs)
-		}
+		first_index += map_results.len
 	}
 	mut reduce_inputs := copy_chain_values(inputs)
 	reduce_inputs.delete(chain.options.input_key)

@@ -10,20 +10,32 @@ and oversized contexts fail before the model call.
 
 `new_map_reduce_documents_chain` maps each bounded input document through an
 `LLMChain`, retains its metadata, and passes the mapped documents to a reducer
-chain. It runs maps sequentially, checks cancellation between documents, and
-can return each map result as `intermediate_steps`. `MapReduceDocumentsOptions`
-sets the document key, map and reduce prompt variables, document count and byte
-caps, optional memory, and intermediate-step output. The default caps are 16
-documents and 64 KiB of source and combined mapped text; configured caps are
-limited to 128 documents and 1 MiB. The reducer determines the final outputs.
+chain. Set `MapReduceDocumentsOptions.max_concurrency` from 1 to 5 to map
+documents concurrently; it defaults to 1. The returned documents and optional
+`intermediate_steps` stay in input order. Models, callbacks, and context values
+used by concurrent calls must support concurrent access. If a worker fails, the
+chain waits for the current bounded batch to finish and returns the error from
+the earliest document in input order. Parent cancellation is checked before
+each batch and after its workers finish. The chain validates mapped output only
+after the batch finishes, so calls already started in a batch may complete
+before an invalid or oversized result is reported. It starts no later batch
+after an error. The options also set the document key, map and reduce prompt
+variables, document count and byte caps, optional memory, and intermediate-step
+output. The default caps are 16 documents and 64 KiB of source and combined
+mapped text; configured caps are limited to 128 documents and 1 MiB. The
+reducer determines the final outputs.
 
 `new_map_rerank_documents_chain` runs an `LLMChain` once per document and
 expects each completion to contain an answer followed by `Score: <integer>`.
 It sorts results by descending score, returns the best answer under the LLM
 chain's output key, and can include sorted `{answer, score}` intermediate
-steps. It runs sequentially and uses the same default and maximum document
-count and byte caps as map-reduce. Invalid output or non-integer scores fail the
-call.
+steps. Set `MapRerankDocumentsOptions.max_concurrency` from 1 to 5 to map
+documents concurrently; it defaults to 1. Tied scores keep their input order.
+Models, callbacks, and context values used by concurrent calls must support
+concurrent access. The chain waits for each current batch before parsing its
+results, so other started calls may finish before invalid output or a
+non-integer score fails the call. It starts no later batch after an error. It
+uses the same default and maximum document count and byte caps as map-reduce.
 
 `new_refine_documents_chain` formats the first document, creates an initial
 answer, then calls a second `LLMChain` with the previous answer and each later

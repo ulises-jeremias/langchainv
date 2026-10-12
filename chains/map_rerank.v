@@ -13,6 +13,7 @@ const default_map_rerank_answer_key = 'answer'
 const map_rerank_intermediate_steps_key = 'intermediate_steps'
 const map_rerank_max_documents = 128
 const map_rerank_max_document_bytes = 1048576
+const default_map_rerank_max_concurrency = 1
 
 // MapRerankDocumentsOptions configures prompt variables, ranked outputs, and limits.
 pub struct MapRerankDocumentsOptions {
@@ -24,6 +25,7 @@ pub:
 	return_intermediate_steps bool
 	max_documents             int = 16
 	max_document_bytes        int = 65536
+	max_concurrency           int = default_map_rerank_max_concurrency
 }
 
 // MapRerankDocumentsChain ranks each document independently with an LLMChain.
@@ -53,6 +55,9 @@ pub fn new_map_rerank_documents_chain(llm_chain LLMChain, options MapRerankDocum
 	}
 	if options.max_documents <= 0 || options.max_documents > map_rerank_max_documents {
 		return error('map-rerank max_documents must be between 1 and 128')
+	}
+	if options.max_concurrency <= 0 || options.max_concurrency > max_document_map_concurrency {
+		return error('map-rerank max_concurrency must be between 1 and 5')
 	}
 	if options.max_document_bytes <= 0 || options.max_document_bytes > map_rerank_max_document_bytes {
 		return error('map-rerank max_document_bytes must be between 1 and 1048576')
@@ -112,7 +117,7 @@ fn map_rerank_step(result RankedMapRerankResult, options MapRerankDocumentsOptio
 	})
 }
 
-// call maps documents in order and returns the answer with the highest score.
+// call maps documents and returns the answer with the highest score.
 pub fn (chain MapRerankDocumentsChain) call(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
 	document_value := inputs[chain.options.input_key] or {
 		return error('missing map-rerank input `${chain.options.input_key}`')
@@ -123,31 +128,31 @@ pub fn (chain MapRerankDocumentsChain) call(mut ctx context.Context, inputs map[
 		return error('map-rerank input must contain at least one document')
 	}
 	mut ranked_results := []RankedMapRerankResult{cap: documents.len}
-	for document in documents {
-		ctx_error := ctx.err()
-		if ctx_error !is none {
-			return ctx_error
-		}
-		mut map_inputs := copy_chain_values(inputs)
-		map_inputs.delete(chain.options.input_key)
-		map_inputs[chain.map_variable] = json2.Any(document.page_content)
-		map_outputs := chain.llm_chain.call(mut ctx, map_inputs)!
-		output_value := map_outputs[chain.llm_chain.output_key] or {
-			return error('map-rerank LLM chain did not produce `${chain.llm_chain.output_key}`')
-		}
-		if output_value !is string {
-			return error('map-rerank LLM chain output must be a string')
-		}
-		result := parse_map_rerank_result(output_value as string, chain.options.answer_key,
-			chain.options.rank_key)!
-		mut insert_at := ranked_results.len
-		for index, existing in ranked_results {
-			if result.score > existing.score {
-				insert_at = index
-				break
+	mut first_index := 0
+	for first_index < documents.len {
+		map_results := map_document_batch(mut ctx, chain.llm_chain, inputs,
+			chain.options.input_key, chain.map_variable, documents, first_index,
+			chain.options.max_concurrency)!
+		for map_result in map_results {
+			map_outputs := map_result.outputs
+			output_value := map_outputs[chain.llm_chain.output_key] or {
+				return error('map-rerank LLM chain did not produce `${chain.llm_chain.output_key}`')
 			}
+			if output_value !is string {
+				return error('map-rerank LLM chain output must be a string')
+			}
+			result := parse_map_rerank_result(output_value as string, chain.options.answer_key,
+				chain.options.rank_key)!
+			mut insert_at := ranked_results.len
+			for index, existing in ranked_results {
+				if result.score > existing.score {
+					insert_at = index
+					break
+				}
+			}
+			ranked_results.insert(insert_at, result)
 		}
-		ranked_results.insert(insert_at, result)
+		first_index += map_results.len
 	}
 	mut outputs := map[string]json2.Any{}
 	outputs[chain.llm_chain.output_key] = json2.Any(ranked_results[0].answer)
