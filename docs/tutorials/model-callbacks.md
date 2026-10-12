@@ -46,6 +46,13 @@ Completion APIs emit `llm_start` with the prompt and then
 propagate unchanged.
 
 ```v
+import context
+import os
+import ulises_jeremias.langchainv.callbacks
+import ulises_jeremias.langchainv.llms
+import ulises_jeremias.langchainv.llms.middleware
+import ulises_jeremias.langchainv.llms.openai
+
 fn completion_example() {
 	client := openai.new_default_client(os.getenv('OPENAI_API_KEY')) or { panic(err) }
 	mut completion_model := middleware.with_completion_callbacks(llms.CompletionModel(client),
