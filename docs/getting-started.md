@@ -35,6 +35,10 @@ v run examples/text_splitter/main.v
 
 The example needs no API key and makes no network calls. It shows recursive character splitting and Markdown-aware chunking. Chunk boundaries prefer paragraphs, lines and words, with a Unicode-aware fallback.
 
+To make a live chat request after the offline example, follow the
+[first chat tutorial](../tutorials/first-chat/). It requires an OpenAI API key
+and may incur provider charges.
+
 ## Create your own splitter
 
 ```v
