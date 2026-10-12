@@ -407,13 +407,13 @@ fn valid_token(value string, allow_prefix_chars bool) bool {
 }
 
 fn escape_tag(value string) string {
-	mut escaped := ''
+	mut escaped := []u8{cap: value.len}
 	for ch in value.bytes() {
 		if ch in [`\\`, `,`, `.`, `<`, `>`, `{`, `}`, `[`, `]`, `"`, `'`, `:`, `;`, `!`, `@`, `#`,
 			`$`, `%`, `^`, `&`, `*`, `(`, `)`, `-`, `+`, `=`, `~`, `|`, ` `] {
-			escaped += '\\'
+			escaped << `\\`
 		}
-		escaped += ch.ascii_str()
+		escaped << ch
 	}
-	return escaped
+	return escaped.bytestr()
 }

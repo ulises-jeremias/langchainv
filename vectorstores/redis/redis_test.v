@@ -50,7 +50,7 @@ fn test_redis_add_documents_writes_bounded_hash_records() {
 	mut document := schema.new_document('stored text')
 	document.metadata['kind'] = json2.Any('guide')
 	ids := store.add_documents(mut ctx, [document], vectorstores.StoreOptions{
-		namespace: 'tenant-1'
+		namespace: 'ténant-1'
 	}) or { panic(err) }
 	assert ids.len == 1
 	assert ids[0].starts_with('doc:langchainv:')
@@ -100,7 +100,7 @@ fn test_redis_search_parses_score_metadata_and_escapes_filter_values() {
 	assert command[0] == 'FT.SEARCH'
 	assert command[1] == 'langchainv_idx'
 	assert command[2].contains('@lcg_source:{langchainv}')
-	assert command[2].contains('@namespace:{tenant\\-1}')
+	assert command[2].contains('@namespace:{ténant\\-1}')
 	assert command[2].contains('@meta_kind:{' + escape_tag('"guide / *"') + '}')
 	assert command.contains('DIALECT')
 	assert command[17].len == 8
