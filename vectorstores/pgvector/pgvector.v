@@ -158,9 +158,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('pgvector query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('pgvector adapter does not expose vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy.to_lower() != 'cosine' {
 		return error('pgvector adapter supports cosine distance only')
 	}
@@ -210,18 +207,33 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	parameters << limit.str()
 	limit_param := parameters.len
 	distance := '${quote(store.vector_column)} <=> $1::vector'
-	statement := 'WITH matches AS MATERIALIZED (SELECT ${quote(store.id_column)}::text AS id, ${quote(store.text_column)} AS page_content, ${quote(store.metadata_column)}::text AS metadata_json, 1 - (${distance}) AS score, ${distance} AS distance, sum(octet_length(${quote(store.id_column)}::text) + octet_length(${quote(store.text_column)}) + octet_length(${quote(store.metadata_column)}::text) + 256) OVER (ORDER BY ${distance} ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM ${quote(store.table)} WHERE ${where_clause} ORDER BY ${distance} ASC LIMIT $${limit_param}::int) SELECT id, page_content, metadata_json, score FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
+	vector_selection := if options.include_vectors {
+		', ${quote(store.vector_column)}::text AS embedding_text'
+	} else {
+		''
+	}
+	vector_size := if options.include_vectors {
+		' + octet_length(${quote(store.vector_column)}::text)'
+	} else {
+		''
+	}
+	vector_result := if options.include_vectors { ', embedding_text' } else { '' }
+	statement := 'WITH matches AS MATERIALIZED (SELECT ${quote(store.id_column)}::text AS id, ${quote(store.text_column)} AS page_content, ${quote(store.metadata_column)}::text AS metadata_json, 1 - (${distance}) AS score, ${distance} AS distance${vector_selection}, sum(octet_length(${quote(store.id_column)}::text) + octet_length(${quote(store.text_column)}) + octet_length(${quote(store.metadata_column)}::text) + 256${vector_size}) OVER (ORDER BY ${distance} ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM ${quote(store.table)} WHERE ${where_clause} ORDER BY ${distance} ASC LIMIT $${limit_param}::int) SELECT id, page_content, metadata_json, score${vector_result} FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
 	result := store.engine.query_params(mut ctx, statement, parameters)!
 	if result.rows.len > limit {
 		return error('pgvector returned more rows than requested')
 	}
 	mut documents := []schema.Document{cap: result.rows.len}
 	mut response_bytes := 0
+	required_columns := if options.include_vectors { 5 } else { 4 }
 	for row in result.rows {
-		if row.len < 4 {
+		if row.len < required_columns {
 			return error('pgvector returned a malformed search row')
 		}
 		response_bytes += row[0].len + row[1].len + row[2].len + row[3].len + 256
+		if options.include_vectors {
+			response_bytes += row[4].len
+		}
 		if response_bytes > max_payload_bytes {
 			return error('pgvector search response exceeds 4 MiB')
 		}
@@ -235,10 +247,15 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if options.min_score != none && score < f64(options.min_score or { f32(0) }) {
 			continue
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			embedding = parse_vector_text(row[4])!
+		}
 		documents << schema.Document{
 			page_content: row[1]
 			metadata:     if options.include_metadata { metadata } else { map[string]json2.Any{} }
 			score:        f32(score)
+			embedding:    embedding
 		}
 	}
 	return documents
@@ -296,6 +313,33 @@ fn parameters_bytes(parameters []string) int {
 
 fn quote(identifier string) string {
 	return '"${identifier}"'
+}
+
+fn parse_vector_text(value string) ![]f32 {
+	text := value.trim_space()
+	if !text.starts_with('[') || !text.ends_with(']') {
+		return error('pgvector returned a malformed vector literal')
+	}
+	contents := text[1..text.len - 1].trim_space()
+	if contents == '' {
+		return error('pgvector returned an empty vector')
+	}
+	parts := contents.split(',')
+	if parts.len > max_embedding_values {
+		return error('pgvector returned an oversized vector')
+	}
+	mut vector := []f32{cap: parts.len}
+	for part in parts {
+		number := strconv.atof64(part.trim_space()) or {
+			return error('pgvector returned a non-numeric vector value')
+		}
+		converted := f32(number)
+		if !math.is_finite(number) || !math.is_finite(f64(converted)) {
+			return error('pgvector returned a non-finite vector value')
+		}
+		vector << converted
+	}
+	return vector
 }
 
 fn vector_literal(vector []f32) string {

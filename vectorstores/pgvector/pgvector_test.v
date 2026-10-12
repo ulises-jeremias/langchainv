@@ -113,6 +113,40 @@ fn test_pgvector_search_uses_cosine_order_and_exact_metadata_filters() {
 	assert state.parameters[0][4] == '4'
 }
 
+fn test_pgvector_search_returns_vectors_when_requested() {
+	mut state := &PgvectorFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['id-1', 'answer', '{"kind":"guide"}', '0.91', '[0.25, 0.75]']]
+		}
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 2, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.25), f32(0.75)]
+	assert state.statements[0].contains('"embedding"::text AS embedding_text')
+	assert state.statements[0].contains('SELECT id, page_content, metadata_json, score, embedding_text')
+}
+
+fn test_pgvector_rejects_malformed_returned_vector_text() {
+	mut state := &PgvectorFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['id-1', 'answer', '{}', '0.91', '[0.25, bad]']]
+		}
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('non-numeric vector')
+		return
+	}
+	assert false, 'expected malformed pgvector value to fail'
+}
+
 fn test_pgvector_delete_uses_parameterized_ids_and_namespace() {
 	mut state := &PgvectorFixtureState{}
 	store := fixture_store(state) or { panic(err) }
