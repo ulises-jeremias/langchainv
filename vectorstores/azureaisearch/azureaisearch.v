@@ -5,7 +5,6 @@ import context
 import json2
 import math
 import net.http
-import net.urllib
 import rand
 import ulises_jeremias.langchainv.embeddings
 import ulises_jeremias.langchainv.httputil
@@ -63,11 +62,7 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 	if endpoint.len == 0 || endpoint.len > 2048 || endpoint.contains('?') || endpoint.contains('#') {
 		return error('Azure AI Search endpoint must be a URL of at most 2048 bytes without query or fragment')
 	}
-	httputil.validate_url(endpoint, '')!
-	parsed := urllib.parse(endpoint) or { return error('Azure AI Search endpoint is invalid') }
-	if parsed.scheme.to_lower() != 'https' {
-		return error('Azure AI Search endpoints must use HTTPS')
-	}
+	httputil.validate_url(endpoint, 'https')!
 	if !valid_index_name(options.index_name) {
 		return error('Azure AI Search index name is invalid')
 	}
