@@ -48,7 +48,10 @@ configurable simple SQL identifiers; they are quoted in generated SQL. Writes
 use parameterized multi-row inserts, searches use the pgvector cosine-distance
 operator, and deletes use parameterized IDs. Scalar metadata equality uses
 JSONB key/value matching; namespace matching is exact. Array metadata, arbitrary
-filter expressions, schema creation, and vector return are not implemented.
+filter expressions, and schema creation are not implemented. Set
+`SearchOptions.include_vectors` to return the stored vector as
+`schema.Document.embedding`; default searches omit it. The adapter validates
+the returned vector literal and counts it against the response size bound.
 
 Writes are limited to 64 documents, deletes to 1,000 IDs, searches to 1,000
 candidate rows, vectors to 2,000 finite values, and insert parameters to 4 MiB.
