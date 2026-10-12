@@ -132,8 +132,9 @@ Chroma — partial: v2 REST create/get-or-create and
 delete collection management, upsert/query/delete, injected embeddings and
 HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
 equality filters, namespaces, score thresholds, and bounded payloads; custom
-collection configuration, array metadata, advanced filters, custom IDs, and
-returned vectors remain outstanding. Qdrant — partial: REST
+collection configuration, array metadata, advanced filters, and custom IDs
+remain outstanding; `SearchOptions.include_vectors` returns validated stored
+embeddings on similarity queries. Qdrant — partial: REST
 create/delete and upsert/query/delete for single-vector cosine collections,
 API-key or HTTPS authentication, payload metadata filters, namespaces, injected
 embeddings/transport, and bounded requests with preflight embedding-dimension

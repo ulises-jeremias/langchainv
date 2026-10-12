@@ -15,13 +15,17 @@ in it.
 
 The adapter supports upserts of up to 64 documents, similarity queries with
 scalar equality filters, namespace filtering, minimum-score filtering, and
-deletion by ID. It stores page content in Chroma's document field. Namespaces
-use the reserved `_langchainv_namespace` metadata key, which the adapter removes
-from returned documents. The default namespace is `langchain`; a per-operation
-namespace overrides it. Request and response bodies are capped at 4 MiB;
-queries and deletes are limited to 1,000 records, and each write/query accepts
-at most 65,536 embedding values. Scores use `1 - distance`,
-matching the LangChainGo adapter's score mapping. Collection routes follow the
+deletion by ID. Set `SearchOptions.include_vectors` to ask Chroma to return each
+stored embedding in `schema.Document.embedding`; the default query omits vector
+payloads. Returned vectors are checked for shape, finite values, and the same
+65,536-value bound used for requests. It stores page content in Chroma's
+document field. Namespaces use the reserved `_langchainv_namespace` metadata
+key, which the adapter removes from returned documents. The default namespace
+is `langchain`; a per-operation namespace overrides it. Request and response
+bodies are capped at 4 MiB; queries and deletes are limited to 1,000 records,
+and each write/query accepts at most 65,536 embedding values. Scores use
+`1 - distance`, matching the LangChainGo adapter's score mapping. Collection
+routes follow the
 [Chroma REST collection API](https://docs.trychroma.com/reference/chroma-api/collection/create-collection).
 
 Loopback servers may use HTTP. Remote servers must use HTTPS. Set `api_key` to
@@ -39,5 +43,4 @@ mut store := chroma.new_store(embedder, chroma.Options{
 ```
 
 Custom collection configuration, Chroma-managed embedding functions, array
-metadata, advanced filter operators, returned vector values, and custom record
-IDs remain unsupported.
+metadata, advanced filter operators, and custom record IDs remain unsupported.

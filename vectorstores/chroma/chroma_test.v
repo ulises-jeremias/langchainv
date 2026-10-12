@@ -160,6 +160,36 @@ fn test_chroma_query_maps_distances_metadata_and_exact_filters() {
 	assert request.body.contains('query_embeddings')
 	assert request.body.contains('\$and')
 	assert request.body.contains('category')
+	assert request.body.contains('"include":["documents","metadatas","distances"]')
+}
+
+fn test_chroma_query_can_return_stored_embeddings() {
+	mut state := &ChromaFixtureState{
+		responses: [chroma_response('{"ids":[["id-1"]],"documents":[["answer"]],"metadatas":[[{}]],"distances":[[0.09]],"embeddings":[[[0.4,0.6]]]}')]
+	}
+	mut store := chroma_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 2, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.4), f32(0.6)]
+	assert state.requests[0].body.contains('"include":["documents","metadatas","distances","embeddings"]')
+}
+
+fn test_chroma_rejects_malformed_returned_embeddings() {
+	mut state := &ChromaFixtureState{
+		responses: [chroma_response('{"ids":[["id-1"]],"documents":[["answer"]],"metadatas":[[{}]],"distances":[[0.09]],"embeddings":[[[0.4,"bad"]]]}')]
+	}
+	mut store := chroma_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('non-numeric')
+		return
+	}
+	assert false, 'expected malformed Chroma embedding to fail'
 }
 
 fn test_chroma_delete_limits_ids_and_applies_namespace_filter() {
