@@ -13,13 +13,14 @@ Work through these recipes in order. Each section links to the package guide tha
 1. Start with the runnable [text splitter example](https://github.com/ulises-jeremias/langchainv/blob/main/examples/text_splitter/main.v) and learn [recursive and Markdown chunking](https://github.com/ulises-jeremias/langchainv/blob/main/textsplitter/README.md).
 2. Follow the [prompt templates tutorial](prompt-templates/), then parse responses with [output parsers](https://github.com/ulises-jeremias/langchainv/blob/main/outputparser/README.md).
 3. Run the [mock model tutorial](offline-model-tests/) to test model-dependent code without a provider.
-4. Call a live model through an explicit adapter such as [OpenAI Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md). Keep credentials outside source control.
-5. Review the [embedding guides](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) and [vector store adapters](https://github.com/ulises-jeremias/langchainv/tree/main/vectorstores) before choosing a retrieval backend.
-6. Run the [offline retrieval QA tutorial](retrieval-qa/) before configuring a remote vector store.
-7. Compose model operations with [chains](https://github.com/ulises-jeremias/langchainv/blob/main/chains/README.md), add [memory](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md), and expose selected [tools](https://github.com/ulises-jeremias/langchainv/tree/main/tools).
-8. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
-9. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
-10. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
+4. Add [model lifecycle callbacks](model-callbacks/) through a provider-neutral middleware wrapper.
+5. Call a live model through an explicit adapter such as [OpenAI Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md). Keep credentials outside source control.
+6. Review the [embedding guides](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) and [vector store adapters](https://github.com/ulises-jeremias/langchainv/tree/main/vectorstores) before choosing a retrieval backend.
+7. Run the [offline retrieval QA tutorial](retrieval-qa/) before configuring a remote vector store.
+8. Compose model operations with [chains](https://github.com/ulises-jeremias/langchainv/blob/main/chains/README.md), add [memory](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md), and expose selected [tools](https://github.com/ulises-jeremias/langchainv/tree/main/tools).
+9. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
+10. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
+11. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
 
 ## Recipes by task
 
