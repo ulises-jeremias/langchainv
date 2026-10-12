@@ -8,48 +8,70 @@ import ulises_jeremias.langchainv.schema
 
 // InMemoryChatMessageHistory is a concurrency-safe, process-local message store.
 pub struct InMemoryChatMessageHistory {
+	state &InMemoryChatMessageHistoryState
+}
+
+struct InMemoryChatMessageHistoryState {
 mut:
-	mutex    sync.Mutex
-	messages []schema.Message
+	mutex        sync.Mutex
+	messages     []schema.Message
+	max_messages int
 }
 
 // new_in_memory_chat_message_history creates an empty history.
 pub fn new_in_memory_chat_message_history() &InMemoryChatMessageHistory {
-	return &InMemoryChatMessageHistory{}
+	return new_in_memory_chat_message_history_with_limit(0)
+}
+
+fn new_in_memory_chat_message_history_with_limit(max_messages int) &InMemoryChatMessageHistory {
+	return &InMemoryChatMessageHistory{
+		state: &InMemoryChatMessageHistoryState{
+			max_messages: max_messages
+		}
+	}
 }
 
 // get_messages returns a snapshot of the stored messages.
-pub fn (mut history InMemoryChatMessageHistory) get_messages(mut ctx context.Context) ![]schema.Message {
-	if err := ctx.err() {
+pub fn (history InMemoryChatMessageHistory) get_messages(mut ctx context.Context) ![]schema.Message {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
-	history.mutex.lock()
-	mut result := []schema.Message{cap: history.messages.len}
-	for message in history.messages {
+	mut state := history.state
+	state.mutex.lock()
+	mut result := []schema.Message{cap: state.messages.len}
+	for message in state.messages {
 		result << clone_message(message)
 	}
-	history.mutex.unlock()
+	state.mutex.unlock()
 	return result
 }
 
 // add_message appends a snapshot of a message.
-pub fn (mut history InMemoryChatMessageHistory) add_message(mut ctx context.Context, message schema.Message) ! {
-	if err := ctx.err() {
+pub fn (history InMemoryChatMessageHistory) add_message(mut ctx context.Context, message schema.Message) ! {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
-	history.mutex.lock()
-	history.messages << clone_message(message)
-	history.mutex.unlock()
+	mut state := history.state
+	state.mutex.lock()
+	if state.max_messages > 0 && state.messages.len >= state.max_messages {
+		state.messages = state.messages[1..].clone()
+	}
+	state.messages << clone_message(message)
+	state.mutex.unlock()
 }
 
 // clear removes all stored messages.
-pub fn (mut history InMemoryChatMessageHistory) clear(mut ctx context.Context) ! {
-	if err := ctx.err() {
+pub fn (history InMemoryChatMessageHistory) clear(mut ctx context.Context) ! {
+	err := ctx.err()
+	if err !is none {
 		return err
 	}
-	history.mutex.lock()
-	history.messages.clear()
-	history.mutex.unlock()
+	mut state := history.state
+	state.mutex.lock()
+	state.messages.clear()
+	state.mutex.unlock()
 }
 
 fn clone_message(message schema.Message) schema.Message {
@@ -103,10 +125,24 @@ fn clone_json_value(value json2.Any) json2.Any {
 // ConversationBuffer stores input/output turns and exposes their transcript.
 pub struct ConversationBuffer {
 pub:
-	history    schema.ChatMessageHistory
-	memory_key string
-	input_key  string
-	output_key string
+	history      schema.ChatMessageHistory
+	memory_key   string
+	input_key    string
+	output_key   string
+	human_prefix string
+	ai_prefix    string
+}
+
+// ConversationBufferOptions configures a conversation buffer. Empty memory_key
+// selects `history`; empty input/output keys are inferred when the respective
+// map contains exactly one value.
+pub struct ConversationBufferOptions {
+pub:
+	memory_key   string
+	input_key    string
+	output_key   string
+	human_prefix string
+	ai_prefix    string
 }
 
 // new_conversation_buffer creates a buffer with explicit key names.
@@ -114,53 +150,154 @@ pub fn new_conversation_buffer(memory_key string, input_key string, output_key s
 	if memory_key == '' || input_key == '' || output_key == '' {
 		return error('memory, input, and output keys must be non-empty')
 	}
-	return ConversationBuffer{
-		history:    new_in_memory_chat_message_history()
+	return new_conversation_buffer_with_options(ConversationBufferOptions{
 		memory_key: memory_key
 		input_key:  input_key
 		output_key: output_key
+	})
+}
+
+// new_conversation_buffer_with_options creates a configurable conversation
+// buffer. Blank prefix values select the standard `Human` and `AI` labels.
+pub fn new_conversation_buffer_with_options(options ConversationBufferOptions) !ConversationBuffer {
+	return new_conversation_buffer_with_history(options,
+		schema.ChatMessageHistory(new_in_memory_chat_message_history()))
+}
+
+// new_conversation_buffer_with_history creates a configurable conversation
+// buffer over a caller-provided chat history implementation.
+pub fn new_conversation_buffer_with_history(options ConversationBufferOptions, history schema.ChatMessageHistory) !ConversationBuffer {
+	memory_key := if options.memory_key.trim_space() == '' { 'history' } else { options.memory_key }
+	human_prefix := if options.human_prefix.trim_space() == '' {
+		'Human'
+	} else {
+		options.human_prefix
+	}
+	ai_prefix := if options.ai_prefix.trim_space() == '' { 'AI' } else { options.ai_prefix }
+	return ConversationBuffer{
+		history:      history
+		memory_key:   memory_key
+		input_key:    options.input_key
+		output_key:   options.output_key
+		human_prefix: human_prefix
+		ai_prefix:    ai_prefix
 	}
 }
 
 // memory_keys returns the key populated by this memory.
-pub fn (memory ConversationBuffer) memory_keys() []string {
-	return [memory.memory_key]
+pub fn (buffer ConversationBuffer) memory_keys() []string {
+	return [buffer.memory_key]
+}
+
+// load_messages returns the typed chat history without converting it to a
+// role-labeled transcript. This is useful for callers that need message roles,
+// metadata, or multimodal content.
+pub fn (buffer ConversationBuffer) load_messages(mut ctx context.Context) ![]schema.Message {
+	return buffer.history.get_messages(mut ctx)
 }
 
 // load_memory_variables returns prior turns as a role-labeled transcript.
-pub fn (memory ConversationBuffer) load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
-	messages := memory.history.get_messages(mut ctx)!
+pub fn (buffer ConversationBuffer) load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	messages := buffer.history.get_messages(mut ctx)!
 	mut lines := []string{cap: messages.len}
 	for message in messages {
 		role := match message.role {
 			.system { 'System' }
-			.human { 'Human' }
-			.ai { 'AI' }
+			.human { buffer.human_prefix }
+			.ai { buffer.ai_prefix }
 			.tool { 'Tool' }
 			.generic { 'Message' }
 		}
 		lines << '${role}: ${message.text()}'
 	}
 	mut result := map[string]json2.Any{}
-	result[memory.memory_key] = json2.Any(lines.join('\n'))
+	result[buffer.memory_key] = json2.Any(lines.join('\n'))
 	return result
 }
 
 // save_context appends one human and one assistant message to the history.
-pub fn (memory ConversationBuffer) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
-	if memory.input_key !in inputs {
-		return error('missing memory input `${memory.input_key}`')
+pub fn (buffer ConversationBuffer) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
+	if buffer.input_key !in inputs {
+		if buffer.input_key != '' || inputs.len != 1 {
+			return error('conversation memory needs an input key or exactly one input value')
+		}
 	}
-	if memory.output_key !in outputs {
-		return error('missing memory output `${memory.output_key}`')
+	if buffer.output_key !in outputs {
+		if buffer.output_key != '' || outputs.len != 1 {
+			return error('conversation memory needs an output key or exactly one output value')
+		}
 	}
-	mut history := memory.history
-	history.add_message(mut ctx, schema.text_message(.human, inputs[memory.input_key].str()))!
-	history.add_message(mut ctx, schema.text_message(.ai, outputs[memory.output_key].str()))!
+	input_key := if buffer.input_key != '' { buffer.input_key } else { inputs.keys()[0] }
+	output_key := if buffer.output_key != '' { buffer.output_key } else { outputs.keys()[0] }
+	input_value := inputs[input_key] or { return error('missing conversation memory input') }
+	output_value := outputs[output_key] or { return error('missing conversation memory output') }
+	input := match input_value {
+		string { input_value }
+		else { return error('conversation memory input must be a string') }
+	}
+	output := match output_value {
+		string { output_value }
+		else { return error('conversation memory output must be a string') }
+	}
+	buffer.history.add_message(mut ctx, schema.text_message(.human, input))!
+	buffer.history.add_message(mut ctx, schema.text_message(.ai, output))!
 }
 
 // clear removes all conversation history.
-pub fn (memory ConversationBuffer) clear(mut ctx context.Context) ! {
-	mut history := memory.history
-	history.clear(mut ctx)
+pub fn (buffer ConversationBuffer) clear(mut ctx context.Context) ! {
+	buffer.history.clear(mut ctx)!
+}
+
+// ConversationWindowBuffer stores only a bounded number of recent turns.
+pub struct ConversationWindowBuffer {
+pub:
+	buffer      ConversationBuffer
+	window_size int
+}
+
+// new_conversation_window_buffer creates a memory that retains the latest turns.
+// Non-positive sizes use the default of five turns. Sizes above 10,000 are rejected.
+pub fn new_conversation_window_buffer(window_size int, memory_key string, input_key string, output_key string) !ConversationWindowBuffer {
+	actual_window_size := if window_size <= 0 { 5 } else { window_size }
+	if actual_window_size > 10000 {
+		return error('conversation window size must be at most 10000 turns')
+	}
+	base := new_conversation_buffer(memory_key, input_key, output_key)!
+	buffer := ConversationBuffer{
+		history:      new_in_memory_chat_message_history_with_limit(actual_window_size * 2)
+		memory_key:   base.memory_key
+		input_key:    base.input_key
+		output_key:   base.output_key
+		human_prefix: base.human_prefix
+		ai_prefix:    base.ai_prefix
+	}
+	return ConversationWindowBuffer{
+		buffer:      buffer
+		window_size: actual_window_size
+	}
+}
+
+// memory_keys returns the key populated by this window memory.
+pub fn (window ConversationWindowBuffer) memory_keys() []string {
+	return window.buffer.memory_keys()
+}
+
+// load_messages returns the typed messages retained by the conversation window.
+pub fn (window ConversationWindowBuffer) load_messages(mut ctx context.Context) ![]schema.Message {
+	return window.buffer.load_messages(mut ctx)
+}
+
+// load_memory_variables returns the retained turns as a role-labeled transcript.
+pub fn (window ConversationWindowBuffer) load_memory_variables(mut ctx context.Context, inputs map[string]json2.Any) !map[string]json2.Any {
+	return window.buffer.load_memory_variables(mut ctx, inputs)
+}
+
+// save_context appends one turn and discards the oldest messages past the window.
+pub fn (window ConversationWindowBuffer) save_context(mut ctx context.Context, inputs map[string]json2.Any, outputs map[string]json2.Any) ! {
+	window.buffer.save_context(mut ctx, inputs, outputs)!
+}
+
+// clear removes all retained turns.
+pub fn (window ConversationWindowBuffer) clear(mut ctx context.Context) ! {
+	window.buffer.clear(mut ctx)!
 }

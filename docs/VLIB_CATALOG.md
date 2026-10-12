@@ -29,12 +29,46 @@ contract. V's `json2` has typed encoding/decoding, reusable decode buffers, and
 explicit legacy-compatibility differences; use it directly and test wire
 compatibility instead of assuming it matches another language's JSON output.
 
+For filesystem ingestion, `os.ls` returns a complete `[]string` for one
+directory before callers can enforce an entry-count limit; `os.walk` is
+iterative but still lists one directory at a time. V 0.5.2 exposes no
+cross-platform streaming directory iterator in `os`. Bound depth, file count,
+file bytes, and aggregate bytes, skip symlinks and non-regular files, and be
+clear that the entry limit cannot prevent the initial allocation for one very
+large directory. `os.file_size` before `os.read_file` also has a filesystem
+race window, so keep per-file caps small and treat the size check as a bound
+for ordinary files rather than a race-proof sandbox.
+
 `net.http` has progress callbacks that receive response chunks, which can feed
 an incremental SSE parser. Do not assume those callbacks imply uniform
 time-to-first-token behavior on every platform: the V source documents a
 Windows transport path that may deliver the full response at once. Streaming
 parity therefore needs provider and platform checks, with a transport-specific
 fallback if callback streaming is unavailable.
+
+V 0.5.2's `x.markdown` includes a CommonMark/GFM block and inline parser, HTML
+and plaintext renderers, and an AST whose link nodes expose resolved reference
+destinations and titles. The current Markdown splitter instead scans a
+supported subset of reference definitions in source lines; it does not import
+`x.markdown` or require that experimental module at compile time. Keep `x.*`
+optional for future full CommonMark block and inline fidelity, and verify its
+actual AST behavior against the pinned compiler before adopting it.
+
+## Generic field inspection and typed JSON
+
+V 0.5.2 does not provide Go-style runtime `reflect` as the route for struct
+schemas. Generic functions can inspect fields at compile time with `$for field
+in T.fields`, branch on `field.typ` with `$if`, and read field names and
+attributes. The standard library uses this pattern in `json2`, `toml`, and
+`flag`. `json2.decode[T]` then decodes JSON directly into a concrete V type.
+
+For LangChainGo's `Defined[T]` output parser, this means schema generation
+should be a generic, compile-time field walk and parsing should call
+`json2.decode[T]`. Its typed `parse(text) !T` cannot implement the common
+`Parser.parse(text) !json2.Any` interface without erasing the result type, so
+it should remain a separate typed API. Field tags also differ: V uses
+attributes such as `@[json: fieldName]`; document any mapping from Go `json`
+and `describe` struct tags to these V attributes.
 
 ## Full top-level inventory
 

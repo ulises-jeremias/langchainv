@@ -8,7 +8,7 @@ fn test_text_message_keeps_role_and_text() {
 
 fn test_message_text_joins_textual_parts_only() {
 	message := Message{
-		role: .ai
+		role:  .ai
 		parts: [
 			ContentPart(TextPart{
 				text: 'answer'

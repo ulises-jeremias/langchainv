@@ -32,6 +32,10 @@ Choose a limit based on measured needs, keep `VJOBS` low, and stop if memory
 pressure rises. An OOM kill or signal is not a passing check; reduce the scope
 or run it in CI. Do not retry the same memory-heavy command unchanged.
 
+In CI, run V commands directly on the hosted runner with a small `VJOBS`
+setting. Never wrap CI commands in `systemd-run`; that scope is only for local
+workstation protection.
+
 Before a local V invocation, confirm no other V compiler is active with
 `pgrep -a -x v`. Never terminate unrelated compiler processes. Keep temporary
 build and generated files inside the repository or an explicitly bounded temp
