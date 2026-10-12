@@ -8,6 +8,7 @@ Examples are standalone V programs. CI compiles and runs every example with the 
 | [Prompt templates](prompts/main.v) | Named variables, template validation, and prompt formatting | Offline; no credentials |
 | [Mock model](mock_model/main.v) | Provider-neutral model calls with a deterministic, concurrency-safe test double | Offline; no credentials |
 | [Retrieval QA](retrieval_qa/main.v) | In-memory retrieval and a bounded question-answering chain with deterministic fakes | Offline; no credentials |
+| [Azure AI Search retrieval](azure_retrieval/main.v) | Persistent vector search with Azure AI Search and OpenAI embeddings | Live opt-in; Azure admin key, OpenAI API key, network access, and usage charges |
 | [Conversation memory](conversation_memory/main.v) | Conversation chain with process-local history and a deterministic completion fake | Offline; no credentials |
 | [Tool-calling agent](tool_calling_agent/main.v) | Bounded executor, calculator tool, and staged fake model | Offline; no credentials |
 
@@ -45,6 +46,14 @@ To run the tool-calling agent without configuring a model provider:
 
 ```sh
 v run examples/tool_calling_agent/main.v
+```
+
+To opt in to the Azure AI Search retrieval walkthrough, configure the variables
+listed in [the tutorial](../docs/tutorials/azure-ai-search-retrieval.md), then
+set `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and run:
+
+```sh
+v run examples/azure_retrieval/main.v
 ```
 
 Every `examples/*/main.v` must complete offline without credentials. CI compiles and runs these programs after removing `LANGCHAINV_ALLOW_LIVE_EXAMPLES`. A live provider demo must require `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and valid credentials before sending a request. Document required environment variables, external services, expected cost, and network behavior. CI must never set the opt-in.
