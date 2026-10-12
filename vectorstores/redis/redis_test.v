@@ -106,6 +106,62 @@ fn test_redis_search_parses_score_metadata_and_escapes_filter_values() {
 	assert command[17].len == 8
 }
 
+fn test_redis_search_returns_binary_vector_when_requested() {
+	mut response := []redis_client.RedisValue{}
+	response << redis_client.RedisValue(i64(1))
+	response << redis_client.RedisValue('doc:langchainv:fixed-id')
+	response << redis_client.RedisValue([
+		redis_client.RedisValue('content'),
+		redis_client.RedisValue('answer'),
+		redis_client.RedisValue('metadata'),
+		redis_client.RedisValue('{}'),
+		redis_client.RedisValue('distance'),
+		redis_client.RedisValue('0.09'),
+		redis_client.RedisValue('content_vector'),
+		redis_client.RedisValue(binary_vector([f32(0.4), 0.6])),
+	])
+	mut state := &RedisFixtureState{
+		response: redis_client.RedisValue(response)
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'question', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.4), f32(0.6)]
+	assert state.commands[0][4] == '4'
+	assert state.commands[0].contains('content_vector')
+}
+
+fn test_redis_rejects_malformed_returned_binary_vector() {
+	mut response := []redis_client.RedisValue{}
+	response << redis_client.RedisValue(i64(1))
+	response << redis_client.RedisValue('doc:langchainv:fixed-id')
+	response << redis_client.RedisValue([
+		redis_client.RedisValue('content'),
+		redis_client.RedisValue('answer'),
+		redis_client.RedisValue('metadata'),
+		redis_client.RedisValue('{}'),
+		redis_client.RedisValue('distance'),
+		redis_client.RedisValue('0.09'),
+		redis_client.RedisValue('content_vector'),
+		redis_client.RedisValue('bad'),
+	])
+	mut state := &RedisFixtureState{
+		response: redis_client.RedisValue(response)
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'question', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('byte length')
+		return
+	}
+	assert false, 'expected malformed Redis vector to fail'
+}
+
 fn test_redis_rejects_namespace_constrained_delete() {
 	mut state := &RedisFixtureState{}
 	store := fixture_store(state) or { panic(err) }

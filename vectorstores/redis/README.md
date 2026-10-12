@@ -55,12 +55,13 @@ to `delete`.
   a 64 KiB aggregate filter limit.
   Namespace and metadata values use escaped RediSearch TAG equality queries.
   Scores are `1 - cosine distance`; `min_score` is applied after retrieval and
-  can return fewer than the requested count.
+  can return fewer than the requested count. Set `SearchOptions.include_vectors`
+  to return the stored binary vector in `schema.Document.embedding`; it is
+  omitted by default and decoded with dimension and finite-value checks.
 - Delete accepts at most 1,000 returned Redis keys. Namespace-constrained
   deletion is rejected because read-then-delete would not be atomic.
 - The configured index must exist and match the HASH schema. Index management,
-  alternate metrics, advanced RediSearch query syntax, and returned vectors are
-  not implemented.
+  alternate metrics, and advanced RediSearch query syntax are not implemented.
 - Redis commands are sequential. If Redis fails partway through a multi-record
   write, earlier HSET commands may already have succeeded. The response cap is
   safe for records written through this adapter and assumes the Redis index is

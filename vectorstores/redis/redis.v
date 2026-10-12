@@ -183,9 +183,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 || options.namespace.len > 65536 || options.filter.len > 128 {
 		return error('Redis query, namespace, or filter count exceeds configured limits')
 	}
-	if options.include_vectors {
-		return error('Redis adapter does not expose vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy.to_lower() != 'cosine' {
 		return error('Redis adapter supports cosine distance only')
 	}
@@ -212,10 +209,15 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	vector := store.embedder.embed_query(mut ctx, query)!
 	validate_vector(vector, store.dimensions)!
 	vector_arg := binary_vector(vector)
-	command := ['FT.SEARCH', store.index,
+	return_count := if options.include_vectors { '4' } else { '3' }
+	mut command := ['FT.SEARCH', store.index,
 		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]', 'RETURN',
-		'3', store.content_field, store.metadata_field, 'distance', 'SORTBY', 'distance', 'ASC',
-		'LIMIT', '0', limit.str(), 'PARAMS', '2', 'query_vector', vector_arg, 'DIALECT', '2']
+		return_count, store.content_field, store.metadata_field, 'distance']
+	if options.include_vectors {
+		command << store.vector_field
+	}
+	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str(), 'PARAMS', '2', 'query_vector',
+		vector_arg, 'DIALECT', '2']
 	mut response_bytes := 0
 	for arg in command {
 		response_bytes += arg.len
@@ -280,6 +282,27 @@ fn binary_vector(vector []f32) string {
 	return bytes.bytestr()
 }
 
+fn parse_binary_vector(value string, dimensions int) ![]f32 {
+	bytes := value.bytes()
+	if dimensions <= 0 || bytes.len != dimensions * 4 {
+		return error('Redis returned a vector with an invalid byte length')
+	}
+	mut vector := []f32{cap: dimensions}
+	for index := 0; index < bytes.len; index += 4 {
+		low_bits := u32(bytes[index])
+		middle_bits := u32(bytes[index + 1]) << 8
+		high_bits := u32(bytes[index + 2]) << 16
+		top_bits := u32(bytes[index + 3]) << 24
+		raw_bits := low_bits | middle_bits | high_bits | top_bits
+		decoded_value := bits.f32_from_bits(raw_bits)
+		if !math.is_finite(f64(decoded_value)) {
+			return error('Redis returned a non-finite vector value')
+		}
+		vector << decoded_value
+	}
+	return vector
+}
+
 fn parse_search_response(response redis_client.RedisValue, store Store, limit int, options vectorstores.SearchOptions, max_bytes int) ![]schema.Document {
 	values := match response {
 		[]redis_client.RedisValue { response }
@@ -306,7 +329,13 @@ fn parse_search_response(response redis_client.RedisValue, store Store, limit in
 		content := attrs[store.content_field] or { return error('Redis result is missing page content') }
 		metadata_json := attrs[store.metadata_field] or { return error('Redis result is missing metadata') }
 		distance_text := attrs['distance'] or { return error('Redis result is missing vector distance') }
-		used_bytes += id.len + content.len + metadata_json.len + distance_text.len + 1024
+		vector_text := if options.include_vectors {
+			attrs[store.vector_field] or { return error('Redis result is missing its vector') }
+		} else {
+			''
+		}
+		used_bytes += id.len + content.len + metadata_json.len + distance_text.len
+		used_bytes += vector_text.len + 1024
 		if used_bytes > max_bytes {
 			return error('Redis search response exceeds 4 MiB')
 		}
@@ -322,10 +351,15 @@ fn parse_search_response(response redis_client.RedisValue, store Store, limit in
 			index += 2
 			continue
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			embedding = parse_binary_vector(vector_text, store.dimensions)!
+		}
 		documents << schema.Document{
 			page_content: content
 			metadata:     if options.include_metadata { metadata } else { map[string]json2.Any{} }
 			score:        f32(score)
+			embedding:    embedding
 		}
 		index += 2
 	}
