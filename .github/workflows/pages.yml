@@ -5,22 +5,22 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      - 'llms/**'
-      - 'embeddings/**'
-      - 'vectorstores/**'
+      - '**/*.v'
       - 'README.md'
-      - 'examples/README.md'
+      - '**/README.md'
+      - 'v.mod'
       - 'scripts/check_provider_catalog.py'
+      - 'scripts/check_site_links.py'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'docs/**'
-      - 'llms/**'
-      - 'embeddings/**'
-      - 'vectorstores/**'
+      - '**/*.v'
       - 'README.md'
-      - 'examples/README.md'
+      - '**/README.md'
+      - 'v.mod'
       - 'scripts/check_provider_catalog.py'
+      - 'scripts/check_site_links.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

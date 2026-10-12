@@ -8,7 +8,10 @@ configuration is capped at 1,000 iterations.
 `ToolCallingAgent` connects any `llms.Model` that supports provider tool
 calling. It sends configured inputs and prior tool steps, converts model tool
 calls into executor actions, and treats assistant text as the final answer.
-Its tests use a fake model and never make provider requests.
+Grouped tool calls are replayed in one assistant message followed by their
+tool results. Single-string calls encoded as `{"__arg1":"..."}` are passed
+to the tool as the inner string. Its tests use a fake model and never make
+provider requests.
 
 `new_react_agent` creates a text-based MRKL/ReAct agent around an
 `llms.CompletionModel`. Its prompt lists registered tools and prior
