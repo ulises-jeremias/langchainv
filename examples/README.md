@@ -8,6 +8,7 @@ Examples are standalone V programs. CI compiles and runs every example with the 
 | [Prompt templates](prompts/main.v) | Named variables, template validation, and prompt formatting | Offline; no credentials |
 | [Mock model](mock_model/main.v) | Provider-neutral model calls with a deterministic, concurrency-safe test double | Offline; no credentials |
 | [Retrieval QA](retrieval_qa/main.v) | In-memory retrieval and a bounded question-answering chain with deterministic fakes | Offline; no credentials |
+| [Return stored vectors](vector_return/main.v) | Opt-in embedding vectors in in-memory search results | Offline; no credentials |
 | [Azure AI Search retrieval](azure_retrieval/main.v) | Persistent vector search with Azure AI Search and OpenAI embeddings | Live opt-in; Azure admin key, OpenAI API key, network access, and usage charges |
 | [Conversation memory](conversation_memory/main.v) | Conversation chain with process-local history and a deterministic completion fake | Offline; no credentials |
 | [Tool-calling agent](tool_calling_agent/main.v) | Bounded executor, calculator tool, and staged fake model | Offline; no credentials |

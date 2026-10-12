@@ -24,6 +24,7 @@ Work through these recipes in order. Each section links to the package guide tha
 12. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
 13. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
 14. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
+15. [Return stored vectors](returning-vectors/) when you need the original embeddings for inspection or downstream calculations.
 
 ## Recipes by task
 
@@ -32,6 +33,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Make a first chat request | [First chat tutorial](first-chat/) | Sends a billable live request; keep the API key in the environment. |
 | Test model-dependent code offline | [Mock model tutorial](offline-model-tests/) | No API key or network calls; adapter HTTP behavior should use an injected fake transport. |
 | Build retrieval QA | [Retrieval tutorial](retrieval-qa/) | Uses in-memory storage and deliberately simple fakes; no semantic embeddings or external services. |
+| Inspect search embeddings | [Return stored vectors](returning-vectors/) | Shows opt-in result vectors with an offline in-memory store; remote adapters have backend-specific limits. |
 | Run retrieval QA against Azure AI Search | [Azure retrieval tutorial](azure-ai-search-retrieval/) | Explicit live opt-in; sends text to OpenAI and Azure and can incur usage charges. |
 | Map documents concurrently | [Concurrent mapping tutorial](concurrent-document-mapping/) | Uses a stateless offline model; the chain defaults to one worker and accepts at most five. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
