@@ -11,6 +11,9 @@ for scalar metadata, and optional certainty thresholds. It uses an injected
 embedder and HTTP client for offline tests. Remote endpoints require HTTPS;
 plain HTTP is allowed only on loopback. Requests and responses are capped at
 4 MiB, search limits at 1000, and embedding vectors at 65,536 values.
+Set `SearchOptions.include_vectors` on similarity or metadata searches to
+request each result's vector in `schema.Document.embedding`; it is omitted by
+default and validated for shape, size, and finite values.
 
 ```v wip
 mut store := weaviate.new_store(embedder, weaviate.Options{
@@ -20,6 +23,6 @@ mut store := weaviate.new_store(embedder, weaviate.Options{
 })!
 ```
 
-Schema management, filters beyond scalar equality, and returning vector values
-remain unsupported. Since namespace is stored in a class property, configure
-that property as a filterable scalar in the existing schema.
+Schema management and filters beyond scalar equality remain unsupported. Since
+namespace is stored in a class property, configure that property as a filterable
+scalar in the existing schema.

@@ -173,8 +173,8 @@ and vector return remain outstanding.
 Weaviate — partial: batch object upsert and delete against a provisioned class,
 GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
 certainty thresholds, injected embeddings/transport, and bounded requests;
-class/schema management, advanced filter operators, and vector return remain
-outstanding.
+class/schema management and advanced filter operators remain outstanding;
+`SearchOptions.include_vectors` returns validated vectors when requested.
 
 ## Document loaders and tools
 

@@ -99,6 +99,35 @@ fn test_weaviate_similarity_search_maps_certainty_and_metadata() {
 	assert request.body.contains('nameSpace')
 }
 
+fn test_weaviate_similarity_search_returns_vector_when_requested() {
+	mut state := &WeaviateFixtureState{
+		responses: [weaviate_response('{"data":{"Get":{"Guide":[{"text":"answer","nameSpace":"default","_additional":{"certainty":0.9,"vector":[0.4,0.6]}}]}}}')]
+	}
+	mut store := weaviate_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.4), f32(0.6)]
+	assert state.requests[0].body.contains('_additional { certainty vector }')
+}
+
+fn test_weaviate_rejects_non_numeric_returned_vector_values() {
+	mut state := &WeaviateFixtureState{
+		responses: [weaviate_response('{"data":{"Get":{"Guide":[{"text":"answer","nameSpace":"default","_additional":{"certainty":0.9,"vector":[0.4,"bad"]}}]}}}')]
+	}
+	mut store := weaviate_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('finite numbers')
+		return
+	}
+	assert false, 'expected malformed Weaviate vector to fail'
+}
+
 fn test_weaviate_metadata_search_and_delete() {
 	mut state := &WeaviateFixtureState{
 		responses: [
