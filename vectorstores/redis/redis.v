@@ -211,14 +211,13 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	vector_arg := binary_vector(vector)
 	return_count := if options.include_vectors { '4' } else { '3' }
 	mut command := ['FT.SEARCH', store.index,
-		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]',
-		'RETURN',
+		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]', 'RETURN',
 		return_count, store.content_field, store.metadata_field, 'distance']
 	if options.include_vectors {
 		command << store.vector_field
 	}
-	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str(), 'PARAMS', '2',
-		'query_vector', vector_arg, 'DIALECT', '2']
+	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str(), 'PARAMS', '2', 'query_vector',
+		vector_arg, 'DIALECT', '2']
 	mut response_bytes := 0
 	for arg in command {
 		response_bytes += arg.len
