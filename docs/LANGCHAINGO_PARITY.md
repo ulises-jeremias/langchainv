@@ -111,8 +111,12 @@ wrapping training layers or downloading weights during ordinary checks.
 
 ## Vector stores
 
-AlloyDB, Bedrock Knowledge Bases, Cloud SQL, Dolt, and MongoDB vector search
-remain not started. MariaDB is partial: bounded parameterized inserts through
+Dedicated AlloyDB and Cloud SQL adapters, Bedrock Knowledge Bases, Dolt, and
+MongoDB vector search remain not started. The generic pgvector adapter can
+connect to Cloud SQL for PostgreSQL or AlloyDB when the application supplies a
+compatible PostgreSQL engine and matching `vector` schema; it does not provide
+Cloud-specific connection/authentication, embedding, indexing, or query APIs.
+MariaDB is partial: bounded parameterized inserts through
 `VEC_FromText`, cosine search through `VEC_DISTANCE_COSINE`, parameterized ID
 deletion, namespace and scalar JSON equality filters, injected embeddings/SQL
 engine, and bounded payloads against an existing MariaDB 11.7.1+ vector table;
