@@ -179,6 +179,7 @@ fn (executor Executor) finish(mut ctx context.Context, finish schema.AgentFinish
 			encoded_action['tool_input'] = json2.Any(step.action.tool_input)
 			encoded_action['log'] = json2.Any(step.action.log)
 			encoded_action['tool_id'] = json2.Any(step.action.tool_id)
+			encoded_action['tool_call_group'] = json2.Any(step.action.tool_call_group)
 			mut encoded_step := map[string]json2.Any{}
 			encoded_step['action'] = json2.Any(encoded_action)
 			encoded_step['observation'] = json2.Any(step.observation)

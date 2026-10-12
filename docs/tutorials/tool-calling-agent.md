@@ -26,7 +26,9 @@ uses the public `llms.Model` contract as a provider adapter.
 ## Understand the boundaries
 
 - `new_tool_calling_agent` supplies the model with the tool name, description,
-  parameter schema, input question, and previous tool results.
+  parameter schema, input question, and previous tool results. When a model
+  requests several tools in one response, the next model request replays the
+  grouped calls before their corresponding results.
 - `new_executor` limits the number of model planning rounds. It calls only
   tools registered with that agent.
 - `tools.new_calculator()` evaluates a bounded arithmetic expression. It does

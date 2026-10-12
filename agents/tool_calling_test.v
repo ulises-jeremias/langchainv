@@ -139,6 +139,150 @@ fn test_tool_calling_agent_replays_tool_history_through_executor() {
 	assert state.messages[1][3].role == .tool
 }
 
+fn test_tool_calling_agent_replays_parallel_calls_as_one_assistant_message() {
+	mut state := &FixtureModelState{
+		responses: [
+			llms.Response{
+				choices: [llms.Choice{
+					tool_calls: [
+						schema.ToolCall{
+							id:            'tool-call-a'
+							call_type:     'function'
+							function_call: schema.FunctionCall{
+								name:      'echo'
+								arguments: 'first'
+							}
+						}
+						schema.ToolCall{
+							id:            'tool-call-b'
+							call_type:     'function'
+							function_call: schema.FunctionCall{
+								name:      'echo'
+								arguments: 'second'
+							}
+						},
+					]
+				}]
+			}
+			llms.Response{
+				choices: [llms.Choice{
+					content: 'done'
+				}]
+			},
+		]
+	}
+	agent := new_tool_calling_agent(FixtureModel{
+		state: state
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
+		input_keys: ['question']
+	}) or { panic(err) }
+	executor := new_executor(agent, ExecutorOptions{
+		max_iterations: 2
+	}) or { panic(err) }
+	mut ctx := context.background()
+	executor.call(mut ctx, {
+		'question': json2.Any('run both')
+	}) or { panic(err) }
+
+	replayed := state.messages[1]
+	assert replayed.len == 5
+	assert replayed[2].role == .ai
+	assert replayed[2].parts.len == 2
+	assert replayed[3].role == .tool
+	assert replayed[4].role == .tool
+	first_result := replayed[3].parts[0]
+	match first_result {
+		schema.ToolResult {
+			assert first_result.call_id == 'tool-call-a'
+			assert first_result.content == 'echo:first'
+		}
+		else {
+			assert false, 'expected the first tool result after the assistant batch'
+		}
+	}
+	second_result := replayed[4].parts[0]
+	match second_result {
+		schema.ToolResult {
+			assert second_result.call_id == 'tool-call-b'
+			assert second_result.content == 'echo:second'
+		}
+		else {
+			assert false, 'expected the second tool result after the assistant batch'
+		}
+	}
+	first_call := replayed[2].parts[0]
+	match first_call {
+		schema.ToolCall {
+			assert first_call.id == 'tool-call-a'
+		}
+		else {
+			assert false, 'expected the first assistant tool call'
+		}
+	}
+	second_call := replayed[2].parts[1]
+	match second_call {
+		schema.ToolCall {
+			assert second_call.id == 'tool-call-b'
+		}
+		else {
+			assert false, 'expected the second assistant tool call'
+		}
+	}
+}
+
+fn test_tool_calling_agent_normalizes_legacy_single_argument_function_input() {
+	mut state := &FixtureModelState{
+		responses: [
+			llms.Response{
+				choices: [llms.Choice{
+					function_call: schema.FunctionCall{
+						name:      'echo'
+						arguments: '{"__arg1":"hello"}'
+					}
+				}]
+			}
+			llms.Response{
+				choices: [llms.Choice{
+					content: 'done'
+				}]
+			},
+		]
+	}
+	agent := new_tool_calling_agent(FixtureModel{
+		state: state
+	}, [ToolCallingEchoTool{}], ToolCallingAgentOptions{
+		input_keys: ['question']
+	}) or { panic(err) }
+	executor := new_executor(agent, ExecutorOptions{
+		max_iterations: 2
+	}) or { panic(err) }
+	mut ctx := context.background()
+	result := executor.call(mut ctx, {
+		'question': json2.Any('echo hello')
+	}) or { panic(err) }
+	assert (result['output'] or { panic('missing output') }) == json2.Any('done')
+	assert state.messages[1].len == 4
+	legacy_call := state.messages[1][2].parts[0]
+	match legacy_call {
+		schema.ToolCall {
+			assert legacy_call.id == 'agent-step-0'
+		}
+		else {
+			assert false, 'expected the legacy call to be replayed as a tool call'
+		}
+	}
+	legacy_result := state.messages[1][3].parts[0]
+	match legacy_result {
+		schema.ToolResult {
+			assert legacy_result.call_id == 'agent-step-0'
+			assert legacy_result.content == 'echo:hello'
+		}
+		else {
+			assert false, 'expected the matching result for the legacy call'
+		}
+	}
+}
+
 fn test_tool_calling_agent_rejects_duplicate_tools() {
 	mut state := &FixtureModelState{}
 	new_tool_calling_agent(FixtureModel{

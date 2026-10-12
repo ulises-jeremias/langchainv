@@ -203,6 +203,8 @@ pub:
 	tool_input string
 	log        string
 	tool_id    string
+	// tool_call_group identifies sibling calls returned in one model response.
+	tool_call_group string
 }
 
 // AgentStep pairs an action with the tool's observation.

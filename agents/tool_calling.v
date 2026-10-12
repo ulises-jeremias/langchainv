@@ -79,31 +79,43 @@ pub fn (agent ToolCallingAgent) plan(mut ctx context.Context, steps []schema.Age
 		prompt_lines << '${key}: ${inputs[key]}'
 	}
 	messages << schema.text_message(.human, prompt_lines.join('\n'))
-	for index, step in steps {
-		call_id := if step.action.tool_id == '' {
-			'agent-step-${index}'
-		} else {
-			step.action.tool_id
+	mut index := 0
+	for index < steps.len {
+		group := steps[index].action.tool_call_group
+		mut group_end := index + 1
+		if group != '' {
+			for group_end < steps.len && steps[group_end].action.tool_call_group == group {
+				group_end++
+			}
 		}
-		messages << schema.Message{
-			role:  .ai
-			parts: [schema.ContentPart(schema.ToolCall{
+		mut assistant_message := schema.Message{
+			role: .ai
+		}
+		for step_index in index .. group_end {
+			step := steps[step_index]
+			call_id := replayed_tool_call_id(step.action, step_index)
+			assistant_message.parts << schema.ContentPart(schema.ToolCall{
 				id:            call_id
 				call_type:     'function'
 				function_call: schema.FunctionCall{
 					name:      step.action.tool
 					arguments: step.action.tool_input
 				}
-			})]
+			})
 		}
-		messages << schema.Message{
-			role:  .tool
-			parts: [schema.ContentPart(schema.ToolResult{
-				call_id: call_id
-				name:    step.action.tool
-				content: step.observation
-			})]
+		messages << assistant_message
+		for step_index in index .. group_end {
+			step := steps[step_index]
+			messages << schema.Message{
+				role:  .tool
+				parts: [schema.ContentPart(schema.ToolResult{
+					call_id: replayed_tool_call_id(step.action, step_index)
+					name:    step.action.tool
+					content: step.observation
+				})]
+			}
 		}
+		index = group_end
 	}
 	mut definitions := []schema.ToolDefinition{cap: agent.agent_tools.len}
 	for tool in agent.agent_tools {
@@ -124,15 +136,17 @@ pub fn (agent ToolCallingAgent) plan(mut ctx context.Context, steps []schema.Age
 	choice := response.choices[0]
 	if choice.tool_calls.len > 0 {
 		mut actions := []schema.AgentAction{cap: choice.tool_calls.len}
+		group := 'agent-round-${steps.len}'
 		for call in choice.tool_calls {
 			if call.function_call.name.trim_space() == '' {
 				return error('model returned a tool call without a function name')
 			}
 			actions << schema.AgentAction{
-				tool:       call.function_call.name
-				tool_input: call.function_call.arguments
-				log:        choice.content
-				tool_id:    call.id
+				tool:            call.function_call.name
+				tool_input:      normalize_function_input(call.function_call.arguments)
+				log:             choice.content
+				tool_id:         call.id
+				tool_call_group: group
 			}
 		}
 		return PlanResult{
@@ -145,9 +159,10 @@ pub fn (agent ToolCallingAgent) plan(mut ctx context.Context, steps []schema.Age
 		}
 		return PlanResult{
 			actions: [schema.AgentAction{
-				tool:       function_call.name
-				tool_input: function_call.arguments
-				log:        choice.content
+				tool:            function_call.name
+				tool_input:      normalize_function_input(function_call.arguments)
+				log:             choice.content
+				tool_call_group: 'agent-round-${steps.len}'
 			}]
 		}
 	}
@@ -158,6 +173,25 @@ pub fn (agent ToolCallingAgent) plan(mut ctx context.Context, steps []schema.Age
 			return_values: return_values
 		}
 	}
+}
+
+fn replayed_tool_call_id(action schema.AgentAction, step_index int) string {
+	return if action.tool_id == '' {
+		'agent-step-${step_index}'
+	} else {
+		action.tool_id
+	}
+}
+
+fn normalize_function_input(input string) string {
+	values := json2.decode[map[string]json2.Any](input, json2.DecoderOptions{}) or {
+		return input
+	}
+	argument := values['__arg1'] or { return input }
+	if argument is string {
+		return argument
+	}
+	return input
 }
 
 fn merge_call_options(base llms.CallOptions, request llms.CallOptions, tool_definitions []schema.ToolDefinition) llms.CallOptions {
