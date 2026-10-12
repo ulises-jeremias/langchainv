@@ -12,6 +12,10 @@ describes its endpoint, configuration, supported behavior, bounds, and known
 gaps. The adapter being listed does not imply full upstream parity; check the
 guide and [parity ledger](../reference/) before selecting it.
 
+For the provider-neutral model contract and callbacks that wrap any model, see
+the [`llms` guide](https://github.com/ulises-jeremias/langchainv/blob/main/llms/README.md)
+and [model callbacks tutorial](../tutorials/model-callbacks/).
+
 ## Chat and completion models
 
 | Integration | Package guide | Connection type |

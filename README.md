@@ -61,6 +61,10 @@ The current core packages include:
 Provider and component packages use nested import paths such as
 `ulises_jeremias.langchainv.llms.openai`.
 
+The shared [`llms` guide](llms/README.md) documents the model contract and
+provider-neutral callback middleware. The [provider catalog](docs/providers.md)
+lists adapter setup guides and current capabilities.
+
 See [`textsplitter/README.md`](textsplitter/README.md) for chunking options and
 the tokenizer interface.
 
