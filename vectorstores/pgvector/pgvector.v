@@ -62,14 +62,14 @@ pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, option
 		}
 	}
 	return Store{
-		table:           options.table
-		id_column:       options.id_column
-		text_column:     options.text_column
-		metadata_column: options.metadata_column
+		table:            options.table
+		id_column:        options.id_column
+		text_column:      options.text_column
+		metadata_column:  options.metadata_column
 		namespace_column: options.namespace_column
-		vector_column:   options.vector_column
-		embedder:        embedder
-		engine:          engine
+		vector_column:    options.vector_column
+		embedder:         embedder
+		engine:           engine
 	}
 }
 
