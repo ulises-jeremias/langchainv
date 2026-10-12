@@ -217,9 +217,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('OpenSearch query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('OpenSearch adapter does not expose vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy.to_lower() != 'cosine' {
 		return error('OpenSearch adapter supports cosine score filtering only')
 	}
@@ -275,10 +272,14 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			})
 		})
 	}
+	mut source_fields := [json2.Any(store.text_field), json2.Any(store.metadata_field),
+		json2.Any(store.namespace_field)]
+	if options.include_vectors {
+		source_fields << json2.Any(store.vector_field)
+	}
 	body := json2.encode(map[string]json2.Any{
 		'size':    json2.Any(limit)
-		'_source': json2.Any([json2.Any(store.text_field), json2.Any(store.metadata_field),
-			json2.Any(store.namespace_field)])
+		'_source': json2.Any(source_fields)
 		'query':   json2.Any({
 			'knn': json2.Any({
 				store.vector_field: json2.Any(knn)
@@ -329,10 +330,28 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			vector_any := source[store.vector_field] or {
+				return error('OpenSearch hit source has no vector field')
+			}
+			if vector_any !is []json2.Any {
+				return error('OpenSearch returned an unsupported vector shape')
+			}
+			vector_values := vector_any as []json2.Any
+			if vector_values.len == 0 || vector_values.len > max_embedding_values {
+				return error('OpenSearch returned an empty or oversized vector')
+			}
+			embedding = []f32{cap: vector_values.len}
+			for value in vector_values {
+				embedding << open_search_float(value)!
+			}
+		}
 		documents << schema.Document{
 			page_content: content_any as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents

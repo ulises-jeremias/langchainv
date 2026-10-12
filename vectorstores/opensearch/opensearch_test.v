@@ -104,6 +104,43 @@ fn test_opensearch_search_sends_knn_filters_and_restores_document() {
 	assert request.body.contains('tenant-1')
 }
 
+fn test_opensearch_search_returns_vectors_when_requested() {
+	mut state := &OpenSearchFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"hits":{"hits":[{"_score":0.91,"_source":{"page_content":"answer","metadata":{},"namespace":"tenant-1","vector":[0.25,0.75]}}]}}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.25), f32(0.75)]
+	assert state.requests[0].body.contains('"_source":["page_content","metadata","namespace","vector"]')
+}
+
+fn test_opensearch_rejects_non_numeric_returned_vector_values() {
+	mut state := &OpenSearchFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"hits":{"hits":[{"_score":0.91,"_source":{"page_content":"answer","metadata":{},"namespace":"tenant-1","vector":[0.25,"bad"]}}]}}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('score must be numeric')
+		return
+	}
+	assert false, 'expected malformed OpenSearch vector to fail'
+}
+
 fn test_opensearch_deletes_ids_with_bulk_api() {
 	mut state := &OpenSearchFixtureState{
 		responses: [httputil.Response{

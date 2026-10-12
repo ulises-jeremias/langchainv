@@ -19,9 +19,11 @@ k-NN scores, and bulk indexing/deletion. Writes are limited to 64 documents,
 deletes to 1,000 IDs, searches to 1,000 results, vectors to 16,000 finite
 values, and request/response bodies to 4 MiB. Returned scores are OpenSearch
 `_score` values; minimum-score filtering happens after the server returns the
-requested top-k results, so fewer than `limit` documents may be returned. The
-adapter returns content and metadata, not vectors. Remote endpoints must use
-HTTPS; HTTP is allowed for loopback development instances.
+requested top-k results, so fewer than `limit` documents may be returned. Set
+`SearchOptions.include_vectors` to include the stored vector in
+`schema.Document.embedding`; the vector source field is omitted by default.
+Returned vectors are validated for shape, finite values, and size. Remote
+endpoints must use HTTPS; HTTP is allowed for loopback development instances.
 
 The adapter uses the Bulk API with `refresh=true`, then checks every operation
 result. Search uses the k-NN query DSL. See OpenSearch's documentation for
