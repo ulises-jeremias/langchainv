@@ -38,8 +38,10 @@ jobs:
         id: v-compiler-cache
         uses: actions/cache@v6
         with:
-          path: vlang/v
-          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}
+          path: |
+            vlang/v
+            vlang/thirdparty/tcc/lib/libgc.a
+          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}-with-libgc
 
       - name: Build V compiler
         if: steps.v-compiler-cache.outputs.cache-hit != 'true'
