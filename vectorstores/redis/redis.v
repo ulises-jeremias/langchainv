@@ -211,7 +211,8 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	vector_arg := binary_vector(vector)
 	return_count := if options.include_vectors { '4' } else { '3' }
 	mut command := ['FT.SEARCH', store.index,
-		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]', 'RETURN',
+		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]',
+		'RETURN',
 		return_count, store.content_field, store.metadata_field, 'distance']
 	if options.include_vectors {
 		command << store.vector_field
@@ -289,8 +290,11 @@ fn parse_binary_vector(value string, dimensions int) ![]f32 {
 	}
 	mut vector := []f32{cap: dimensions}
 	for index := 0; index < bytes.len; index += 4 {
-		raw_bits := u32(bytes[index]) | (u32(bytes[index + 1]) << 8) | (u32(bytes[index + 2]) << 16)
-			| (u32(bytes[index + 3]) << 24)
+		low_bits := u32(bytes[index])
+		middle_bits := u32(bytes[index + 1]) << 8
+		high_bits := u32(bytes[index + 2]) << 16
+		top_bits := u32(bytes[index + 3]) << 24
+		raw_bits := low_bits | middle_bits | high_bits | top_bits
 		decoded_value := bits.f32_from_bits(raw_bits)
 		if !math.is_finite(f64(decoded_value)) {
 			return error('Redis returned a non-finite vector value')
@@ -331,7 +335,8 @@ fn parse_search_response(response redis_client.RedisValue, store Store, limit in
 		} else {
 			''
 		}
-		used_bytes += id.len + content.len + metadata_json.len + distance_text.len + vector_text.len + 1024
+		used_bytes += id.len + content.len + metadata_json.len + distance_text.len
+		used_bytes += vector_text.len + 1024
 		if used_bytes > max_bytes {
 			return error('Redis search response exceeds 4 MiB')
 		}
