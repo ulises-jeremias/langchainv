@@ -46,6 +46,7 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	assert results.len == 2
 	assert results[0].page_content == 'alpha document'
 	assert results[0].score > results[1].score
+	assert results[0].embedding.len == 0, 'search results omit vectors by default'
 	source_metadata := results[0].metadata['source'] or { panic('missing nested metadata') }
 	match source_metadata {
 		map[string]json2.Any {
@@ -68,7 +69,25 @@ fn test_memory_vector_store_search_filter_namespace_and_delete() {
 	assert remaining.len == 0
 }
 
-fn test_memory_vector_store_enforces_capacity_and_options() {
+fn test_memory_vector_store_returns_vectors_only_when_requested() {
+	mut ctx := context.background()
+	mut store := new_in_memory_vector_store(FixtureEmbedder{}, 1) or { panic(err) }
+	store.add_documents(mut ctx, [schema.new_document('alpha')], StoreOptions{}) or { panic(err) }
+	mut with_vectors := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert with_vectors.len == 1
+	assert with_vectors[0].embedding == [f32(1), 0]
+	with_vectors[0].embedding[0] = f32(42)
+	again := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert again[0].embedding == [f32(1), 0], 'returned vectors do not mutate stored embeddings'
+	without_vectors := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{}) or { panic(err) }
+	assert without_vectors[0].embedding.len == 0
+}
+
+fn test_memory_vector_store_enforces_capacity() {
 	mut ctx := context.background()
 	mut store := new_in_memory_vector_store(FixtureEmbedder{}, 1) or { panic(err) }
 	store.add_documents(mut ctx, [schema.new_document('alpha')], StoreOptions{}) or { panic(err) }
@@ -77,11 +96,4 @@ fn test_memory_vector_store_enforces_capacity_and_options() {
 		return
 	}
 	assert false, 'expected capacity error'
-	store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
-		include_vectors: true
-	}) or {
-		assert err.msg().contains('does not return vectors')
-		return
-	}
-	assert false, 'expected include_vectors option to fail'
 }

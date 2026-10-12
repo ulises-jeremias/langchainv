@@ -83,7 +83,6 @@ struct VectorEntry {
 	id        string
 	namespace string
 	document  schema.Document
-	vector    []f32
 }
 
 // new_in_memory_vector_store creates a store with a required positive entry
@@ -133,7 +132,7 @@ pub fn (store InMemoryVectorStore) add_documents(mut ctx context.Context, docume
 		state.mutex.unlock()
 		return error('adding documents exceeds the store limit of ${state.max_documents}')
 	}
-	if state.entries.len > 0 && state.entries[0].vector.len != dimension {
+	if state.entries.len > 0 && state.entries[0].document.embedding.len != dimension {
 		state.mutex.unlock()
 		return error('embedding vector dimensions differ from vectors already in the store')
 	}
@@ -142,11 +141,12 @@ pub fn (store InMemoryVectorStore) add_documents(mut ctx context.Context, docume
 		state.next_id++
 		id := 'memory-${state.next_id}'
 		ids << id
+		mut stored_document := clone_document(document, false)
+		stored_document.embedding = vectors[index].clone()
 		state.entries << VectorEntry{
 			id:        id
 			namespace: options.namespace
-			document:  clone_document(document)
-			vector:    vectors[index].clone()
+			document:  stored_document
 		}
 	}
 	state.mutex.unlock()
@@ -160,9 +160,6 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 	}
 	if limit == 0 {
 		return []schema.Document{}
-	}
-	if options.include_vectors {
-		return error('in-memory vector store does not return vectors')
 	}
 	if options.distance_strategy != '' && options.distance_strategy != 'cosine' {
 		return error('in-memory vector store supports only cosine distance')
@@ -182,22 +179,21 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 	state.mutex.unlock()
 	mut matches := []ScoredEntry{}
 	for entry in entries {
-		if entry.vector.len != query_vector.len {
+		if entry.document.embedding.len != query_vector.len {
 			return error('query and document embedding dimensions differ')
 		}
 		if (options.namespace != '' && entry.namespace != options.namespace)
 			|| !metadata_matches(entry.document.metadata, options.filter) {
 			continue
 		}
-		score := embeddings.cosine_similarity(query_vector, entry.vector)!
+		score := embeddings.cosine_similarity(query_vector, entry.document.embedding)!
 		minimum := options.min_score or { f32(-1) }
 		if score < minimum {
 			continue
 		}
 		matches << ScoredEntry{
-			document: clone_document(entry.document)
-			score:    score
-			id:       entry.id
+			entry: entry
+			score: score
 		}
 	}
 	matches.sort(a.score > b.score)
@@ -206,7 +202,7 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 		if index >= limit {
 			break
 		}
-		mut document := result.document
+		mut document := clone_document(result.entry.document, options.include_vectors)
 		document.score = result.score
 		if !options.include_metadata {
 			document.metadata = map[string]json2.Any{}
@@ -240,9 +236,8 @@ pub fn (store InMemoryVectorStore) delete(mut ctx context.Context, ids []string,
 }
 
 struct ScoredEntry {
-	document schema.Document
-	score    f32
-	id       string
+	entry VectorEntry
+	score f32
 }
 
 fn metadata_matches(metadata map[string]json2.Any, filter map[string]json2.Any) bool {
@@ -255,11 +250,12 @@ fn metadata_matches(metadata map[string]json2.Any, filter map[string]json2.Any) 
 	return true
 }
 
-fn clone_document(document schema.Document) schema.Document {
+fn clone_document(document schema.Document, include_embedding bool) schema.Document {
 	return schema.Document{
 		page_content: document.page_content
 		metadata:     clone_metadata(document.metadata)
 		score:        document.score
+		embedding:    if include_embedding { document.embedding.clone() } else { []f32{} }
 	}
 }
 
