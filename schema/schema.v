@@ -4,12 +4,14 @@ module schema
 import context
 import json2
 
-// Document is a text unit with source metadata and an optional retrieval score.
+// Document is a text unit with source metadata, an optional retrieval score,
+// and an optional embedding returned by vector stores.
 pub struct Document {
 pub mut:
 	page_content string
 	metadata     map[string]json2.Any
 	score        f32
+	embedding    []f32
 }
 
 // new_document constructs a document with initialized metadata.
