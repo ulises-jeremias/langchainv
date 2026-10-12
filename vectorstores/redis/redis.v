@@ -132,9 +132,9 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 	mut commands := [][]string{cap: documents.len}
 	mut written_bytes := 0
 	for index, document in documents {
-		ctx_error := ctx.err()
-		if ctx_error !is none {
-			return ctx_error
+		write_ctx_error := ctx.err()
+		if write_ctx_error !is none {
+			return write_ctx_error
 		}
 		vector := vectors[index]
 		validate_vector(vector, store.dimensions)!
@@ -159,9 +159,9 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 		commands << command
 	}
 	for command in commands {
-		ctx_error := ctx.err()
-		if ctx_error !is none {
-			return ctx_error
+		command_ctx_error := ctx.err()
+		if command_ctx_error !is none {
+			return command_ctx_error
 		}
 		store.client.cmd(...command) or { return error('Redis HSET failed: ${err.msg()}') }
 	}
