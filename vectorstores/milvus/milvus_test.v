@@ -125,6 +125,43 @@ fn test_milvus_search_restores_document_and_applies_filter() {
 	assert request.body.contains('tenant-1')
 }
 
+fn test_milvus_search_returns_vectors_when_requested() {
+	mut state := &MilvusFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"code":0,"data":[{"id":"vec-1","distance":0.91,"page_content":"answer","metadata":{},"namespace":"tenant-1","vector":[0.4,0.6]}]}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.4), f32(0.6)]
+	assert state.requests[0].body.contains('"outputFields":["page_content","metadata","namespace","vector"]')
+}
+
+fn test_milvus_rejects_non_numeric_returned_vector_values() {
+	mut state := &MilvusFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"code":0,"data":[{"id":"vec-1","distance":0.91,"page_content":"answer","metadata":{},"namespace":"tenant-1","vector":[0.4,"bad"]}]}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('numeric')
+		return
+	}
+	assert false, 'expected malformed Milvus vector to fail'
+}
+
 fn test_milvus_deletes_ids_with_namespace_scope() {
 	mut state := &MilvusFixtureState{
 		responses: [httputil.Response{

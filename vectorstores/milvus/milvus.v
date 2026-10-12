@@ -238,9 +238,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('Milvus query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Milvus adapter does not expose stored vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && metric_for_strategy(options.distance_strategy) != store.metric_type {
 		return error('Milvus search distance strategy must match the configured collection metric')
 	}
@@ -278,14 +275,18 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		}
 		wire_vector << json2.Any(value)
 	}
+	mut output_fields := [json2.Any(store.text_field), json2.Any(store.metadata_field),
+		json2.Any(store.namespace_field)]
+	if options.include_vectors {
+		output_fields << json2.Any(store.vector_field)
+	}
 	mut request := map[string]json2.Any{
 		'dbName':         json2.Any(store.database)
 		'collectionName': json2.Any(store.collection)
 		'data':           json2.Any([json2.Any(wire_vector)])
 		'annsField':      json2.Any(store.vector_field)
 		'limit':          json2.Any(limit)
-		'outputFields':   json2.Any([json2.Any(store.text_field), json2.Any(store.metadata_field),
-			json2.Any(store.namespace_field)])
+		'outputFields':   json2.Any(output_fields)
 		'searchParams':   json2.Any({
 			'metricType': json2.Any(store.metric_type)
 			'params':     json2.Any(map[string]json2.Any{})
@@ -333,10 +334,28 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			vector_any := fields[store.vector_field] or {
+				return error('Milvus search match is missing its vector field')
+			}
+			if vector_any !is []json2.Any {
+				return error('Milvus returned an unsupported vector shape')
+			}
+			vector_values := vector_any as []json2.Any
+			if vector_values.len == 0 || vector_values.len > max_embedding_values {
+				return error('Milvus returned an empty or oversized vector')
+			}
+			embedding = []f32{cap: vector_values.len}
+			for value in vector_values {
+				embedding << milvus_float(value)!
+			}
+		}
 		documents << schema.Document{
 			page_content: content_any as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents
