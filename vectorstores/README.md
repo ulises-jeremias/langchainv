@@ -13,6 +13,16 @@ The in-memory implementation currently supports only cosine distance. It
 requires non-empty, finite vectors of consistent dimensions and rejects query
 dimension mismatches.
 
+## Return stored vectors
+
+Set `SearchOptions.include_vectors` on `similarity_search` to populate
+`schema.Document.embedding`. The default is `false`, so ordinary retrieval
+does not return vectors. The [offline example](../examples/vector_return/main.v)
+shows the option with the in-memory store; remote stores also support it, but
+their returned-vector limits and index requirements vary by backend. See the
+[vector return tutorial](../docs/tutorials/returning-vectors.md) and the
+adapter-specific guides before enabling it remotely.
+
 The `azureaisearch`, `chroma`, `milvus`, `opensearch`, `qdrant`, `pinecone`,
 and `weaviate` subpackages provide bounded REST adapters for existing remote
 collections or indexes. Each accepts an injected embedder and HTTP client for
