@@ -24,6 +24,7 @@ mut:
 
 struct RecordingHandler {
 	callbacks.SimpleHandler
+mut:
 	state &CallbackState
 }
 
