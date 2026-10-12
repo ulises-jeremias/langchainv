@@ -19,6 +19,11 @@ pub fn (handler LogHandler) llm_start(mut ctx context.Context, prompts []string)
 	println('Entering LLM with prompts: ${prompts}')
 }
 
+// llm_complete_end prints a completed string-model response.
+pub fn (handler LogHandler) llm_complete_end(mut ctx context.Context, response string) {
+	println('Exiting LLM with response: ${response}')
+}
+
 // llm_generate_content_start prints the role and text for each chat message.
 pub fn (handler LogHandler) llm_generate_content_start(mut ctx context.Context, messages []schema.Message) {
 	println('Entering LLM with messages:')

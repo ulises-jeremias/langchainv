@@ -16,6 +16,9 @@ pub fn (mut handler SimpleHandler) text(mut ctx context.Context, text string) {}
 // llm_start ignores completion-model start events.
 pub fn (mut handler SimpleHandler) llm_start(mut ctx context.Context, prompts []string) {}
 
+// llm_complete_end ignores completed string-model responses.
+pub fn (mut handler SimpleHandler) llm_complete_end(mut ctx context.Context, response string) {}
+
 // llm_generate_content_start ignores chat-model start events.
 pub fn (mut handler SimpleHandler) llm_generate_content_start(mut ctx context.Context, messages []schema.Message) {}
 

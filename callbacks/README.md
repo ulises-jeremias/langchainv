@@ -1,6 +1,9 @@
 # Callbacks
 
-`Handler` receives lifecycle events; `SimpleHandler` supplies no-op behavior,
+`Handler` receives lifecycle events; string completions use `llm_start` and
+`llm_complete_end`, while chat models use `llm_generate_content_start` and
+`llm_generate_content_end`. Both paths report failures with `llm_error`.
+`SimpleHandler` supplies no-op behavior,
 `CombiningHandler` fans out events in registration order, and `LogHandler` writes
 events to standard output. `StreamLogHandler` logs only raw streaming chunks.
 

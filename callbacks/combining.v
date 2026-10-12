@@ -32,6 +32,11 @@ pub fn (mut handler CombiningHandler) llm_start(mut ctx context.Context, prompts
 	handler.handlers.dispatch_llm_start(mut ctx, prompts)
 }
 
+// llm_complete_end forwards completed string-model responses.
+pub fn (mut handler CombiningHandler) llm_complete_end(mut ctx context.Context, response string) {
+	handler.handlers.dispatch_llm_complete_end(mut ctx, response)
+}
+
 // llm_generate_content_start forwards chat-model start events.
 pub fn (mut handler CombiningHandler) llm_generate_content_start(mut ctx context.Context, messages []schema.Message) {
 	handler.handlers.dispatch_llm_generate_content_start(mut ctx, messages)

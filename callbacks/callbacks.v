@@ -13,6 +13,7 @@ pub interface Handler {
 mut:
 	text(mut ctx context.Context, text string)
 	llm_start(mut ctx context.Context, prompts []string)
+	llm_complete_end(mut ctx context.Context, response string)
 	llm_generate_content_start(mut ctx context.Context, messages []schema.Message)
 	llm_generate_content_end(mut ctx context.Context, response llms.Response)
 	llm_error(mut ctx context.Context, err IError)
@@ -51,6 +52,13 @@ pub fn (mut handlers Handlers) dispatch_text(mut ctx context.Context, text strin
 pub fn (mut handlers Handlers) dispatch_llm_start(mut ctx context.Context, prompts []string) {
 	for mut handler in handlers.items {
 		handler.llm_start(mut ctx, prompts)
+	}
+}
+
+// dispatch_llm_complete_end delivers a completed string-model response.
+pub fn (mut handlers Handlers) dispatch_llm_complete_end(mut ctx context.Context, response string) {
+	for mut handler in handlers.items {
+		handler.llm_complete_end(mut ctx, response)
 	}
 }
 
