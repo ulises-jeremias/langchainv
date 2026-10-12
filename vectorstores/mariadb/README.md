@@ -26,8 +26,10 @@ Writes use parameterized multi-row inserts and `VEC_FromText`; searches use
 support scalar JSON values and namespaces use exact matching. Field and table
 names are configurable simple identifiers and quoted with MariaDB identifier
 quotes. The existing vector index must use `DISTANCE=cosine` for indexed search.
-Array metadata, arbitrary filter expressions, schema creation, and
-vector return are unsupported.
+Array metadata, arbitrary filter expressions, and schema creation are
+unsupported. Set `SearchOptions.include_vectors` to retrieve stored vectors in
+`schema.Document.embedding`; MariaDB formats them with `VEC_ToText`, and the
+adapter checks the returned dimension and finite values before exposing them.
 
 Writes are limited to 64 documents, deletes to 1,000 IDs, searches to 1,000
 candidate rows, vectors to 2,000 finite values, and insert parameters to 4 MiB.
@@ -38,7 +40,8 @@ filtering happens after MariaDB returns the bounded top-k, so fewer than
 `limit` results may be returned. The implementation uses the
 [MariaDB vector overview](https://mariadb.com/docs/server/reference/sql-structure/vectors/vector-overview),
 [VECTOR data type](https://mariadb.com/docs/server/reference/sql-structure/vectors/vector),
-and [cosine distance function](https://mariadb.com/docs/server/reference/sql-functions/vector-functions/vec_distance_cosine).
+[cosine distance function](https://mariadb.com/docs/server/reference/sql-functions/vector-functions/vec_distance_cosine),
+and [vector-to-text function](https://mariadb.com/docs/server/reference/sql-functions/vector-functions/vec_totext).
 
 Tests use a fake SQL engine and do not require a MariaDB server. Hosted CI
 compiles and tests the adapter with the pinned V compiler.
