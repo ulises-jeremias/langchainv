@@ -2,7 +2,9 @@ module agents
 
 import context
 import json2
+import ulises_jeremias.langchainv.chains
 import ulises_jeremias.langchainv.llms
+import ulises_jeremias.langchainv.memory
 import ulises_jeremias.langchainv.schema
 import ulises_jeremias.langchainv.tools
 
@@ -133,6 +135,54 @@ fn test_react_agent_runs_through_the_executor_with_tool_observation() {
 	assert answer == json2.Any('hello')
 	assert state.prompts.len == 2
 	assert state.prompts[1].contains('Observation: hello')
+}
+
+fn test_conversational_react_agent_loads_and_saves_history_through_chain_memory() {
+	mut state := &ReactFixtureModelState{
+		outputs: [
+			'Final Answer: I will remember your name.',
+			'Final Answer: Your name is Ada.',
+		]
+	}
+	agent := new_conversational_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{}) or { panic(err) }
+	assert agent.input_keys() == ['input', 'history']
+	executor := new_executor(agent, ExecutorOptions{
+		memory: memory.new_conversation_buffer('history', 'input', 'output') or { panic(err) }
+	}) or { panic(err) }
+	mut ctx := context.background()
+	first := chains.call(mut ctx, executor, {
+		'input': json2.Any('My name is Ada.')
+	}) or { panic(err) }
+	assert (first['output'] or { panic('missing first answer') }).str() == 'I will remember your name.'
+	second := chains.call(mut ctx, executor, {
+		'input': json2.Any('What is my name?')
+	}) or { panic(err) }
+	assert (second['output'] or { panic('missing second answer') }).str() == 'Your name is Ada.'
+	assert state.prompts[0].contains('Conversation history:\n')
+	assert state.prompts[0].contains('Current request:\ninput: My name is Ada.')
+	assert state.prompts[1].contains('Human: My name is Ada.\nAI: I will remember your name.')
+	assert state.prompts[1].contains('Current request:\ninput: What is my name?')
+}
+
+fn test_conversational_react_agent_preserves_custom_inputs_and_adds_history() {
+	mut state := &ReactFixtureModelState{
+		outputs: ['Final Answer: done']
+	}
+	agent := new_conversational_react_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], ReactOptions{
+		input_keys: ['question']
+	}) or { panic(err) }
+	assert agent.input_keys() == ['question', 'history']
+	mut ctx := context.background()
+	agent.plan(mut ctx, [], {
+		'history':  'Earlier conversation.'
+		'question': 'Continue.'
+	}, llms.CallOptions{}) or { panic(err) }
+	assert state.prompts[0].contains('question: Continue.')
+	assert state.prompts[0].contains('Conversation history:\nEarlier conversation.')
 }
 
 fn test_react_agent_rejects_missing_action_input() {

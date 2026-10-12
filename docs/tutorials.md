@@ -21,7 +21,8 @@ Work through these recipes in order. Each section links to the package guide tha
 9. Try [bounded concurrent document mapping](concurrent-document-mapping/) with an offline completion model before raising concurrency on a live provider.
 10. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
 11. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
-12. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
+12. Build a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
+13. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
 
 ## Recipes by task
 
@@ -33,6 +34,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Map documents concurrently | [Concurrent mapping tutorial](concurrent-document-mapping/) | Uses a stateless offline model; the chain defaults to one worker and accepts at most five. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
+| Keep history in a tool-using conversation | [Conversational ReAct agent](conversational-agent-memory/) | Uses executor memory and an offline model; swap in a provider only after reviewing its limits. |
 | Split plain text or Markdown | [textsplitter](https://github.com/ulises-jeremias/langchainv/blob/main/textsplitter/README.md) | Token chunking uses an injected tokenizer; no tokenizer data downloads. |
 | Generate chat completions | [OpenAI](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md), [Ollama](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md), or another provider README | Provider options and streaming support differ. |
 | Embed documents | [embeddings](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) | Select a provider and inspect its batch and input limits. |
