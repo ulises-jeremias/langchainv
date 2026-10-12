@@ -13,8 +13,8 @@ Work through these recipes in order. Each section links to the package guide tha
 1. Start with the runnable [text splitter example](https://github.com/ulises-jeremias/langchainv/blob/main/examples/text_splitter/main.v) and learn [recursive and Markdown chunking](https://github.com/ulises-jeremias/langchainv/blob/main/textsplitter/README.md).
 2. Follow the [prompt templates tutorial](prompt-templates/), then parse responses with [output parsers](https://github.com/ulises-jeremias/langchainv/blob/main/outputparser/README.md).
 3. Run the [mock model tutorial](offline-model-tests/) to test model-dependent code without a provider.
-4. Add [model lifecycle callbacks](model-callbacks/) through a provider-neutral middleware wrapper.
-5. Call a live model through an explicit adapter such as [OpenAI Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md). Keep credentials outside source control.
+4. Make one [live chat request](first-chat/) with an explicit provider adapter after reviewing key handling and provider costs.
+5. Add [model lifecycle callbacks](model-callbacks/) through a provider-neutral middleware wrapper.
 6. Review the [embedding guides](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) and [vector store adapters](https://github.com/ulises-jeremias/langchainv/tree/main/vectorstores) before choosing a retrieval backend.
 7. Run the [offline retrieval QA tutorial](retrieval-qa/) before configuring a remote vector store.
 8. Compose model operations with [chains](https://github.com/ulises-jeremias/langchainv/blob/main/chains/README.md), add [memory](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md), and expose selected [tools](https://github.com/ulises-jeremias/langchainv/tree/main/tools).
@@ -26,6 +26,7 @@ Work through these recipes in order. Each section links to the package guide tha
 
 | Task | Start here | Notes |
 |---|---|---|
+| Make a first chat request | [First chat tutorial](first-chat/) | Sends a billable live request; keep the API key in the environment. |
 | Test model-dependent code offline | [Mock model tutorial](offline-model-tests/) | No API key or network calls; adapter HTTP behavior should use an injected fake transport. |
 | Build retrieval QA | [Retrieval tutorial](retrieval-qa/) | Uses in-memory storage and deliberately simple fakes; no semantic embeddings or external services. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
