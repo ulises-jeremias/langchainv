@@ -29,19 +29,8 @@ jobs:
           path: langchainv
           persist-credentials: false
 
-      - name: Reject workstation-only resource wrapper in CI workflows
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          forbidden = "systemd" + "-run"
-          for workflow in Path("langchainv/.github/workflows").glob("*"):
-              if workflow.is_file() and forbidden in workflow.read_text():
-                  raise SystemExit(
-                      f"{workflow}: CI workflows must run commands directly; "
-                      f"{forbidden} is reserved for local workstation limits"
-                  )
-          PY
+      - name: Check CI package coverage and command policy
+        run: python3 langchainv/scripts/check_ci_coverage.py
 
       - name: Check out pinned V compiler
         uses: actions/checkout@v7

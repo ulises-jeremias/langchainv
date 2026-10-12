@@ -36,7 +36,9 @@ Use focused checks for the changed package. Do not run a full local suite;
 CI runs formatting and Markdown checks once, then package groups and standalone
 examples in bounded GitHub-hosted jobs. The CI jobs run V directly with
 `VJOBS=2`; `systemd-run` is only for safely limiting local processes. Package
-test logs identify each package as it starts. If a command is killed by memory
+test logs identify each package as it starts. CI also checks that every package
+with V test files appears in its package matrix and rejects workstation-only
+resource wrappers in workflow files. If a command is killed by memory
 limits, record it as unverified and reduce the workload before trying again.
 Do not run live provider calls or incur API charges in routine validation.
 
