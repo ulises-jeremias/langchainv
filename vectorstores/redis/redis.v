@@ -209,10 +209,10 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	vector := store.embedder.embed_query(mut ctx, query)!
 	validate_vector(vector, store.dimensions)!
 	vector_arg := binary_vector(vector)
+	return_count := if options.include_vectors { '4' } else { '3' }
 	mut command := ['FT.SEARCH', store.index,
 		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]', 'RETURN',
-		if options.include_vectors { '4' } else { '3' }, store.content_field,
-		store.metadata_field, 'distance']
+		return_count, store.content_field, store.metadata_field, 'distance']
 	if options.include_vectors {
 		command << store.vector_field
 	}
@@ -291,11 +291,11 @@ fn parse_binary_vector(value string, dimensions int) ![]f32 {
 	for index := 0; index < bytes.len; index += 4 {
 		raw_bits := u32(bytes[index]) | (u32(bytes[index + 1]) << 8) | (u32(bytes[index + 2]) << 16)
 			| (u32(bytes[index + 3]) << 24)
-		value := bits.f32_from_bits(raw_bits)
-		if !math.is_finite(f64(value)) {
+		decoded_value := bits.f32_from_bits(raw_bits)
+		if !math.is_finite(f64(decoded_value)) {
 			return error('Redis returned a non-finite vector value')
 		}
-		vector << value
+		vector << decoded_value
 	}
 	return vector
 }
