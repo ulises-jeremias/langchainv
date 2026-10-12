@@ -12,7 +12,7 @@ embedder and HTTP client for offline tests. Remote endpoints require HTTPS;
 plain HTTP is allowed only on loopback. Requests and responses are capped at
 4 MiB, search limits at 1000, and embedding vectors at 65,536 values.
 
-```v
+```v wip
 mut store := weaviate.new_store(embedder, weaviate.Options{
 	base_url: 'https://weaviate.example.com'
 	class_name: 'Guide'

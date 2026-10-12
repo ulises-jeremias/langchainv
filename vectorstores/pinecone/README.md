@@ -13,7 +13,7 @@ metadata are checked before embedding. Pinecone metadata values are limited to
 JSON scalars and string arrays; page content is stored under a reserved key and
 removed when documents are returned. Tests use an injected HTTP transport.
 
-```v
+```v wip
 mut store := pinecone.new_store(embedder, pinecone.Options{
 	host:    'https://my-index.example.svc.pinecone.io'
 	api_key: pinecone_api_key

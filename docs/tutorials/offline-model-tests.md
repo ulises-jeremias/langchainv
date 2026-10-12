@@ -24,7 +24,7 @@ example with the pinned V compiler.
 
 ## Configure responses and failures
 
-```v
+```v wip
 model := llmtest.new_mock_model(llms.Response{
     choices: [llms.Choice{content: 'fixture answer'}]
 })

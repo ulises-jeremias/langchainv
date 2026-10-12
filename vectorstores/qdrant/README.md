@@ -20,7 +20,7 @@ queries at most 64 KiB, and searches/deletes at most 1,000 entries. Local HTTP e
 to loopback; remote endpoints require HTTPS. Tests use an injected
 `httputil.HTTPClient` and do not require Qdrant or credentials.
 
-```v
+```v wip
 mut store := qdrant.new_store('documents', embedder, qdrant.StoreOptions{
 	base_url: 'https://qdrant.example.test'
 	api_key:  qdrant_api_key
