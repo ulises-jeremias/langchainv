@@ -6,15 +6,44 @@ are accounted for. `verified` requires behavior evidence at the same scope as
 the claim.
 
 The inventory is based on upstream commit
-`039fbb6c6469a8ffcdae615ec7bdc465c83abadc` (`main`, 1,500 entries) inspected on
-2026-10-09. Upstream can change; refresh this inventory before a release.
+[`6351d0d03286ba1f8be78b572d88c9b43ed6b869`](https://github.com/tmc/langchaingo/commit/6351d0d03286ba1f8be78b572d88c9b43ed6b869)
+(`main`, 1,501 tree entries) inspected on 2026-10-12. This snapshot is 16
+commits ahead of the previous 2026-10-09 scan. Upstream can change; refresh this
+inventory before a release.
+
+## Changes since the previous upstream scan
+
+- CI now runs `govulncheck`, upgrades its Go lint tool, and uses an explicit
+  Bash shell for piped test output so test failures propagate through `tee`.
+  LangChainV has no mandatory third-party modules; its hosted CI pins V, runs
+  `v fmt -verify .`, tests configured packages, and compiles every standalone
+  example.
+- `ConversationalRetrievalQA.GetOutputKeys()` now reports
+  `generated_question` when that output is enabled. LangChainV already includes
+  that key in its conversational retrieval chain output contract.
+- Anthropic now emits its generation-end callback on successful legacy and
+  Messages API responses. LangChainV has lifecycle event contracts and
+  streaming callbacks, but its provider adapters are not yet wired to dispatch
+  the full model start/end/error lifecycle through `callbacks`.
+- Mistral now returns distinct empty/multiple-choice errors, invokes the
+  configured callback handler, and exposes usage through the same token-count
+  keys as other providers. LangChainV normalizes token usage into
+  `llms.Usage`; callback lifecycle wiring remains a cross-provider gap.
+- The upstream compliance helper recognizes more provider usage key spellings
+  and integer types; its reusable `MockLLM` is now concurrency-safe. LangChainV
+  currently has opt-in live model contract checks and deterministic fixtures
+  in package tests, but no exported, concurrency-safe mock model in
+  `testing/llmtest`.
+- The remaining changes in this range are mainly dependency/example refreshes,
+  replay-fixture adjustments, and test robustness fixes; they do not add a new
+  upstream framework package.
 
 ## Framework packages
 
 | Upstream package | Scope to account for | Status |
 |---|---|---|
 | `agents` | agent contract, planning, MRKL, conversational agents, OpenAI functions/tools, executor, initialization, options, errors | partial: Plan/Finish contract, bounded textual MRKL/ReAct agent with configurable prompts, tool descriptions/names, iterative scratchpad, streaming-capable completion options, case-insensitive final/action parsing, and output byte limits; generic model tool-calling agent; and bounded iterative executor with typed string inputs, case-insensitive tool dispatch, cancellation checks, callbacks, chain memory integration, and optional intermediate-step output; conversational variants, specialized OpenAI-functions agent, advanced parser recovery, and full initialization remain outstanding |
-| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; see V-native queue behavior in package docs |
+| `callbacks` | callback interfaces, simple/logging/streaming handlers, composition, agent-final stream | partial: lifecycle contract, no-op base handler, ordered fan-out composition, standard-output event logging and raw streaming log handlers, and a bounded agent-final stream with per-instance keywords; model provider adapters do not yet dispatch the full start/end/error lifecycle through this package; see V-native queue behavior in package docs |
 | `chains` | base chain API/options, LLM, conversation, sequential, transform, stuff/map-reduce/map-rerank/refine, retrieval and conversational retrieval QA, question answering, summarization, SQL database, constitutional chains | partial: chain contract, input/output validation, prompt-backed completion and chat-model chains, a fixed-prompt completion conversation chain with history memory, bounded document-stuffing into completion prompts, sequential bounded map-reduce with metadata preservation and optional intermediate steps, bounded sequential map-rerank with answer/score parsing, descending rank selection and optional sorted steps, bounded sequential refine with metadata-aware document formatting, running-answer updates and pre-call limits, bounded sequential constitutional critique and revision with validated principles/prompts, byte limits, cancellation checks, and optional intermediate steps, bounded retrieval QA with optional source-document return, bounded history-based standalone-question rewriting for conversational retrieval QA with original-question rephrasing control and optional generated-question output, built-in stuff/refine/map-reduce/map-rerank QA presets, question-condensing prompt chain, stuff/refine/map-reduce summarization presets, validated sequential composition, simple sequential key adaptation, function-backed transform chain, and bounded SQLDatabase schema/sample/query APIs; database calls materialize rows before output caps and cannot be interrupted mid-query through `context.Context`. Map-reduce, map-rerank, and refine currently process documents sequentially rather than using LangChainGo's concurrent mapping |
 | `documentloaders` | text, directory, CSV, HTML, PDF, Notion, AssemblyAI | partial: bounded HTML text, text-file, CSV, page-scoped Poppler PDF extraction with page metadata and bounded splitting, paginated recursive Notion blocks, and AssemblyAI transcription loaders; bounded recursive directory traversal for `.txt`, `.md`, `.csv`, `.html`, `.htm`, and `.pdf` files with extension filters, CSV columns, source metadata, and bounded splitting; PDF extraction uses literal `pdftotext` arguments without a shell, regular-file checks, input/output/time/page-count limits, cancellation, and process-group cleanup; encrypted PDFs remain unsupported because Poppler exposes passwords through process arguments; Poppler is an external runtime dependency |
 | `embeddings` | common embedding contract/options, vector math, Bedrock, Cybertron, Google AI, Hugging Face, Jina, OpenAI, Ollama, VoyageAI | partial: contracts, client adapter, newline preprocessing, bounded sequential batching, weighted vector combination, dot product, cosine similarity, OpenAI, Jina, and Voyage `/v1/embeddings`, Hugging Face feature extraction, Ollama `/api/embed`, Gemini `batchEmbedContents`, and Amazon Bedrock Titan/Cohere `InvokeModel` clients with injectable transport; Cybertron remains outstanding |
