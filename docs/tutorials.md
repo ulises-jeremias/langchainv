@@ -17,12 +17,13 @@ Work through these recipes in order. Each section links to the package guide tha
 5. Add [model lifecycle callbacks](model-callbacks/) through a provider-neutral middleware wrapper.
 6. Review the [embedding guides](https://github.com/ulises-jeremias/langchainv/tree/main/embeddings) and [vector store adapters](https://github.com/ulises-jeremias/langchainv/tree/main/vectorstores) before choosing a retrieval backend.
 7. Run the [offline retrieval QA tutorial](retrieval-qa/) before configuring a remote vector store.
-8. Compose model operations with [chains](https://github.com/ulises-jeremias/langchainv/blob/main/chains/README.md), add [memory](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md), and expose selected [tools](https://github.com/ulises-jeremias/langchainv/tree/main/tools).
-9. Try [bounded concurrent document mapping](concurrent-document-mapping/) with an offline completion model before raising concurrency on a live provider.
-10. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
-11. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
-12. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
-13. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
+8. Try [retrieval QA with Azure AI Search](azure-ai-search-retrieval/) after reviewing its live-service costs and credentials.
+9. Compose model operations with [chains](https://github.com/ulises-jeremias/langchainv/blob/main/chains/README.md), add [memory](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md), and expose selected [tools](https://github.com/ulises-jeremias/langchainv/tree/main/tools).
+10. Try [bounded concurrent document mapping](concurrent-document-mapping/) with an offline completion model before raising concurrency on a live provider.
+11. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
+12. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
+13. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
+14. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
 
 ## Recipes by task
 
@@ -31,6 +32,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Make a first chat request | [First chat tutorial](first-chat/) | Sends a billable live request; keep the API key in the environment. |
 | Test model-dependent code offline | [Mock model tutorial](offline-model-tests/) | No API key or network calls; adapter HTTP behavior should use an injected fake transport. |
 | Build retrieval QA | [Retrieval tutorial](retrieval-qa/) | Uses in-memory storage and deliberately simple fakes; no semantic embeddings or external services. |
+| Run retrieval QA against Azure AI Search | [Azure retrieval tutorial](azure-ai-search-retrieval/) | Explicit live opt-in; sends text to OpenAI and Azure and can incur usage charges. |
 | Map documents concurrently | [Concurrent mapping tutorial](concurrent-document-mapping/) | Uses a stateless offline model; the chain defaults to one worker and accepts at most five. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
