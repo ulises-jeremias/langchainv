@@ -36,6 +36,12 @@ executor with `chains.call` to load prior turns and save the latest question
 and answer. The constructor accepts the same prompt, byte-limit, and model-call
 options as `new_react_agent`.
 
+`initialize_agent` constructs either preset and its executor in one call. Use
+`AgentType.react` or `AgentType.conversational_react`, provide `ReactOptions`
+for the prompt and model, then `ExecutorOptions` for iteration limits, memory,
+callbacks, and executor call defaults. The V enum keeps supported agent types
+explicit at compile time.
+
 Executors implement `chains.Chain`. Pass one to `chains.call` to integrate its
 optional memory through the shared chain lifecycle. Inputs must be strings.
 Tool lookup is case-insensitive; an unknown tool becomes an observation so the

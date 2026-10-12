@@ -185,6 +185,47 @@ fn test_conversational_react_agent_preserves_custom_inputs_and_adds_history() {
 	assert state.prompts[0].contains('Conversation history:\nEarlier conversation.')
 }
 
+fn test_initialize_agent_builds_react_preset_and_executor() {
+	mut state := &ReactFixtureModelState{
+		outputs: ['Final Answer: initialized']
+	}
+	mut ctx := context.background()
+	mut executor := initialize_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], .react, ReactOptions{}, ExecutorOptions{
+		max_iterations: 3
+	}) or { panic(err) }
+	assert executor.agent.input_keys() == ['input']
+	result := executor.call(mut ctx, {
+		'input': json2.Any('question')
+	}) or { panic(err) }
+	assert (result['output'] or { panic('missing initialized ReAct answer') }) == json2.Any('initialized')
+}
+
+fn test_initialize_agent_builds_conversational_preset_with_memory() {
+	mut state := &ReactFixtureModelState{
+		outputs: [
+			'Final Answer: I will remember your name.',
+			'Final Answer: Your name is Ada.',
+		]
+	}
+	mut executor := initialize_agent(ReactFixtureModel{
+		state: state
+	}, [ReactEchoTool{}], .conversational_react, ReactOptions{}, ExecutorOptions{
+		memory: memory.new_conversation_buffer('history', 'input', 'output') or { panic(err) }
+	}) or { panic(err) }
+	assert executor.agent.input_keys() == ['input', 'history']
+	mut ctx := context.background()
+	chains.call(mut ctx, executor, {
+		'input': json2.Any('My name is Ada.')
+	}) or { panic(err) }
+	result := chains.call(mut ctx, executor, {
+		'input': json2.Any('What is my name?')
+	}) or { panic(err) }
+	assert (result['output'] or { panic('missing initialized conversational answer') }) == json2.Any('Your name is Ada.')
+	assert state.prompts[1].contains('Human: My name is Ada.')
+}
+
 fn test_react_agent_rejects_missing_action_input() {
 	parse_react_output('Thought: act\nAction: echo', 'output') or {
 		assert err.msg().contains('Action Input')
