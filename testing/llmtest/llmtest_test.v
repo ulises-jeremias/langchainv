@@ -1,6 +1,7 @@
 module llmtest
 
 import context
+import sync
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
@@ -161,4 +162,74 @@ fn test_test_model_validates_tool_call_arguments() {
 		return
 	}
 	assert false, 'expected invalid tool arguments to be reported'
+}
+
+fn test_mock_model_returns_configured_response_and_counts_calls() {
+	model := new_mock_model(llms.Response{
+		choices: [llms.Choice{
+			content: 'mock response'
+		}]
+		usage:   llms.Usage{
+			prompt_tokens:     3
+			completion_tokens: 2
+			total_tokens:      5
+		}
+	})
+	mut ctx := context.background()
+	response := model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	assert response.choices.len == 1
+	assert response.choices[0].content == 'mock response'
+	assert response.usage.total_tokens == 5
+	assert model.call_count() == 1
+}
+
+fn test_mock_model_error_and_response_configuration() {
+	model := new_mock_model(llms.Response{
+		choices: [llms.Choice{
+			content: 'before'
+		}]
+	})
+	model.set_error('fixture failure')
+	mut ctx := context.background()
+	model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{}) or {
+		assert err.msg() == 'fixture failure'
+		assert model.call_count() == 1
+		model.set_response(llms.Response{
+			choices: [llms.Choice{
+				content: 'after'
+			}]
+		})
+		response := model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{}) or {
+			panic(err)
+		}
+		assert response.choices[0].content == 'after'
+		assert model.call_count() == 2
+		return
+	}
+	assert false, 'expected the configured model error'
+}
+
+fn test_mock_model_handles_concurrent_calls() {
+	model := new_mock_model(llms.Response{
+		choices: [llms.Choice{
+			content: 'ok'
+		}]
+	})
+	mut wait_group := sync.new_waitgroup()
+	parallel_calls := 16
+	wait_group.add(parallel_calls)
+	for _ in 0 .. parallel_calls {
+		go fn [model, mut wait_group] () {
+			mut ctx := context.background()
+			model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{}) or {
+				wait_group.done()
+				panic(err)
+			}
+			wait_group.done()
+		}()
+	}
+	wait_group.wait()
+	assert model.call_count() == parallel_calls
 }
