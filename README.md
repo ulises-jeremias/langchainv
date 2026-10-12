@@ -53,7 +53,7 @@ The current core packages include:
   and optional intermediate-step output.
 - `callbacks`: chat/completion lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
-- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
+- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Azure AI Search, Chroma, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
 - `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders
   plus a bounded recursive directory loader for those file types. PDF extraction
   requires Poppler's `pdftotext` executable.
@@ -148,6 +148,10 @@ generation and its supported options.
 
 See [`vectorstores/qdrant/README.md`](vectorstores/qdrant/README.md) for the
 Qdrant REST adapter and its collection requirements.
+
+See [`vectorstores/azureaisearch/README.md`](vectorstores/azureaisearch/README.md)
+for Azure AI Search index fields, vector profile, endpoint authentication, and
+adapter limits.
 
 See [`vectorstores/pinecone/README.md`](vectorstores/pinecone/README.md) for the
 Pinecone index host and metadata requirements.

@@ -11,7 +11,7 @@ The in-memory implementation currently supports only cosine distance. It
 requires non-empty, finite vectors of consistent dimensions and rejects query
 dimension mismatches.
 
-The `chroma`, `milvus`, `opensearch`, `pgvector`, `qdrant`, `pinecone`, and `weaviate` subpackages provide
+The `azureaisearch`, `chroma`, `milvus`, `opensearch`, `pgvector`, `qdrant`, `pinecone`, and `weaviate` subpackages provide
 bounded REST adapters for existing remote collections or indexes. Each accepts
 an injected embedder and HTTP client for offline tests. The `redis` subpackage
 uses the V standard Redis client with an injected command interface and a
