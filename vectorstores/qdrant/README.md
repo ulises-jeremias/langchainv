@@ -14,10 +14,13 @@ REST endpoints.
 
 The adapter supports document upserts bounded to 64 points per call, similarity
 search, metadata equality filters, namespaces, minimum score filtering, and UUID
-deletion. Requests and responses are capped at 4 MiB; document content and
-metadata are checked before embedding. Writes accept at most 64 documents,
-queries at most 64 KiB, and searches/deletes at most 1,000 entries. Local HTTP endpoints are restricted
-to loopback; remote endpoints require HTTPS. Tests use an injected
+deletion. Set `SearchOptions.include_vectors` to request each point's vector in
+`schema.Document.embedding`; vectors are omitted by default and validated for
+numeric values and size before being returned. Requests and responses are
+capped at 4 MiB; document content and metadata are checked before embedding.
+Writes accept at most 64 documents, queries at most 64 KiB, and searches/deletes
+at most 1,000 entries. Local HTTP endpoints are restricted to loopback; remote
+endpoints require HTTPS. Tests use an injected
 `httputil.HTTPClient` and do not require Qdrant or credentials.
 
 ```v wip
@@ -28,7 +31,7 @@ mut store := qdrant.new_store('documents', embedder, qdrant.StoreOptions{
 ```
 
 Qdrant's wider query DSL, named/multi-vector collections, additional collection
-configuration, payload schema management, custom point IDs, and returned
-vectors remain unsupported. The adapter stores page content and metadata in a
+configuration, payload schema management, and custom point IDs remain
+unsupported. The adapter stores page content and metadata in a
 payload envelope and requires the Qdrant REST API to be reachable at the
 configured base URL.
