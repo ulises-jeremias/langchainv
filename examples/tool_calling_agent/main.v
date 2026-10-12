@@ -35,9 +35,10 @@ fn (model DemoModel) generate_content(mut _ctx context.Context, messages []schem
 		}
 	}
 	if messages.len > 0 && messages[messages.len - 1].parts.len > 0 {
-		match messages[messages.len - 1].parts[0] {
+		last_part := messages[messages.len - 1].parts[0]
+		match last_part {
 			schema.ToolResult {
-				if part.content == '42' {
+				if last_part.content == '42' {
 					return llms.Response{
 						choices: [llms.Choice{
 							content: '6 times 7 is 42.'
