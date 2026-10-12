@@ -141,7 +141,7 @@ pub fn (store InMemoryVectorStore) add_documents(mut ctx context.Context, docume
 		state.next_id++
 		id := 'memory-${state.next_id}'
 		ids << id
-		mut stored_document := clone_document(document)
+		mut stored_document := clone_document(document, false)
 		stored_document.embedding = vectors[index].clone()
 		state.entries << VectorEntry{
 			id:        id
@@ -192,9 +192,8 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 			continue
 		}
 		matches << ScoredEntry{
-			document: clone_document(entry.document)
-			score:    score
-			id:       entry.id
+			entry: entry
+			score: score
 		}
 	}
 	matches.sort(a.score > b.score)
@@ -203,11 +202,8 @@ pub fn (store InMemoryVectorStore) similarity_search(mut ctx context.Context, qu
 		if index >= limit {
 			break
 		}
-		mut document := result.document
+		mut document := clone_document(result.entry.document, options.include_vectors)
 		document.score = result.score
-		if !options.include_vectors {
-			document.embedding = []f32{}
-		}
 		if !options.include_metadata {
 			document.metadata = map[string]json2.Any{}
 		}
@@ -240,9 +236,8 @@ pub fn (store InMemoryVectorStore) delete(mut ctx context.Context, ids []string,
 }
 
 struct ScoredEntry {
-	document schema.Document
-	score    f32
-	id       string
+	entry VectorEntry
+	score f32
 }
 
 fn metadata_matches(metadata map[string]json2.Any, filter map[string]json2.Any) bool {
@@ -255,12 +250,12 @@ fn metadata_matches(metadata map[string]json2.Any, filter map[string]json2.Any) 
 	return true
 }
 
-fn clone_document(document schema.Document) schema.Document {
+fn clone_document(document schema.Document, include_embedding bool) schema.Document {
 	return schema.Document{
 		page_content: document.page_content
 		metadata:     clone_metadata(document.metadata)
 		score:        document.score
-		embedding:    document.embedding.clone()
+		embedding:    if include_embedding { document.embedding.clone() } else { []f32{} }
 	}
 }
 
