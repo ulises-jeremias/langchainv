@@ -207,9 +207,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('Weaviate query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Weaviate adapter does not return vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy != 'cosine' {
 		return error('Weaviate certainty thresholds require cosine distance')
 	}
@@ -236,12 +233,13 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	} else {
 		'{ vector: ${json2.encode(vector_values, json2.EncoderOptions{})} }'
 	}
-	query_body := '{ Get { ${store.class_name}(nearVector: ${near_vector}, where: ${where}, limit: ${limit}) { ${store.graphql_fields()} } } }'
+	query_body := '{ Get { ${store.class_name}(nearVector: ${near_vector}, where: ${where}, limit: ${limit}) { ${store.graphql_fields(options.include_vectors)} } } }'
 	body := json2.encode(map[string]json2.Any{
 		'query': json2.Any(query_body)
 	}, json2.EncoderOptions{})
 	response := store.request(mut ctx, .post, '/v1/graphql', body)!
-	return store.parse_graphql_response(response.body, limit, options.include_metadata, true)
+	return store.parse_graphql_response(response.body, limit, options.include_metadata, true,
+		options.include_vectors)
 }
 
 // metadata_search fetches objects by exact scalar metadata filters without vector ranking.
@@ -252,16 +250,14 @@ pub fn (store Store) metadata_search(mut ctx context.Context, limit int, options
 	if limit == 0 {
 		return []schema.Document{}
 	}
-	if options.include_vectors {
-		return error('Weaviate adapter does not return vectors through schema.Document')
-	}
 	where := store.where_clause(options.filter, options.namespace)!
-	query_body := '{ Get { ${store.class_name}(where: ${where}, limit: ${limit}) { ${store.graphql_fields()} } } }'
+	query_body := '{ Get { ${store.class_name}(where: ${where}, limit: ${limit}) { ${store.graphql_fields(options.include_vectors)} } } }'
 	body := json2.encode(map[string]json2.Any{
 		'query': json2.Any(query_body)
 	}, json2.EncoderOptions{})
 	response := store.request(mut ctx, .post, '/v1/graphql', body)!
-	return store.parse_graphql_response(response.body, limit, options.include_metadata, false)
+	return store.parse_graphql_response(response.body, limit, options.include_metadata, false,
+		options.include_vectors)
 }
 
 // delete removes up to 64 UUID objects by ID.
@@ -313,11 +309,12 @@ fn (_store Store) equal_filter(key string, value json2.Any) !string {
 	return '{ path: [${graphql_string(key)}], operator: Equal, ${field}: ${json2.encode(value, json2.EncoderOptions{})} }'
 }
 
-fn (store Store) graphql_fields() string {
-	return '${store.query_attrs.join(', ')}, _additional { certainty }'
+fn (store Store) graphql_fields(include_vectors bool) string {
+	additional := if include_vectors { 'certainty vector' } else { 'certainty' }
+	return '${store.query_attrs.join(', ')}, _additional { ${additional} }'
 }
 
-fn (store Store) parse_graphql_response(body string, limit int, include_metadata bool, with_scores bool) ![]schema.Document {
+fn (store Store) parse_graphql_response(body string, limit int, include_metadata bool, with_scores bool, include_vectors bool) ![]schema.Document {
 	decoded := json2.decode[map[string]json2.Any](body, json2.DecoderOptions{}) or {
 		return error('Weaviate returned invalid GraphQL JSON')
 	}
@@ -371,6 +368,21 @@ fn (store Store) parse_graphql_response(body string, limit int, include_metadata
 				return error('Weaviate response is missing certainty')
 			})!
 		}
+		mut embedding := []f32{}
+		if include_vectors {
+			vector_any := additional['vector'] or { return error('Weaviate response is missing its vector') }
+			if vector_any !is []json2.Any {
+				return error('Weaviate returned an unsupported vector shape')
+			}
+			vector_values := vector_any as []json2.Any
+			if vector_values.len == 0 || vector_values.len > max_embedding_values {
+				return error('Weaviate returned an empty or oversized vector')
+			}
+			embedding = []f32{cap: vector_values.len}
+			for value in vector_values {
+				embedding << weaviate_vector_float(value)!
+			}
+		}
 		if !include_metadata {
 			properties = map[string]json2.Any{}
 		}
@@ -378,6 +390,7 @@ fn (store Store) parse_graphql_response(body string, limit int, include_metadata
 			page_content: content_any as string
 			metadata:     properties
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents
@@ -493,6 +506,23 @@ fn weaviate_float(value json2.Any) !f32 {
 		int { return f32(value) }
 		else { return error('Weaviate certainty must be numeric') }
 	}
+}
+
+fn weaviate_vector_float(value json2.Any) !f32 {
+	if value is f64 {
+		number := value as f64
+		converted := f32(number)
+		if math.is_finite(number) && math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	if value is int {
+		converted := f32(value as int)
+		if math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	return error('Weaviate vector values must be finite numbers')
 }
 
 fn valid_uuid(value string) bool {
