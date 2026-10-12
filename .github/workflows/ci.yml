@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VJOBS: '2'
+      V_COMPILER_REF: 03e12f368ad5061756d523891e12cd759053f486
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -28,12 +29,23 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: vlang/v
-          ref: 03e12f368ad5061756d523891e12cd759053f486
+          ref: ${{ env.V_COMPILER_REF }}
           path: vlang
 
+      - name: Cache pinned V compiler
+        id: v-compiler-cache
+        uses: actions/cache@v6
+        with:
+          path: vlang/v
+          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}
+
       - name: Build V compiler
+        if: steps.v-compiler-cache.outputs.cache-hit != 'true'
         run: |
           make -C vlang
+
+      - name: Add V compiler to PATH
+        run: |
           echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
           ./vlang/v version
 
