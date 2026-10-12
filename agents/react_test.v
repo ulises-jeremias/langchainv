@@ -228,6 +228,32 @@ fn test_react_agent_parses_final_answer_after_unicode_text() {
 	}
 }
 
+fn test_react_agent_recovers_inline_case_insensitive_action_headers() {
+	parsed := parse_react_output('I will use a tool. action: echo ACTION INPUT: hello world',
+		'output') or { panic(err) }
+	assert parsed.actions.len == 1
+	assert parsed.actions[0].tool == 'echo'
+	assert parsed.actions[0].tool_input == 'hello world'
+}
+
+fn test_react_agent_recovers_inline_final_answer_after_prose() {
+	parsed := parse_react_output('The result is ready. THE ANSWER IS: 42', 'output') or {
+		panic(err)
+	}
+	if finish := parsed.finish {
+		assert (finish.return_values['output'] or { panic('missing recovered answer') }) == json2.Any('42')
+	} else {
+		assert false, 'expected inline final answer'
+	}
+}
+
+fn test_react_agent_does_not_parse_control_labels_inside_tool_input() {
+	parsed := parse_react_output('Action: echo\nAction Input: Final Answer: done\nAction: keep as data',
+		'output') or { panic(err) }
+	assert parsed.actions.len == 1
+	assert parsed.actions[0].tool_input == 'Final Answer: done\nAction: keep as data'
+}
+
 fn test_react_agent_rejects_prompt_bound_below_minimum() {
 	mut state := &ReactFixtureModelState{
 		outputs: ['Final Answer: done']
