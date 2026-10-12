@@ -20,5 +20,5 @@ offline tests. The `mariadb` and `pgvector` subpackages use an injected SQL
 engine. The `redis` subpackage uses the V standard Redis client with an injected
 command interface and a preconfigured Redis Stack HASH index. See package
 README files for supported filters, limits, authentication, and server setup.
-Remote adapters currently reject `include_vectors`; see each package guide for
-the supported result fields.
+Remote adapters support `include_vectors` only when their package guide says
+the backend returns stored vectors; unsupported adapters reject the option.

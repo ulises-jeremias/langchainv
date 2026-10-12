@@ -248,9 +248,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('Chroma query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Chroma adapter does not return vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy !in ['cosine', 'euclidean'] {
 		return error('Chroma supports cosine or euclidean distance strategies')
 	}
@@ -276,11 +273,14 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		}
 		values << json2.Any(value)
 	}
+	mut include := [json2.Any('documents'), json2.Any('metadatas'), json2.Any('distances')]
+	if options.include_vectors {
+		include << json2.Any('embeddings')
+	}
 	mut request := map[string]json2.Any{
 		'query_embeddings': json2.Any([json2.Any(values)])
 		'n_results':        json2.Any(limit)
-		'include':          json2.Any([json2.Any('documents'), json2.Any('metadatas'),
-			json2.Any('distances')])
+		'include':          json2.Any(include)
 	}
 	namespace := if options.namespace == '' { store.namespace } else { options.namespace }
 	where := make_filter(options.filter, namespace)
@@ -295,11 +295,17 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	documents := chroma_nested_array(decoded, 'documents')!
 	metadatas := chroma_nested_array(decoded, 'metadatas')!
 	distances := chroma_nested_array(decoded, 'distances')!
-	if ids.len != 1 || documents.len != 1 || metadatas.len != 1 || distances.len != 1 {
+	mut embeddings_values := [][]json2.Any{}
+	if options.include_vectors {
+		embeddings_values = chroma_nested_array(decoded, 'embeddings')!
+	}
+	if ids.len != 1 || documents.len != 1 || metadatas.len != 1 || distances.len != 1
+		|| (options.include_vectors && embeddings_values.len != 1) {
 		return error('Chroma returned an unexpected number of query result groups')
 	}
 	if ids[0].len != documents[0].len || ids[0].len != metadatas[0].len
-		|| ids[0].len != distances[0].len || ids[0].len > limit {
+		|| ids[0].len != distances[0].len || ids[0].len > limit
+		|| (options.include_vectors && ids[0].len != embeddings_values[0].len) {
 		return error('Chroma returned mismatched or excessive query result lengths')
 	}
 	mut results := []schema.Document{cap: ids[0].len}
@@ -318,10 +324,26 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			vector_value := embeddings_values[0][index]
+			if vector_value !is []json2.Any {
+				return error('Chroma returned a malformed embedding')
+			}
+			vector := vector_value as []json2.Any
+			if vector.len == 0 || vector.len > max_embedding_values {
+				return error('Chroma returned an empty or oversized embedding')
+			}
+			embedding = []f32{cap: vector.len}
+			for value in vector {
+				embedding << chroma_float(value)!
+			}
+		}
 		results << schema.Document{
 			page_content: documents[0][index] as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return results
