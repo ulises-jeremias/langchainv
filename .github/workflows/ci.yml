@@ -58,4 +58,5 @@ jobs:
           for example in examples/*/main.v; do
             output="/tmp/langchainv-example-$(basename "$(dirname "$example")")"
             v -o "$output" "$example"
+            "$output"
           done

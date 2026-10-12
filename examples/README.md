@@ -1,6 +1,6 @@
 # Examples
 
-Examples are standalone V programs. CI compiles them with the pinned V compiler. Examples marked offline do not require credentials or external services.
+Examples are standalone V programs. CI compiles and runs every example with the pinned V compiler. Examples marked offline do not require credentials or external services.
 
 | Example | What it demonstrates | Runtime requirements |
 |---|---|---|
