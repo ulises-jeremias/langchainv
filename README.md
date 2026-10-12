@@ -47,9 +47,10 @@ The current core packages include:
   sequential map-reduce, map-rerank and refine, constitutional critique and
   revision, retrieval QA, sequential composition, memory loading, bounded
   conversational retrieval QA, and input/output validation.
-- `agents`: text-based MRKL/ReAct, conversational ReAct, and model tool-calling
-  agents, plus a bounded executor with tool dispatch, callbacks, memory
-  integration, and optional intermediate-step output.
+- `agents`: text-based MRKL/ReAct, conversational ReAct, provider-neutral
+  tool-calling, and OpenAI-compatible functions agents, plus a bounded executor
+  with tool dispatch, callbacks, memory integration, and optional
+  intermediate-step output.
 - `callbacks`: chat/completion lifecycle event contract, ordered dispatch, no-op and standard
   output logging handlers, final-answer streaming, and handler composition.
 - `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Chroma, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
