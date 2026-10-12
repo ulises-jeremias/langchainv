@@ -157,9 +157,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('mariadb query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('mariadb adapter does not expose vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy.to_lower() != 'cosine' {
 		return error('MariaDB vector index uses cosine distance only')
 	}
@@ -208,7 +205,15 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	// MariaDB uses the vector index when the cosine-distance expression is in
 	// ORDER BY with LIMIT. Bind the query vector in SELECT and ORDER BY rather
 	// than hiding it behind a CTE that could prevent index recognition.
-	statement := 'WITH topk AS (SELECT CAST(${quote(store.id_column)} AS CHAR) AS id, ${quote(store.text_column)} AS page_content, CAST(${quote(store.metadata_column)} AS CHAR) AS metadata_json, ${distance} AS distance FROM ${quote(store.table)} WHERE ${where_clause} ORDER BY ${distance} ASC LIMIT ?), matches AS (SELECT id, page_content, metadata_json, 1 - distance AS score, distance, sum(OCTET_LENGTH(id) + OCTET_LENGTH(page_content) + OCTET_LENGTH(metadata_json) + 256) OVER (ORDER BY distance ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM topk) SELECT id, page_content, metadata_json, score FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
+	vector_select := if options.include_vectors {
+		', VEC_ToText(${quote(store.vector_column)}) AS vector_text'
+	} else {
+		''
+	}
+	vector_column := if options.include_vectors { ', vector_text' } else { '' }
+	vector_bytes := if options.include_vectors { ' + OCTET_LENGTH(vector_text)' } else { '' }
+	vector_result := if options.include_vectors { ', vector_text' } else { '' }
+	statement := 'WITH topk AS (SELECT CAST(${quote(store.id_column)} AS CHAR) AS id, ${quote(store.text_column)} AS page_content, CAST(${quote(store.metadata_column)} AS CHAR) AS metadata_json${vector_select}, ${distance} AS distance FROM ${quote(store.table)} WHERE ${where_clause} ORDER BY ${distance} ASC LIMIT ?), matches AS (SELECT id, page_content, metadata_json${vector_column}, 1 - distance AS score, distance, sum(OCTET_LENGTH(id) + OCTET_LENGTH(page_content) + OCTET_LENGTH(metadata_json)${vector_bytes} + 256) OVER (ORDER BY distance ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM topk) SELECT id, page_content, metadata_json, score${vector_result} FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
 	parameters << vector_param
 	parameters << limit.str()
 	result := store.engine.query_params(mut ctx, statement, parameters)!
@@ -218,7 +223,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	mut documents := []schema.Document{cap: result.rows.len}
 	mut response_bytes := 0
 	for row in result.rows {
-		if row.len < 4 {
+		if row.len < (if options.include_vectors { 5 } else { 4 }) {
 			return error('mariadb returned a malformed search row')
 		}
 		response_bytes += row[0].len + row[1].len + row[2].len + row[3].len + 256
@@ -235,10 +240,29 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if options.min_score != none && score < f64(options.min_score or { f32(0) }) {
 			continue
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			embedding = json2.decode[[]f32](row[4], json2.DecoderOptions{}) or {
+				return error('mariadb returned invalid vector JSON')
+			}
+			if embedding.len == 0 || embedding.len > max_embedding_values || embedding.len != vector.len {
+				return error('mariadb returned a vector with an invalid dimension')
+			}
+			for value in embedding {
+				if !math.is_finite(f64(value)) {
+					return error('mariadb returned a non-finite vector value')
+				}
+			}
+			response_bytes += row[4].len
+			if response_bytes > max_payload_bytes {
+				return error('mariadb search response exceeds 4 MiB')
+			}
+		}
 		documents << schema.Document{
 			page_content: row[1]
 			metadata:     if options.include_metadata { metadata } else { map[string]json2.Any{} }
 			score:        f32(score)
+			embedding:    embedding
 		}
 	}
 	return documents

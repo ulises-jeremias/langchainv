@@ -111,6 +111,42 @@ fn test_mariadb_search_uses_cosine_order_and_exact_metadata_filters() {
 		'4']
 }
 
+fn test_mariadb_search_returns_vectors_only_when_requested() {
+	mut state := &MariaDBFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['id-1', 'answer', '{}', '0.91', '[0.25,0.75]']]
+		}
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 4, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].embedding == [f32(0.25), 0.75]
+	statement := state.statements[0]
+	assert statement.contains('VEC_ToText(`embedding`) AS vector_text')
+	assert statement.contains('OCTET_LENGTH(vector_text)')
+	assert statement.ends_with('SELECT id, page_content, metadata_json, score, vector_text FROM matches WHERE response_bytes <= 4194304 ORDER BY distance ASC')
+}
+
+fn test_mariadb_search_rejects_malformed_returned_vectors() {
+	mut state := &MariaDBFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['id-1', 'answer', '{}', '0.91', '[0.25]']]
+		}
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.similarity_search(mut ctx, 'query', 4, vectorstores.SearchOptions{
+		include_vectors: true
+	}) or {
+		assert err.msg().contains('invalid dimension')
+		return
+	}
+	assert false, 'expected a returned vector with a mismatched dimension to fail'
+}
+
 fn test_mariadb_delete_uses_parameterized_ids_and_namespace() {
 	mut state := &MariaDBFixtureState{}
 	store := fixture_store(state) or { panic(err) }

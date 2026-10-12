@@ -119,9 +119,10 @@ Cloud-specific connection/authentication, embedding, indexing, or query APIs.
 MariaDB is partial: bounded parameterized inserts through
 `VEC_FromText`, cosine search through `VEC_DISTANCE_COSINE`, parameterized ID
 deletion, namespace and scalar JSON equality filters, injected embeddings/SQL
-engine, and bounded payloads against an existing MariaDB 11.7.1+ vector table;
-table/index provisioning, non-scalar or advanced filters, alternate distance
-strategies, and vector return remain outstanding. Azure AI Search is partial: bounded document upload,
+engine, optional validated vector return through `VEC_ToText`, and bounded
+payloads against an existing MariaDB 11.7.1+ vector table; table/index
+provisioning, non-scalar or advanced filters, and alternate distance strategies
+remain outstanding. Azure AI Search is partial: bounded document upload,
 vector search and key deletion against an existing index, with injected
 embeddings/HTTP transport, API-key authentication, namespace filtering and
 indexing-result validation. It requires configured key/content/vector/metadata/
