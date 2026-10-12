@@ -87,7 +87,7 @@ jobs:
           - group: embedding providers
             packages: 'embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock'
           - group: vector stores
-            packages: 'vectorstores vectorstores/azureaisearch vectorstores/chroma vectorstores/milvus vectorstores/opensearch vectorstores/pgvector vectorstores/redis vectorstores/qdrant vectorstores/pinecone vectorstores/weaviate'
+            packages: 'vectorstores vectorstores/azureaisearch vectorstores/chroma vectorstores/mariadb vectorstores/milvus vectorstores/opensearch vectorstores/pgvector vectorstores/redis vectorstores/qdrant vectorstores/pinecone vectorstores/weaviate'
           - group: tools and document processing
             packages: 'tools tools/duckduckgo tools/perplexity tools/serpapi tools/wikipedia tools/exa tools/scraper tools/sqldatabase tools/zapier documentloaders textsplitter httputil'
           - group: standalone examples

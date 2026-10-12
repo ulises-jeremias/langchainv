@@ -11,9 +11,10 @@ The in-memory implementation currently supports only cosine distance. It
 requires non-empty, finite vectors of consistent dimensions and rejects query
 dimension mismatches.
 
-The `azureaisearch`, `chroma`, `milvus`, `opensearch`, `pgvector`, `qdrant`, `pinecone`, and `weaviate` subpackages provide
-bounded REST adapters for existing remote collections or indexes. Each accepts
-an injected embedder and HTTP client for offline tests. The `redis` subpackage
-uses the V standard Redis client with an injected command interface and a
-preconfigured Redis Stack HASH index. See package README files for supported
-filters, limits, authentication, and server setup.
+The `azureaisearch`, `chroma`, `milvus`, `opensearch`, `qdrant`, `pinecone`,
+and `weaviate` subpackages provide bounded REST adapters for existing remote
+collections or indexes. Each accepts an injected embedder and HTTP client for
+offline tests. The `mariadb` and `pgvector` subpackages use an injected SQL
+engine. The `redis` subpackage uses the V standard Redis client with an injected
+command interface and a preconfigured Redis Stack HASH index. See package
+README files for supported filters, limits, authentication, and server setup.
