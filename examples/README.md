@@ -47,4 +47,4 @@ To run the tool-calling agent without configuring a model provider:
 v run examples/tool_calling_agent/main.v
 ```
 
-New examples should document required environment variables, external services, expected cost, and whether compilation or execution makes network calls. Keep examples small enough for CI to compile without credentials.
+Every `examples/*/main.v` must complete offline without credentials. CI compiles and runs these programs after removing `LANGCHAINV_ALLOW_LIVE_EXAMPLES`. A live provider demo must require `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and valid credentials before sending a request. Document required environment variables, external services, expected cost, and network behavior. CI must never set the opt-in.

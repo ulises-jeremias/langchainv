@@ -58,5 +58,5 @@ jobs:
           for example in examples/*/main.v; do
             output="/tmp/langchainv-example-$(basename "$(dirname "$example")")"
             v -o "$output" "$example"
-            "$output"
+            env -u LANGCHAINV_ALLOW_LIVE_EXAMPLES "$output"
           done
