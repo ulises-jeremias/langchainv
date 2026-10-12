@@ -6,10 +6,11 @@ permalink: /tutorials/conversational-agent-memory/
 
 # Build a conversational ReAct agent with memory
 
-`new_conversational_react_agent` adds a `history` input to the bounded text-based
-ReAct agent. Connect an `Executor` to a memory implementation and call it with
-`chains.call`; the chain lifecycle loads prior turns before planning and saves
-the new input and answer afterward.
+`initialize_agent` can construct the conversational ReAct preset and its
+`Executor` together. Choose `.conversational_react` and provide a memory
+implementation through `ExecutorOptions`; `chains.call` then loads prior turns
+before planning and saves the new input and answer afterward. Use `.react` for
+the stateless preset.
 
 This complete example uses an offline model and an in-memory conversation
 buffer. It needs no API key or network connection.

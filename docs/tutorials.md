@@ -21,7 +21,7 @@ Work through these recipes in order. Each section links to the package guide tha
 9. Try [bounded concurrent document mapping](concurrent-document-mapping/) with an offline completion model before raising concurrency on a live provider.
 10. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
 11. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
-12. Build a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
+12. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
 13. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
 
 ## Recipes by task

@@ -33,12 +33,11 @@ fn (_ ConversationDemoTool) call(mut _ctx context.Context, input string) !string
 }
 
 fn main() {
-	agent := agents.new_conversational_react_agent(ConversationDemoModel{}, [ConversationDemoTool{}],
-		agents.ReactOptions{}) or { panic(err) }
 	chat_memory := memory.new_conversation_buffer('history', 'input', 'output') or { panic(err) }
-	executor := agents.new_executor(agent, agents.ExecutorOptions{
-		memory: chat_memory
-	}) or { panic(err) }
+	executor := agents.initialize_agent(ConversationDemoModel{}, [ConversationDemoTool{}],
+		.conversational_react, agents.ReactOptions{}, agents.ExecutorOptions{
+			memory: chat_memory
+		}) or { panic(err) }
 	mut ctx := context.background()
 	first := chains.call(mut ctx, executor, {
 		'input': json2.Any('My name is Ada.')
