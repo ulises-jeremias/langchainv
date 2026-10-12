@@ -24,9 +24,11 @@ single string argument. Provider adapters must support function/tool calls.
 `llms.CompletionModel`. Its prompt lists registered tools and prior
 Thought/Action/Observation steps. It parses either an Action/Action Input pair
 or a Final Answer and bounds tool count, description bytes, prompt bytes, and
-completion output bytes. Supply a custom `prompts.StringTemplate` when the
-default input-key layout does not fit. Its tests use an offline completion
-model and fake tools.
+completion output bytes. Output recovery accepts case-insensitive and inline
+Action/Action Input or final-answer labels while preserving control-like text
+inside the tool input. Malformed or incomplete action output returns an error.
+Supply a custom `prompts.StringTemplate` when the default input-key layout does
+not fit. Its tests use an offline completion model and fake tools.
 
 `new_conversational_react_agent` adds a `history` input to the ReAct prompt.
 Attach a memory implementation through `ExecutorOptions.memory`, then call the

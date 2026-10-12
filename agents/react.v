@@ -271,42 +271,48 @@ fn validate_react_prompt_size(template prompts.StringTemplate, values map[string
 }
 
 fn parse_react_output(output string, output_key string) !PlanResult {
-	lines := output.split_into_lines()
-	for index, line in lines {
-		trimmed := line.trim_space()
-		if !trimmed.to_lower().starts_with('action:') {
-			continue
+	lower_output := output.to_lower()
+	action_marker := lower_output.index('action:')
+	if answer_marker := find_react_final_answer_marker(output) {
+		mut final_answer_first := true
+		if action_index := action_marker {
+			final_answer_first = answer_marker.index < action_index
 		}
-		action_name := trimmed['Action:'.len..].trim_space()
+		if final_answer_first {
+			answer := output[answer_marker.index + answer_marker.value.len..].trim_space()
+			if answer.to_lower().contains('\naction:') {
+				return error('ReAct output contains a final answer followed by another action')
+			}
+			return react_finish(answer, output_key)
+		}
+	}
+	if action_index := action_marker {
+		after_action := action_index + 'action:'.len
+		remainder := lower_output[after_action..]
+		input_relative := remainder.index('action input:') or {
+			return error('ReAct output has Action but no Action Input field')
+		}
+		if second_action := remainder.index('action:') {
+			if second_action < input_relative {
+				return error('ReAct output has Action but no Action Input field')
+			}
+		}
+		input_index := after_action + input_relative
+		action_name := output[after_action..input_index].trim_space()
 		if action_name == '' {
 			return error('ReAct output has an empty Action field')
 		}
-		for input_index in index + 1 .. lines.len {
-			input_line := lines[input_index].trim_space()
-			lower_input_line := input_line.to_lower()
-			if lower_input_line.starts_with('action:') {
-				return error('ReAct output has Action but no Action Input field')
-			}
-			if !lower_input_line.starts_with('action input:') {
-				continue
-			}
-			mut action_input := input_line['action input:'.len..].trim_space()
-			if input_index + 1 < lines.len {
-				action_input += '\n' + lines[input_index + 1..].join('\n')
-			}
-			action_input = action_input.trim_space()
-			if action_input == '' {
-				return error('ReAct output has an empty Action Input field')
-			}
-			return PlanResult{
-				actions: [schema.AgentAction{
-					tool:       action_name
-					tool_input: action_input
-					log:        output
-				}]
-			}
+		mut action_input := output[input_index + 'action input:'.len..].trim_space()
+		if action_input == '' {
+			return error('ReAct output has an empty Action Input field')
 		}
-		return error('ReAct output has Action but no Action Input field')
+		return PlanResult{
+			actions: [schema.AgentAction{
+				tool:       action_name
+				tool_input: action_input
+				log:        output
+			}]
+		}
 	}
 	if answer := parse_react_final_answer(output) {
 		if answer == '' {
@@ -324,13 +330,49 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 }
 
 fn parse_react_final_answer(output string) ?string {
+	if marker := find_react_final_answer_marker(output) {
+		return output[marker.index + marker.value.len..].trim_space()
+	}
+	return none
+}
+
+struct ReactFinalAnswerMarker {
+	index int
+	value string
+}
+
+fn find_react_final_answer_marker(output string) ?ReactFinalAnswerMarker {
+	lower_output := output.to_lower()
+	mut found := ?ReactFinalAnswerMarker(none)
 	for marker in ['final answer:', 'final answer :', 'the final answer is:', 'the answer is:'] {
-		for line in output.split_into_lines() {
-			trimmed := line.trim_space()
-			if trimmed.to_lower().starts_with(marker) {
-				return trimmed[marker.len..].trim_space()
+		if index := lower_output.index(marker) {
+			if current := found {
+				if index < current.index {
+					found = ReactFinalAnswerMarker{
+						index: index
+						value: marker
+					}
+				}
+			} else {
+				found = ReactFinalAnswerMarker{
+					index: index
+					value: marker
+				}
 			}
 		}
 	}
-	return none
+	return found
+}
+
+fn react_finish(answer string, output_key string) !PlanResult {
+	if answer == '' {
+		return error('ReAct output has an empty Final Answer field')
+	}
+	mut return_values := map[string]json2.Any{}
+	return_values[output_key] = json2.Any(answer)
+	return PlanResult{
+		finish: schema.AgentFinish{
+			return_values: return_values
+		}
+	}
 }
