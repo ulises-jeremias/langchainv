@@ -15,6 +15,7 @@ const api_version = '2025-10'
 const max_vectors_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_top_k = 1000
+const max_embedding_values = 65536
 const page_content_key = '_langchainv_page_content'
 
 // Store connects to one Pinecone index host and uses an injected embedder.
@@ -135,9 +136,6 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if query.len > 65536 {
 		return error('Pinecone query exceeds 64 KiB')
 	}
-	if options.include_vectors {
-		return error('Pinecone adapter does not return vectors through schema.Document')
-	}
 	if options.distance_strategy != '' && options.distance_strategy !in ['cosine', 'dotproduct',
 		'euclidean'] {
 		return error('Pinecone distance strategy must be cosine, dotproduct, or euclidean')
@@ -166,6 +164,9 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		'namespace':       json2.Any(options.namespace)
 		'topK':            json2.Any(limit)
 		'includeMetadata': json2.Any(true)
+	}
+	if options.include_vectors {
+		request['includeValues'] = json2.Any(true)
 	}
 	if options.filter.len > 0 {
 		request['filter'] = json2.Any(make_filter(options.filter))
@@ -208,10 +209,26 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
 		}
+		mut embedding := []f32{}
+		if options.include_vectors {
+			values_any := match_fields['values'] or { return error('Pinecone match has no vector values') }
+			if values_any !is []json2.Any {
+				return error('Pinecone match values must be an array')
+			}
+			match_values := values_any as []json2.Any
+			if match_values.len == 0 || match_values.len > max_embedding_values {
+				return error('Pinecone returned an empty or oversized vector')
+			}
+			embedding = []f32{cap: match_values.len}
+			for value in match_values {
+				embedding << pinecone_vector_float(value)!
+			}
+		}
 		documents << schema.Document{
 			page_content: content_any as string
 			metadata:     metadata
 			score:        score
+			embedding:    embedding
 		}
 	}
 	return documents
@@ -303,4 +320,21 @@ fn pinecone_float(value json2.Any) !f32 {
 		return f32(value as int)
 	}
 	return error('Pinecone score must be a finite number')
+}
+
+fn pinecone_vector_float(value json2.Any) !f32 {
+	if value is f64 {
+		number := value as f64
+		converted := f32(number)
+		if math.is_finite(number) && math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	if value is int {
+		converted := f32(value as int)
+		if math.is_finite(f64(converted)) {
+			return converted
+		}
+	}
+	return error('Pinecone vector values must be finite numbers')
 }
