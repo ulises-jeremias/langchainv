@@ -100,7 +100,7 @@ fn test_redis_search_parses_score_metadata_and_escapes_filter_values() {
 	assert command[0] == 'FT.SEARCH'
 	assert command[1] == 'langchainv_idx'
 	assert command[2].contains('@lcg_source:{langchainv}')
-	assert command[2].contains('@namespace:{tenant-1}')
+	assert command[2].contains('@namespace:{tenant\\-1}')
 	assert command[2].contains('@meta_kind:{\\"guide\\ / \\*\\"}')
 	assert command.contains('DIALECT')
 	assert command[17].len == 8
