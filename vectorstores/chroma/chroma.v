@@ -330,12 +330,12 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			if vector_value !is []json2.Any {
 				return error('Chroma returned a malformed embedding')
 			}
-			vector := vector_value as []json2.Any
-			if vector.len == 0 || vector.len > max_embedding_values {
+			returned_values := vector_value as []json2.Any
+			if returned_values.len == 0 || returned_values.len > max_embedding_values {
 				return error('Chroma returned an empty or oversized embedding')
 			}
-			embedding = []f32{cap: vector.len}
-			for value in vector {
+			embedding = []f32{cap: returned_values.len}
+			for value in returned_values {
 				embedding << chroma_float(value)!
 			}
 		}
