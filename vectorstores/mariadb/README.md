@@ -25,7 +25,8 @@ Writes use parameterized multi-row inserts and `VEC_FromText`; searches use
 `VEC_DISTANCE_COSINE`; deletes use parameterized IDs. Metadata equality filters
 support scalar JSON values and namespaces use exact matching. Field and table
 names are configurable simple identifiers and quoted with MariaDB identifier
-quotes. Array metadata, arbitrary filter expressions, schema creation, and
+quotes. The existing vector index must use `DISTANCE=cosine` for indexed search.
+Array metadata, arbitrary filter expressions, schema creation, and
 vector return are unsupported.
 
 Writes are limited to 64 documents, deletes to 1,000 IDs, searches to 1,000

@@ -204,8 +204,12 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		predicates << "JSON_EXTRACT(${quote(store.metadata_column)}, CONCAT('$.', ?)) = JSON_EXTRACT(?, '$')"
 	}
 	where_clause := if predicates.len == 0 { 'TRUE' } else { predicates.join(' AND ') }
-	distance := 'VEC_DISTANCE_COSINE(${quote(store.vector_column)}, q.vector)'
-	statement := 'WITH query_vector AS (SELECT VEC_FromText(?) AS vector), matches AS (SELECT CAST(${quote(store.id_column)} AS CHAR) AS id, ${quote(store.text_column)} AS page_content, CAST(${quote(store.metadata_column)} AS CHAR) AS metadata_json, 1 - (${distance}) AS score, ${distance} AS distance, sum(OCTET_LENGTH(CAST(${quote(store.id_column)} AS CHAR)) + OCTET_LENGTH(${quote(store.text_column)}) + OCTET_LENGTH(CAST(${quote(store.metadata_column)} AS CHAR)) + 256) OVER (ORDER BY ${distance} ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM ${quote(store.table)} CROSS JOIN query_vector q WHERE ${where_clause} ORDER BY distance ASC LIMIT ?) SELECT id, page_content, metadata_json, score FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
+	distance := 'VEC_DISTANCE_COSINE(${quote(store.vector_column)}, VEC_FromText(?))'
+	// MariaDB uses the vector index when the cosine-distance expression is in
+	// ORDER BY with LIMIT. Bind the query vector in SELECT and ORDER BY rather
+	// than hiding it behind a CTE that could prevent index recognition.
+	statement := 'WITH topk AS (SELECT CAST(${quote(store.id_column)} AS CHAR) AS id, ${quote(store.text_column)} AS page_content, CAST(${quote(store.metadata_column)} AS CHAR) AS metadata_json, ${distance} AS distance FROM ${quote(store.table)} WHERE ${where_clause} ORDER BY ${distance} ASC LIMIT ?), matches AS (SELECT id, page_content, metadata_json, 1 - distance AS score, distance, sum(OCTET_LENGTH(id) + OCTET_LENGTH(page_content) + OCTET_LENGTH(metadata_json) + 256) OVER (ORDER BY distance ASC ROWS UNBOUNDED PRECEDING) AS response_bytes FROM topk) SELECT id, page_content, metadata_json, score FROM matches WHERE response_bytes <= ${max_payload_bytes} ORDER BY distance ASC'
+	parameters << vector_param
 	parameters << limit.str()
 	result := store.engine.query_params(mut ctx, statement, parameters)!
 	if result.rows.len > limit {

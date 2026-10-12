@@ -101,12 +101,14 @@ fn test_mariadb_search_uses_cosine_order_and_exact_metadata_filters() {
 	assert documents[0].score == f32(0.91)
 	assert (documents[0].metadata['kind'] or { json2.Any('') }) == json2.Any('guide')
 	statement := state.statements[0]
-	assert statement.starts_with('WITH query_vector AS (SELECT VEC_FromText(?) AS vector)')
-	assert statement.contains('VEC_DISTANCE_COSINE(`embedding`, q.vector)')
+	assert statement.starts_with('WITH topk AS (')
+	assert statement.contains('ORDER BY VEC_DISTANCE_COSINE(`embedding`, VEC_FromText(?)) ASC LIMIT ?), matches AS (')
+	assert statement.contains('VEC_DISTANCE_COSINE(`embedding`, VEC_FromText(?)) AS distance')
 	assert statement.contains('`namespace` = ?')
 	assert statement.contains("JSON_EXTRACT(`metadata`, CONCAT('$.', ?)) = JSON_EXTRACT(?, '$')")
 	assert statement.contains('response_bytes <= 4194304')
-	assert state.parameters[0] == ['[0.25,0.75]', 'tenant-1', 'kind', '"guide"', '4']
+	assert state.parameters[0] == ['[0.25,0.75]', 'tenant-1', 'kind', '"guide"', '[0.25,0.75]',
+		'4']
 }
 
 fn test_mariadb_delete_uses_parameterized_ids_and_namespace() {
@@ -121,7 +123,7 @@ fn test_mariadb_delete_uses_parameterized_ids_and_namespace() {
 	assert state.parameters[0] == ['id-1', 'id-2', 'tenant-1']
 }
 
-fn test_mariadb_rejects_unsafe_identifiers_metrics_and_limits() {
+fn test_mariadb_rejects_unsafe_identifiers() {
 	mut state := &MariaDBFixtureState{}
 	new_store(MariaDBFixtureEmbedder{}, MariaDBFixtureEngine{
 		state: state
@@ -132,6 +134,10 @@ fn test_mariadb_rejects_unsafe_identifiers_metrics_and_limits() {
 		return
 	}
 	assert false, 'expected an unsafe table identifier to fail'
+}
+
+fn test_mariadb_rejects_non_cosine_distance() {
+	mut state := &MariaDBFixtureState{}
 	store := fixture_store(state) or { panic(err) }
 	mut ctx := context.background()
 	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
