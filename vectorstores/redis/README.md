@@ -21,7 +21,7 @@ FT.CREATE langchainv_idx ON HASH PREFIX 1 doc:langchainv: SCHEMA \
 
 ## V usage
 
-```v
+```v wip
 import db.redis as redis_client
 import ulises_jeremias.langchainv.vectorstores.redis as redis_vector
 

@@ -28,7 +28,7 @@ Loopback servers may use HTTP. Remote servers must use HTTPS. Set `api_key` to
 send the `x-chroma-token` header. Tests inject an HTTP client and do not need a
 Chroma server or credentials. See the [Chroma API reference](https://api.trychroma.com/docs/).
 
-```v
+```v wip
 mut store := chroma.new_store(embedder, chroma.Options{
 	base_url:      'https://chroma.example.test'
 	tenant:        'default_tenant'
