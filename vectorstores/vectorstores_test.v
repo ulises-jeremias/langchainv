@@ -73,14 +73,12 @@ fn test_memory_vector_store_returns_vectors_only_when_requested() {
 	mut ctx := context.background()
 	mut store := new_in_memory_vector_store(FixtureEmbedder{}, 1) or { panic(err) }
 	store.add_documents(mut ctx, [schema.new_document('alpha')], StoreOptions{}) or { panic(err) }
-	with_vectors := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
+	mut with_vectors := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
 		include_vectors: true
 	}) or { panic(err) }
 	assert with_vectors.len == 1
 	assert with_vectors[0].embedding == [f32(1), 0]
-	mut returned_embedding := with_vectors[0].embedding
-	returned_embedding[0] = f32(42)
-	assert returned_embedding[0] == f32(42)
+	with_vectors[0].embedding[0] = f32(42)
 	again := store.similarity_search(mut ctx, 'alpha', 1, SearchOptions{
 		include_vectors: true
 	}) or { panic(err) }
