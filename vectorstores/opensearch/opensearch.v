@@ -338,12 +338,12 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			if vector_any !is []json2.Any {
 				return error('OpenSearch returned an unsupported vector shape')
 			}
-			vector_values := vector_any as []json2.Any
-			if vector_values.len == 0 || vector_values.len > max_embedding_values {
+			returned_vector_values := vector_any as []json2.Any
+			if returned_vector_values.len == 0 || returned_vector_values.len > max_embedding_values {
 				return error('OpenSearch returned an empty or oversized vector')
 			}
-			embedding = []f32{cap: vector_values.len}
-			for value in vector_values {
+			embedding = []f32{cap: returned_vector_values.len}
+			for value in returned_vector_values {
 				embedding << open_search_float(value)!
 			}
 		}
