@@ -190,35 +190,39 @@ fn test_tool_calling_agent_replays_parallel_calls_as_one_assistant_message() {
 	assert replayed[2].parts.len == 2
 	assert replayed[3].role == .tool
 	assert replayed[4].role == .tool
-	match replayed[3].parts[0] {
+	first_result := replayed[3].parts[0]
+	match first_result {
 		schema.ToolResult {
-			assert part.call_id == 'tool-call-a'
-			assert part.content == 'echo:first'
+			assert first_result.call_id == 'tool-call-a'
+			assert first_result.content == 'echo:first'
 		}
 		else {
 			assert false, 'expected the first tool result after the assistant batch'
 		}
 	}
-	match replayed[4].parts[0] {
+	second_result := replayed[4].parts[0]
+	match second_result {
 		schema.ToolResult {
-			assert part.call_id == 'tool-call-b'
-			assert part.content == 'echo:second'
+			assert second_result.call_id == 'tool-call-b'
+			assert second_result.content == 'echo:second'
 		}
 		else {
 			assert false, 'expected the second tool result after the assistant batch'
 		}
 	}
-	match replayed[2].parts[0] {
+	first_call := replayed[2].parts[0]
+	match first_call {
 		schema.ToolCall {
-			assert part.id == 'tool-call-a'
+			assert first_call.id == 'tool-call-a'
 		}
 		else {
 			assert false, 'expected the first assistant tool call'
 		}
 	}
-	match replayed[2].parts[1] {
+	second_call := replayed[2].parts[1]
+	match second_call {
 		schema.ToolCall {
-			assert part.id == 'tool-call-b'
+			assert second_call.id == 'tool-call-b'
 		}
 		else {
 			assert false, 'expected the second assistant tool call'
@@ -258,18 +262,20 @@ fn test_tool_calling_agent_normalizes_legacy_single_argument_function_input() {
 	}) or { panic(err) }
 	assert (result['output'] or { panic('missing output') }) == json2.Any('done')
 	assert state.messages[1].len == 4
-	match state.messages[1][2].parts[0] {
+	legacy_call := state.messages[1][2].parts[0]
+	match legacy_call {
 		schema.ToolCall {
-			assert part.id == 'agent-step-0'
+			assert legacy_call.id == 'agent-step-0'
 		}
 		else {
 			assert false, 'expected the legacy call to be replayed as a tool call'
 		}
 	}
-	match state.messages[1][3].parts[0] {
+	legacy_result := state.messages[1][3].parts[0]
+	match legacy_result {
 		schema.ToolResult {
-			assert part.call_id == 'agent-step-0'
-			assert part.content == 'echo:hello'
+			assert legacy_result.call_id == 'agent-step-0'
+			assert legacy_result.content == 'echo:hello'
 		}
 		else {
 			assert false, 'expected the matching result for the legacy call'

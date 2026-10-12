@@ -184,10 +184,10 @@ fn replayed_tool_call_id(action schema.AgentAction, step_index int) string {
 }
 
 fn normalize_function_input(input string) string {
-	arguments := json2.decode[map[string]json2.Any](input, json2.DecoderOptions{}) or {
+	values := json2.decode[map[string]json2.Any](input, json2.DecoderOptions{}) or {
 		return input
 	}
-	argument := arguments['__arg1'] or { return input }
+	argument := values['__arg1'] or { return input }
 	if argument is string {
 		return argument
 	}
