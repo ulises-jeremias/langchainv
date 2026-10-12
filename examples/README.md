@@ -8,6 +8,7 @@ Examples are standalone V programs. CI compiles them with the pinned V compiler.
 | [Prompt templates](prompts/main.v) | Named variables, template validation, and prompt formatting | Offline; no credentials |
 | [Mock model](mock_model/main.v) | Provider-neutral model calls with a deterministic, concurrency-safe test double | Offline; no credentials |
 | [Retrieval QA](retrieval_qa/main.v) | In-memory retrieval and a bounded question-answering chain with deterministic fakes | Offline; no credentials |
+| [Tool-calling agent](tool_calling_agent/main.v) | Bounded executor, calculator tool, and staged fake model | Offline; no credentials |
 
 Run it from the repository root:
 
@@ -31,6 +32,12 @@ To run the retrieval and question-answering flow:
 
 ```sh
 v run examples/retrieval_qa/main.v
+```
+
+To run the tool-calling agent without configuring a model provider:
+
+```sh
+v run examples/tool_calling_agent/main.v
 ```
 
 New examples should document required environment variables, external services, expected cost, and whether compilation or execution makes network calls. Keep examples small enough for CI to compile without credentials.
