@@ -50,7 +50,7 @@ fn test_redis_add_documents_writes_bounded_hash_records() {
 	mut document := schema.new_document('stored text')
 	document.metadata['kind'] = json2.Any('guide')
 	ids := store.add_documents(mut ctx, [document], vectorstores.StoreOptions{
-		namespace: 'ténant-1'
+		namespace: 'tenant-1'
 	}) or { panic(err) }
 	assert ids.len == 1
 	assert ids[0].starts_with('doc:langchainv:')
