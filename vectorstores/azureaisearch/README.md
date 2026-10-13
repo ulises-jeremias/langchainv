@@ -15,7 +15,7 @@ and [API key permissions](https://learn.microsoft.com/en-us/azure/search/search-
 For an explicit create-only setup, `store.create_index(mut ctx, dimensions)!`
 creates the fields matching `Options`; Azure returns a conflict when that
 index already exists, so existing schemas and documents are not replaced. The
-helper accepts dimensions from 1 to 4,096. It requires an admin key and creates
+helper accepts dimensions from 2 to 4,096. It requires an admin key and creates
 a cosine HNSW vector profile. Azure service vector quotas still apply.
 
 This minimal REST request is an equivalent manual create-only operation for

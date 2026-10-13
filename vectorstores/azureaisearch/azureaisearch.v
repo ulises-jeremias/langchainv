@@ -102,8 +102,8 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 // field names and cosine HNSW profile. It uses the create-only REST operation:
 // an existing index causes an error and is never updated or replaced.
 pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
-	if dimensions < 1 || dimensions > max_index_dimensions {
-		return error('Azure AI Search index dimensions must be between 1 and ${max_index_dimensions}')
+	if dimensions < 2 || dimensions > max_index_dimensions {
+		return error('Azure AI Search index dimensions must be between 2 and ${max_index_dimensions}')
 	}
 	fields := [
 		json2.Any(map[string]json2.Any{

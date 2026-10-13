@@ -84,6 +84,18 @@ fn test_azure_search_index_creation_rejects_invalid_dimensions_without_request()
 	assert false, 'expected invalid Azure vector dimensions to fail'
 }
 
+fn test_azure_search_index_creation_rejects_one_dimension_without_request() {
+	mut state := &AzureFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.new_context()
+	store.create_index(mut ctx, 1) or {
+		assert err.msg().contains('between 2 and 4096')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected one-dimensional Azure vector index creation to fail'
+}
+
 fn test_azure_search_create_only_operation_does_not_update_existing_index() {
 	mut state := &AzureFixtureState{
 		responses: [httputil.Response{
