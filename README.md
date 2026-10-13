@@ -1,193 +1,149 @@
+<div align="center">
+
 # LangChainV
 
-LangChainV is a composable framework for building applications with language
-models in V. Its target is feature parity with the public LangChainGo API, with
-V-native interfaces, errors, options, and resource handling.
+**Build composable LLM applications in [V](https://vlang.io).** Chains, agents,
+retrievers, tools, memory, and vector search behind small, provider-neutral
+interfaces with bounded, testable adapters.
 
-The project includes framework primitives and a growing set of model,
-embedding, tool, loader, memory, and vector store adapters. Coverage varies by
-package: the [parity matrix](docs/LANGCHAINGO_PARITY.md) records what is
-implemented, verified, partial, and outstanding. Treat an adapter as supported
-only within the implementation and validation scope documented there.
+[Documentation](https://ulises-jeremias.github.io/langchainv/) |
+[Get started](https://ulises-jeremias.github.io/langchainv/getting-started/) |
+[Tutorials](https://ulises-jeremias.github.io/langchainv/tutorials/) |
+[Providers](docs/providers.md) |
+[Parity matrix](docs/LANGCHAINGO_PARITY.md) |
+[Examples](examples/) |
+[Contributing](CONTRIBUTING.md)
 
-## Documentation
+[![CI](https://github.com/ulises-jeremias/langchainv/actions/workflows/ci.yml/badge.svg)](https://github.com/ulises-jeremias/langchainv/actions/workflows/ci.yml)
+[![Documentation](https://github.com/ulises-jeremias/langchainv/actions/workflows/pages.yml/badge.svg)](https://github.com/ulises-jeremias/langchainv/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![V](https://img.shields.io/badge/V-0.5.2%2B-5d87bf?logo=v&logoColor=white)
+![Dependencies](https://img.shields.io/badge/core%20dependencies-none-success)
 
-Visit the [LangChainV documentation site](https://ulises-jeremias.github.io/langchainv/)
-for the quick start, tutorials, component map, searchable generated
-[API reference](https://ulises-jeremias.github.io/langchainv/api/), and
-compatibility reference. The [production guide](https://ulises-jeremias.github.io/langchainv/production/)
-covers data handling, resource limits, cancellation, retries, and tool access.
-The [`examples/`](examples/) directory contains standalone programs; the
-[example catalog](examples/README.md) lists their requirements.
+</div>
 
-## Install
+LangChainV tracks feature parity with the public
+[LangChainGo](https://github.com/tmc/langchaingo) API while staying V-native:
+sum-type messages, result-based errors, explicit options, context
+cancellation, and resource limits on every network, file, and process
+boundary. Coverage is tracked honestly in the
+[parity matrix](docs/LANGCHAINGO_PARITY.md). An adapter is supported only
+within the scope documented there.
+
+## Quick start
+
+Install the module:
 
 ```sh
 v install ulises-jeremias.langchainv
 ```
 
-V normalizes the import prefix to `ulises_jeremias.langchainv`:
+Run an offline example. No API key and no network are needed:
 
-```v
-import ulises_jeremias.langchainv
+```sh
+git clone https://github.com/ulises-jeremias/langchainv.git
+cd langchainv
+v run examples/text_splitter/main.v
 ```
 
-The current core packages include:
+Split text in your own program:
 
-- `schema`: documents, multimodal messages, and shared interfaces.
-- `llms`: model contracts, provider-neutral lifecycle middleware, provider-neutral generation results, OpenAI Chat Completions, llamafile's OpenAI-compatible local API, an explicitly configured local executable adapter, Amazon Bedrock Converse, Anthropic Messages, Cohere Chat, Baidu Qianfan v2, Maritaca Chat Completions, Mistral Chat Completions, Hugging Face Inference Providers chat, Cloudflare Workers AI chat, Ollama chat, Gemini text/image/function-tool generation, Vertex AI Gemini generation with explicit OAuth access tokens, and watsonx.ai text generation with IBM API-key exchange or explicit IAM tokens.
-- `embeddings`: provider client adapter, bounded batching, vector aggregation, vector math, and OpenAI, Ollama, Google AI, Jina, Voyage AI, Hugging Face, and Bedrock embeddings.
-- `httputil`: injectable provider HTTP transport with timeouts, TLS validation, and body limits.
-- `tools`: agent tool contract, bounded arithmetic calculator, search and web tools, Zapier MCP, and SQL database inspection/query helpers.
-- `testing/llmtest`: opt-in model contract checks for generation, cancellation, multiturn, streaming, tool calls, and usage, plus a concurrency-safe mock model.
-- `memory`: no-op memory, in-memory and bounded session-specific SQLite or PostgreSQL chat history, bounded Zep memory history, conversation buffer, bounded window buffer, and token-bounded buffer with an injected counter.
-- `prompts`: validated string templates, role-tagged chat templates, and fixed- or selector-backed few-shot prompts.
-- `outputparser`: string, boolean, list, regex, structured, combining, and
-  typed JSON parsers.
-- `jsonschema`: a validated, recursive subset for tool parameter schemas.
-- `chains`: prompt-backed completion and chat-model chains, document stuffing,
-  sequential map-reduce, map-rerank and refine, constitutional critique and
-  revision, retrieval QA, sequential composition, memory loading, bounded
-  conversational retrieval QA, and input/output validation.
-- `agents`: text-based MRKL/ReAct, conversational ReAct, provider-neutral
-  tool-calling, and OpenAI-compatible functions agents, a typed initializer,
-  plus a bounded executor with tool dispatch, callbacks, memory integration,
-  and optional intermediate-step output.
-- `callbacks`: chat/completion lifecycle event contract, ordered dispatch, no-op and standard
-  output logging handlers, final-answer streaming, and handler composition.
-- `vectorstores`: storage contract, retriever adapter, bounded in-memory cosine store, and Azure AI Search, Chroma, Dolt, MariaDB, Milvus, OpenSearch, pgvector, Redis Stack, Qdrant, Pinecone, and Weaviate integrations.
-- `documentloaders`: size-bounded PDF, HTML, text-file, and CSV content loaders
-  plus a bounded recursive directory loader for those file types. PDF extraction
-  requires Poppler's `pdftotext` executable.
-- `textsplitter`: recursive character and tokenizer-injected token chunks, plus
-  Markdown-aware heading, paragraph, fenced-code, table-row, and optional
-  reference-link splitting.
+```v
+module main
 
-Provider and component packages use nested import paths such as
-`ulises_jeremias.langchainv.llms.openai`.
+import ulises_jeremias.langchainv.textsplitter
 
-The shared [`llms` guide](llms/README.md) documents the model contract and
-provider-neutral callback middleware. The [provider catalog](docs/providers.md)
-lists adapter setup guides and current capabilities.
+fn main() {
+	text := 'First paragraph.\n\nSecond paragraph with more detail.'
+	splitter := textsplitter.new_recursive_character_text_splitter(
+		chunk_size:    32
+		chunk_overlap: 6
+	) or { panic(err) }
+	for chunk in splitter.split_text(text) or { panic(err) } {
+		println(chunk)
+	}
+}
+```
 
-See [`textsplitter/README.md`](textsplitter/README.md) for chunking options and
-the tokenizer interface.
+Ready for a live model call? Follow the
+[first chat tutorial](https://ulises-jeremias.github.io/langchainv/tutorials/first-chat/)
+(OpenAI key required), or browse the
+[tutorials](https://ulises-jeremias.github.io/langchainv/tutorials/) for
+retrieval QA, tool-calling agents, memory, and provider recipes.
 
-See [`outputparser/README.md`](outputparser/README.md) for parser behavior and
-the current V regular-expression compatibility boundary.
+## What you get
 
-See [`callbacks/README.md`](callbacks/README.md) for lifecycle logging and
-bounded final-answer streaming.
+| Capability | Packages | Highlights |
+|---|---|---|
+| Model contracts | `llms`, `schema` | Chat/completion/reasoning contracts, multimodal messages, tool calls, usage accounting, lifecycle callbacks and middleware for any model |
+| Chains | `chains` | LLM and conversation chains, stuff / map-reduce / map-rerank / refine QA, conversational retrieval, summarization, SQL, constitutional revision, sequential composition |
+| Agents | `agents`, `callbacks` | ReAct/MRKL, conversational ReAct, provider-neutral tool-calling and OpenAI-functions presets, bounded executor with memory, callbacks, and intermediate steps |
+| Prompts & parsing | `prompts`, `outputparser`, `jsonschema` | Validated string/chat templates, few-shot selectors, typed structured output parsers, recursive JSON-Schema subset |
+| Memory | `memory` | Conversation buffer, window and token buffers, SQLite/PostgreSQL chat history, Zep history |
+| Retrieval | `vectorstores`, `documentloaders`, `textsplitter` | 12 vector-store adapters, bounded PDF/HTML/CSV/text/directory loaders, recursive, token, and Markdown splitters |
+| Tools | `tools` | Calculator, web search (DuckDuckGo, SerpApi, Exa, Perplexity, Wikipedia), page scraping, SQL database, Zapier MCP |
+| Testing | `testing/llmtest`, `httputil` | Concurrency-safe mock model, opt-in live contract checks, injectable bounded HTTP transports used by every provider test |
 
-See [`memory/README.md`](memory/README.md) for full and windowed conversation memory.
+## Providers
 
-See [`chains/README.md`](chains/README.md) for the completion-model chain API.
+Chat and completion models. The [provider catalog](docs/providers.md) lists
+setup and per-adapter limits:
 
-See [`embeddings/openai/README.md`](embeddings/openai/README.md) for the
-OpenAI embeddings client and its injectable HTTP transport.
+OpenAI · Anthropic · Amazon Bedrock · Google AI (Gemini) · Google Vertex AI ·
+Ollama · Cohere · Mistral · Hugging Face · Cloudflare Workers AI · Baidu
+Qianfan (ERNIE) · Maritaca · IBM watsonx · llamafile · local executables
 
-See [`embeddings/ollama/README.md`](embeddings/ollama/README.md) for the
-Ollama embeddings client and its injectable HTTP transport.
+Embeddings: OpenAI · Google AI · Ollama · Jina · Voyage AI · Hugging Face ·
+Amazon Bedrock. Every provider accepts an injectable transport, so the full
+test suite runs offline against fake transports, with no keys required.
 
-See [`embeddings/googleai/README.md`](embeddings/googleai/README.md) for the
-Gemini batch embeddings client and its injectable HTTP transport.
+Vector stores: in-memory · Azure AI Search · Chroma · Dolt · MariaDB ·
+Milvus · OpenSearch · pgvector · Pinecone · Qdrant · Redis Stack · Weaviate.
 
-See [`embeddings/jina/README.md`](embeddings/jina/README.md) for the Jina text
-embeddings client and its injectable HTTP transport.
+## Why LangChainV
 
-See [`embeddings/voyageai/README.md`](embeddings/voyageai/README.md) for the
-Voyage AI client and its query/document-specific input modes.
+- **Bounded by default.** Request/response byte caps, message and batch
+  limits, timeouts, and context cancellation are built into adapters, not
+  left to callers.
+- **Offline-testable.** Providers depend on small transport and engine
+  interfaces; tests inject fakes and never need credentials or network.
+- **No mandatory dependencies.** Core packages use only the V standard
+  library; optional backends stay isolated in their adapters.
+- **Honest status.** The parity matrix records what is implemented,
+  verified, partial, or outstanding for every upstream package, provider,
+  embedding, and vector store.
 
-See [`embeddings/huggingface/README.md`](embeddings/huggingface/README.md) for
-the Hugging Face feature-extraction client and its injectable transport.
+## Documentation
 
-See [`embeddings/bedrock/README.md`](embeddings/bedrock/README.md) for Titan and
-Cohere embeddings through Bedrock Runtime with API-key authentication.
+| Guide | What it covers |
+|---|---|
+| [Documentation site](https://ulises-jeremias.github.io/langchainv/) | Quick start, tutorials, component map, production guide |
+| [API reference](https://ulises-jeremias.github.io/langchainv/api/) | Searchable generated reference for every module |
+| [Get started](docs/getting-started.md) | Install, first example, first program |
+| [Tutorials](docs/tutorials.md) | End-to-end recipes from first chat to vector search |
+| [Component map](docs/components.md) | How to choose a package |
+| [Provider catalog](docs/providers.md) | Adapter setup, capabilities, and limits |
+| [Production guide](docs/production.md) | Data handling, limits, cancellation, retries, tool access |
+| [Parity matrix](docs/LANGCHAINGO_PARITY.md) | LangChainGo coverage, package by package |
+| [Examples](examples/README.md) | Standalone programs and their requirements |
 
-See [`llms/openai/README.md`](llms/openai/README.md) for OpenAI chat generation,
-tool calls, and multimodal image inputs.
-
-See [`llms/llamafile/README.md`](llms/llamafile/README.md) for local llamafile
-chat through its OpenAI-compatible API.
-
-See [`llms/local/README.md`](llms/local/README.md) for running an explicitly
-configured local executable with bounded arguments/output and context cancellation.
-
-See [`llms/vertex/README.md`](llms/vertex/README.md) for Gemini generation on
-Vertex AI using an explicitly supplied OAuth access token.
-
-See [`llms/watsonx/README.md`](llms/watsonx/README.md) for watsonx.ai text
-generation using an API key or an explicitly supplied IAM access token.
-
-See [`llms/bedrock/README.md`](llms/bedrock/README.md) for Amazon Bedrock
-Converse chat, tool use, images, and API-key authentication details.
-
-See [`llms/anthropic/README.md`](llms/anthropic/README.md) for Anthropic
-Messages, tool use, and its supported options.
-
-See [`llms/cohere/README.md`](llms/cohere/README.md) for Cohere Chat API v2,
-function tools, and its supported options.
-
-See [`llms/ernie/README.md`](llms/ernie/README.md) for Baidu Qianfan v2 chat.
-
-See [`llms/maritaca/README.md`](llms/maritaca/README.md) for Maritaca Chat
-Completions.
-
-See [`llms/mistral/README.md`](llms/mistral/README.md) for Mistral's
-OpenAI-compatible Chat Completions adapter.
-
-See [`llms/huggingface/README.md`](llms/huggingface/README.md) for Hugging Face
-Inference Providers chat via its OpenAI-compatible router.
-
-See [`llms/cloudflare/README.md`](llms/cloudflare/README.md) for Cloudflare
-Workers AI Chat Completions.
-
-See [`llms/ollama/README.md`](llms/ollama/README.md) for local Ollama chat,
-multimodal inputs, and its supported options.
-
-See [`llms/googleai/README.md`](llms/googleai/README.md) for Gemini text
-generation and its supported options.
-
-See [`vectorstores/qdrant/README.md`](vectorstores/qdrant/README.md) for the
-Qdrant REST adapter and its collection requirements.
-
-See [`vectorstores/azureaisearch/README.md`](vectorstores/azureaisearch/README.md)
-for Azure AI Search index fields, vector profile, endpoint authentication, and
-adapter limits.
-
-See [`vectorstores/pinecone/README.md`](vectorstores/pinecone/README.md) for the
-Pinecone index host and metadata requirements.
-
-See [`vectorstores/weaviate/README.md`](vectorstores/weaviate/README.md) for
-Weaviate class, namespace, and filter requirements.
-
-See [`vectorstores/milvus/README.md`](vectorstores/milvus/README.md) for the
-Milvus REST v2 adapter and collection schema requirements.
-
-See [`vectorstores/opensearch/README.md`](vectorstores/opensearch/README.md) for
-the OpenSearch k-NN REST adapter and index mapping requirements.
-
-See [`vectorstores/pgvector/README.md`](vectorstores/pgvector/README.md) for the
-PostgreSQL pgvector adapter and existing table schema requirements.
-See [`vectorstores/redis/README.md`](vectorstores/redis/README.md) for Redis
-Stack index setup, HASH fields, and adapter limits.
-See [`vectorstores/dolt/README.md`](vectorstores/dolt/README.md) for explicit
-table setup, opt-in vector index creation, and Dolt search limits.
+Each package also carries its own README next to the code. Start with the
+[shared `llms` guide](llms/README.md) for the model contract.
 
 ## Compatibility
 
-- V 0.5.2 or newer, subject to compiler compatibility notes in the docs.
-- Core packages are designed to use V's standard library without mandatory
-  third-party dependencies.
-- Optional integrations may use VSL or VTL when that is the best V-native
-  backend; those dependencies will remain isolated to their adapters.
+- V 0.5.2 or newer.
+- PDF loading shells out to Poppler's `pdftotext` (arguments passed without a
+  shell); everything else is pure V.
+- Hosted CI runs `v fmt -verify`, compiles every Markdown code block, tests
+  all packages, and builds and runs every standalone example.
 
-## Project status
+## Contributing
 
-LangChainGo has a broad integration surface. This project tracks its APIs and
-integrations explicitly rather than implying full compatibility from a small
-set of working examples. See [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)
-and [`docs/LANGCHAINGO_PARITY.md`](docs/LANGCHAINGO_PARITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the safe local V workflow and the
+hosted-CI gates every change must pass. Changes land through pull requests
+with a green CI matrix; documentation changes update the parity matrix when
+behavior changes.
 
 ## License
 
