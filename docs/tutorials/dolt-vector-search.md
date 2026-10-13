@@ -31,8 +31,9 @@ Create a store with your application embedder and injected engine, then call
 `similarity_search(mut ctx, query, limit, options)`. `StoreOptions.namespace`
 selects the collection for writes and deletes; `SearchOptions.namespace` scopes
 queries. Search accepts scalar JSON metadata equality filters and uses squared
-Euclidean distance. Its score is `1 - distance`, and the server must have the
-vector index available for `VEC_DISTANCE`.
+Euclidean distance. Its score is `1 - distance`. Build the vector index for
+approximate indexed retrieval and verify exact-scan behavior on your Dolt
+version before deciding to run without one.
 
 Writes accept at most 32 documents and 4 MiB per call. Search and delete each
 cap their requested rows/IDs at 1,000. See the guide for field-size and vector

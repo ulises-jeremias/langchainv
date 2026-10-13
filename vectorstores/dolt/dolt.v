@@ -31,7 +31,7 @@ pub:
 }
 
 // Store uses existing Dolt tables through a caller-owned MySQL-compatible SQL
-// engine. Vector search requires an explicit Dolt VECTOR INDEX.
+// engine. An explicit Dolt VECTOR INDEX enables approximate indexed search.
 pub struct Store {
 pub:
 	database_name    string
@@ -269,7 +269,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		return error('Dolt search request exceeds 4 MiB')
 	}
 	result := store.engine.query_params(mut ctx, statement, parameters) or {
-		return error('Dolt similarity search failed; verify the vector index and Dolt version')
+		return error('Dolt similarity search failed; verify Dolt version, vector dimensions, and index setup')
 	}
 	if result.rows.len > limit {
 		return error('Dolt returned more documents than requested')

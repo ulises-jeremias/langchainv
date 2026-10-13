@@ -7,14 +7,15 @@ engine remains caller-owned.
 
 ## Setup
 
-Provision tables explicitly, then decide whether to build a vector index. Dolt
-documents vector indexes over JSON vectors as alpha; index construction and
-approximate search can consume substantial resources and may trade recall for
-speed. Review the [Dolt vector index announcement](https://www.dolthub.com/blog/2025-01-16-announcing-vector-indexes/),
+Provision tables explicitly, then decide whether to build a vector index for
+approximate indexed retrieval. Dolt announced vector indexes over JSON as an
+alpha feature; index construction and approximate search can consume
+substantial resources and may trade recall for speed. Review the [Dolt vector index announcement](https://www.dolthub.com/blog/2025-01-16-announcing-vector-indexes/),
 the [current vector syntax notes](https://www.dolthub.com/blog/2025-08-08-vector-type/),
 and your Dolt version's current docs before enabling it. Dolt uses an index
 when `VEC_DISTANCE` appears directly in `ORDER BY`; the retrieval query keeps
-that expression in place.
+that expression in place. Verify exact-scan behavior and index availability
+against the Dolt release you deploy.
 
 ```v
 import context
@@ -53,5 +54,6 @@ not own or close the injected engine.
   and no larger than 2,000 values. Dolt's index also requires consistent
   dimensions across indexed rows.
 
-Adapter tests use a fake engine and do not require Dolt. A live database and
-vector index are required to test retrieval end to end.
+Adapter tests use a fake engine and do not require Dolt. A live database is
+required to test retrieval end to end; an index is needed for indexed
+approximate retrieval.
