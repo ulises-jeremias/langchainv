@@ -35,18 +35,12 @@ import json2
 import ulises_jeremias.langchainv.llms
 
 fn main() {
-	response_schema := json2.Any(map[string]json2.Any{
-		'type': json2.Any('object')
-		'properties': json2.Any(map[string]json2.Any{
-			'answer': json2.Any(map[string]json2.Any{
-				'type': json2.Any('string')
-			})
-		})
-		'required': json2.Any([json2.Any('answer')])
-	})
+	schema_json := '{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}'
+	response_schema := json2.decode[map[string]json2.Any](schema_json,
+		json2.DecoderOptions{}) or { panic(err) }
 	options := llms.CallOptions{
 		provider_options: {
-			'response_schema': response_schema
+			'response_schema': json2.Any(response_schema)
 		}
 	}
 	println(options.provider_options.len)
