@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Remote image URLs for Gemini: `schema.ImageURLPart` now maps to a
+  `fileData` part for bounded HTTPS or `gs://` references without embedded
+  credentials, in both the Google AI and Vertex clients.
+
 - Ollama model management: `list_models`, `show_model`, `pull_model`, and
   `delete_model` with validated model names and bounded responses.
 
