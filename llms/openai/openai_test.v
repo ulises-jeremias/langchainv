@@ -66,12 +66,12 @@ fn sample_response_format() ResponseFormat {
 		panic(err)
 	}
 	return ResponseFormat{
-		kind: 'json_schema'
+		kind:        'json_schema'
 		json_schema: JSONSchemaResponseFormat{
-			name: 'answer'
+			name:        'answer'
 			description: 'A short answer'
-			schema: schema
-			strict: true
+			schema:      schema
+			strict:      true
 		}
 	}
 }
@@ -148,17 +148,19 @@ fn test_client_rejects_invalid_json_schema_response_formats() {
 		ResponseFormat{ kind: 'invalid' },
 		ResponseFormat{ kind: 'json_schema' },
 		ResponseFormat{
-			kind: 'json_schema'
+			kind:        'json_schema'
 			json_schema: JSONSchemaResponseFormat{
-				name: 'answer'
+				name:   'answer'
 				schema: map[string]json2.Any{}
 			}
 		},
 		ResponseFormat{
-			kind: 'json_schema'
+			kind:        'json_schema'
 			json_schema: JSONSchemaResponseFormat{
-				name: 'bad name'
-				schema: { 'type': json2.Any('object') }
+				name:   'bad name'
+				schema: {
+					'type': json2.Any('object')
+				}
 			}
 		},
 	]

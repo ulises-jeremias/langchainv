@@ -16,8 +16,8 @@ const max_inline_image_bytes = 5 * 1024 * 1024
 
 // Client implements chat generation over the injectable bounded HTTP transport.
 pub struct Client {
-	api_key     string
-	http_client httputil.HTTPClient
+	api_key         string
+	http_client     httputil.HTTPClient
 	response_format ?ResponseFormat
 pub:
 	base_url string = default_base_url
@@ -27,8 +27,8 @@ pub:
 // Options configures endpoint and default model.
 pub struct Options {
 pub:
-	base_url       string = default_base_url
-	model          string = default_model
+	base_url        string = default_base_url
+	model           string = default_model
 	response_format ?ResponseFormat
 }
 
@@ -152,11 +152,11 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	}
 	validate_response_format(options.response_format)!
 	return Client{
-		api_key:        api_key
-		http_client:    http_client
+		api_key:         api_key
+		http_client:     http_client
 		response_format: options.response_format
-		base_url:       options.base_url.trim_space().trim_right('/')
-		model:          options.model.trim_space()
+		base_url:        options.base_url.trim_space().trim_right('/')
+		model:           options.model.trim_space()
 	}
 }
 
