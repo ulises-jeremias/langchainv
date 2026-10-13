@@ -39,3 +39,17 @@ bound of 16 MiB. Oversized messages and unsupported bound combinations return er
 The adapter uses V's `db.sqlite` module and needs SQLite development files on
 Linux when the compiler cannot find its bundled amalgamation. Tests use an
 in-memory database.
+
+`memory/sqlhistory` implements the same typed history contract over an
+injected PostgreSQL `sqldatabase.Engine` with the `pgx` or `postgresql` dialect.
+It creates a shared `langchain_chat_messages` table and session index when they
+are missing, stores JSON-encoded messages, and keeps a bounded number of recent
+messages per session. A blank session uses `default`. Existing tables are not
+altered or validated. Zero limits use 1024 messages and 16 KiB per message; the
+combined read bound cannot exceed 16 MiB. A caller can use a compatible engine
+connected to Cloud SQL for PostgreSQL or AlloyDB, but connection setup,
+authentication, and engine lifetime remain the caller's responsibility. The
+history object never closes the injected engine. Inserts and trimming are
+separate statements because `sqldatabase.Engine` does not expose transactions;
+an insert may remain stored if trimming fails. CI tests use a deterministic
+fake engine and do not require a PostgreSQL service.
