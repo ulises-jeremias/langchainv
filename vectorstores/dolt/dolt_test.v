@@ -170,7 +170,7 @@ fn test_dolt_search_uses_parameterized_metadata_filter_and_optional_vector() {
 	assert state.parameters[0] == ['[0.25,0.75]', 'docs', '$.kind', '"guide"', '[0.25,0.75]', '4']
 }
 
-fn test_dolt_search_omits_metadata_and_vectors_by_default() {
+fn test_dolt_search_omits_metadata_when_disabled_and_vectors_by_default() {
 	mut state := &DoltFixtureState{
 		result: sqldatabase.QueryResult{
 			rows: [['answer', '{"kind":"guide"}', '0.91']]
@@ -178,7 +178,9 @@ fn test_dolt_search_omits_metadata_and_vectors_by_default() {
 	}
 	store := dolt_fixture_store(state) or { panic(err) }
 	mut ctx := context.background()
-	documents := store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{}) or {
+	documents := store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{
+		include_metadata: false
+	}) or {
 		panic(err)
 	}
 	assert documents[0].metadata.len == 0
