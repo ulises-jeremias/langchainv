@@ -27,10 +27,11 @@ Work through these recipes in order. Each section links to the package guide tha
 15. [Return stored vectors](returning-vectors/) when you need the original embeddings for inspection or downstream calculations.
 16. Persist bounded remote conversation history with the [Zep chat history tutorial](zep-chat-history/); the example reads by default and requires a second opt-in before writing.
 17. Connect an existing Dolt database with [Dolt vector search](dolt-vector-search/) after reviewing the explicit index-build cost and approximate-recall behavior.
-18. Set up a Redis Stack HASH vector index with the [Redis vector search guide](redis-vector-search/) before binding the adapter to it.
-19. Provision a cosine k-NN mapping with the [OpenSearch vector search guide](opensearch-vector-search/) before indexing documents.
-20. Provision a MariaDB vector table and separately schedule its cosine index build with the [MariaDB vector search guide](mariadb-vector-search/).
-21. Set up a dimensioned PostgreSQL vector table and schedule its cosine HNSW index with the [pgvector tutorial](pgvector-vector-search/).
+18. Query a [SQL database](sql-database/) with SQLite fixtures and parameterized values before connecting an agent or application to a persistent database.
+19. Set up a Redis Stack HASH vector index with the [Redis vector search guide](redis-vector-search/) before binding the adapter to it.
+20. Provision a cosine k-NN mapping with the [OpenSearch vector search guide](opensearch-vector-search/) before indexing documents.
+21. Provision a MariaDB vector table and separately schedule its cosine index build with the [MariaDB vector search guide](mariadb-vector-search/).
+22. Set up a dimensioned PostgreSQL vector table and schedule its cosine HNSW index with the [pgvector tutorial](pgvector-vector-search/).
 
 ## Recipes by task
 
@@ -60,6 +61,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Load files | [documentloaders](https://github.com/ulises-jeremias/langchainv/blob/main/documentloaders/README.md) | Limits and external runtime requirements are documented per loader. |
 | Add SQL tools | [SQL database tools](https://github.com/ulises-jeremias/langchainv/blob/main/tools/sqldatabase/README.md) | Use parameterized queries and least-privilege credentials. |
 | Prepare a service for deployment | [Production guide](../production/) | Review data handling, resource bounds, cancellation, retries, and tool access. |
+| Query SQL with bound values | [SQL database tutorial](sql-database/) | The example uses in-memory SQLite; hidden tables are not access control. |
 
 The tutorials favor offline, runnable examples where practical. A package
 marked partial in the parity ledger may have important unsupported behavior;
