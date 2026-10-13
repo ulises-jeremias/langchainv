@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Embedding request options: Voyage output dimensions and truncation
+  control, and Jina task, dimensions, and late chunking, all sent only when
+  configured and validated at construction.
+
 - More `Defined` field types in `outputparser`: optional scalar slices and
   maps, nested scalar slices, slices of scalar maps, and maps of scalar
   slices, in generated schemas and typed decoding.

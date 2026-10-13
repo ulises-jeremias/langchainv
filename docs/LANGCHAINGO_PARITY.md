@@ -93,11 +93,11 @@ a release.
 
 OpenAI — partial: JSON float requests, configurable model/base URL/dimensions,
 input-order restoration, and injected HTTP transport. Jina — partial: bounded
-JSON float requests, configurable model/base URL, response-order restoration,
-and injected HTTP transport; task/dimension options and asynchronous batches
-remain outstanding. VoyageAI — partial: bounded JSON float requests, configurable
-model/base URL, query/document input modes, and injected HTTP transport;
-dimension and task configuration remain outstanding. Ollama — partial: batched
+JSON float requests, configurable model/base URL, task, dimensions, and
+late-chunking options, response-order restoration, and injected HTTP
+transport; asynchronous batches remain outstanding. VoyageAI — partial: bounded JSON float requests, configurable
+model/base URL, query/document input modes, output dimensions, truncation
+control, and injected HTTP transport. Ollama — partial: batched
 `/api/embed`, configurable model/base URL, input and response limits, vector
 shape validation, and injected HTTP transport. Google AI — partial: batched
 `batchEmbedContents`, configurable model/base URL/task/dimensions, vector shape
