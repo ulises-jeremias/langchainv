@@ -87,7 +87,7 @@ fn test_azure_search_index_creation_rejects_invalid_dimensions_without_request()
 fn test_azure_search_index_creation_rejects_one_dimension_without_request() {
 	mut state := &AzureFixtureState{}
 	store := fixture_store(state) or { panic(err) }
-	mut ctx := context.new_context()
+	mut ctx := context.background()
 	store.create_index(mut ctx, 1) or {
 		assert err.msg().contains('between 2 and 4096')
 		assert state.requests.len == 0
