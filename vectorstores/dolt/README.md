@@ -17,20 +17,16 @@ when `VEC_DISTANCE` appears directly in `ORDER BY`; the retrieval query keeps
 that expression in place. Verify exact-scan behavior and index availability
 against the Dolt release you deploy.
 
-```v
-import context
-import ulises_jeremias.langchainv.tools.sqldatabase
-import ulises_jeremias.langchainv.vectorstores
-import ulises_jeremias.langchainv.vectorstores.dolt
-
+```text
+// Wiring sketch: configured_engine must implement sqldatabase.Engine, and
+// my_embedder must implement embeddings.Embedder.
 mut ctx := context.background()
-engine := your_mysql_engine // any caller-configured sqldatabase.Engine
 options := dolt.Options{}
 
 // Explicit calls: index builds may be resource-intensive.
-dolt.initialize_tables(mut ctx, engine, options)!
-dolt.create_vector_index(mut ctx, engine, options)!
-store := dolt.new_store(my_embedder, engine, options)!
+dolt.initialize_tables(mut ctx, configured_engine, options)!
+dolt.create_vector_index(mut ctx, configured_engine, options)!
+store := dolt.new_store(my_embedder, configured_engine, options)!
 ```
 
 `my_embedder` implements `embeddings.Embedder`. Configure the engine with
