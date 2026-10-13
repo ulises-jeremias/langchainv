@@ -128,9 +128,10 @@ version-dependent and may trade recall for speed. MariaDB is partial: bounded pa
 `VEC_FromText`, cosine search through `VEC_DISTANCE_COSINE`, parameterized ID
 deletion, namespace and scalar JSON equality filters, injected embeddings/SQL
 engine, optional validated vector return through `VEC_ToText`, and bounded
-payloads against an existing MariaDB 11.7.1+ vector table; table/index
-provisioning, non-scalar or advanced filters, and alternate distance strategies
-remain outstanding. Azure AI Search is partial: bounded document upload,
+payloads against MariaDB 11.7.1+ vector tables; explicit non-destructive table
+initialization and a separately invoked, idempotent cosine vector-index build
+are supported. Schema migration, index replacement, non-scalar or advanced
+filters, and alternate distance strategies remain outstanding. Azure AI Search is partial: bounded document upload,
 vector search and key deletion against an existing index, with injected
 embeddings/HTTP transport, API-key authentication, namespace filtering and
 indexing-result validation. It requires configured key/content/vector/metadata/

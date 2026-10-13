@@ -33,7 +33,9 @@ fn (engine MariaDBFixtureEngine) dialect() string {
 	return if engine.dialect_name == '' { 'mysql' } else { engine.dialect_name }
 }
 
-fn (engine MariaDBFixtureEngine) query(mut _ctx context.Context, _statement string) !sqldatabase.QueryResult {
+fn (engine MariaDBFixtureEngine) query(mut _ctx context.Context, statement string) !sqldatabase.QueryResult {
+	mut state := engine.state
+	state.statements << statement
 	return sqldatabase.QueryResult{}
 }
 
@@ -81,6 +83,56 @@ fn test_mariadb_adds_documents_with_parameterized_bulk_insert() {
 	assert state.parameters[0][2].contains('"kind":"guide"')
 	assert state.parameters[0][3] == 'tenant-1'
 	assert state.parameters[0][4] == '[0.25,0.75]'
+}
+
+fn test_mariadb_initializes_table_without_building_index() {
+	mut state := &MariaDBFixtureState{}
+	engine := MariaDBFixtureEngine{ state: state }
+	mut ctx := context.background()
+	initialize_table(mut ctx, engine, Options{ table: 'documents' }, 384) or { panic(err) }
+	assert state.statements.len == 1
+	assert state.statements[0].starts_with('CREATE TABLE IF NOT EXISTS `documents`')
+	assert state.statements[0].contains('`embedding` VECTOR(384) NOT NULL')
+	assert !state.statements[0].contains('VECTOR INDEX')
+}
+
+fn test_mariadb_explicitly_builds_cosine_vector_index() {
+	mut state := &MariaDBFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['0']]
+		}
+	}
+	engine := MariaDBFixtureEngine{ state: state }
+	mut ctx := context.background()
+	create_vector_index(mut ctx, engine, Options{ table: 'documents' }) or { panic(err) }
+	assert state.statements.len == 2
+	assert state.statements[0].contains('information_schema.statistics')
+	assert state.parameters[0] == ['documents', 'langchainv_embedding_idx']
+	assert state.statements[1] == 'ALTER TABLE `documents` ADD VECTOR INDEX `langchainv_embedding_idx` (`embedding`) M=8 DISTANCE=cosine'
+}
+
+fn test_mariadb_vector_index_initializer_is_idempotent() {
+	mut state := &MariaDBFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['1']]
+		}
+	}
+	engine := MariaDBFixtureEngine{ state: state }
+	mut ctx := context.background()
+	create_vector_index(mut ctx, engine, Options{ table: 'documents' }) or { panic(err) }
+	assert state.statements.len == 1
+}
+
+fn test_mariadb_initializers_reject_invalid_dimensions_without_sql() {
+	mut state := &MariaDBFixtureState{}
+	engine := MariaDBFixtureEngine{ state: state }
+	mut ctx := context.background()
+	initialize_table(mut ctx, engine, Options{ table: 'documents' }, 0) or {
+		assert err.msg().contains('dimensions')
+		assert state.statements.len == 0
+		return
+	}
+	assert false, 'expected invalid MariaDB vector dimensions to fail'
 }
 
 fn test_mariadb_search_uses_cosine_order_and_exact_metadata_filters() {
