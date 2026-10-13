@@ -6,6 +6,7 @@ import encoding.base64
 import hash.crc32
 import json2
 import math
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -148,8 +149,9 @@ fn read_u32_be(bytes []u8, offset int) u32 {
 // Options configures an AWS region and a Bedrock Converse model ID.
 pub struct Options {
 pub:
-	region   string = 'us-east-1'
-	model_id string = default_model
+	region    string = 'us-east-1'
+	model_id  string = default_model
+	callbacks ?callbacks.Handler
 }
 
 // Client calls the Bedrock Runtime Converse operation using a Bedrock API key.
@@ -160,6 +162,8 @@ mut:
 pub:
 	region   string
 	model_id string
+pub mut:
+	callbacks ?callbacks.Handler
 }
 
 // new_client constructs a client with default region and model settings.
@@ -194,11 +198,29 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 		http_client: http_client
 		region:      region
 		model_id:    model_id
+		callbacks:   options.callbacks
 	}
 }
 
 // generate_content sends text, image, and tool messages to Converse.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
+	llms.validate_messages(messages)!
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_start(mut ctx, messages)
+	}
+	response := client.generate_content_request(mut ctx, messages, options) or {
+		if mut handler := client.callbacks {
+			handler.llm_error(mut ctx, err)
+		}
+		return err
+	}
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_end(mut ctx, response)
+	}
+	return response
+}
+
+fn (client Client) generate_content_request(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	llms.validate_messages(messages)!
 	validate_options(options)!
 	model := if options.model.trim_space() == '' {

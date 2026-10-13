@@ -25,3 +25,5 @@ Maritaca-specific request options remain outside this adapter.
 The provider documents Chat Completions compatibility and the
 `https://chat.maritaca.ai/api` base URL in its
 [API examples](https://docs.maritaca.ai/pt/examples/csharp-js).
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

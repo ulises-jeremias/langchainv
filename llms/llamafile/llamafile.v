@@ -3,6 +3,7 @@ module llamafile
 
 import context
 import net.urllib
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.openai
@@ -18,9 +19,10 @@ const max_api_key_bytes = 16 * 1024
 // Options configures the local server endpoint and default model.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
-	api_key  string = default_api_key
+	base_url  string = default_base_url
+	model     string = default_model
+	api_key   string = default_api_key
+	callbacks ?callbacks.Handler
 }
 
 // Client implements LangChainV model contracts using llamafile's current
@@ -44,8 +46,9 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 	validate_base_url(base_url)!
 	return Client{
 		inner: openai.new_client_with_options(api_key, http_client, openai.Options{
-			base_url: base_url
-			model:    model
+			base_url:  base_url
+			model:     model
+			callbacks: options.callbacks
 		})!
 	}
 }

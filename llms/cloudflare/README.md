@@ -28,3 +28,5 @@ transport and never contact Cloudflare.
 
 See Cloudflare's [OpenAI-compatible API documentation](https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/)
 for supported routes and models.
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

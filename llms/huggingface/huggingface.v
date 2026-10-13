@@ -3,6 +3,7 @@ module huggingface
 
 import context
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.openai
@@ -21,8 +22,9 @@ pub:
 // Options configures the router URL and a required Hugging Face model ID.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string
+	base_url  string = default_base_url
+	model     string
+	callbacks ?callbacks.Handler
 }
 
 struct HuggingFaceHTTPClient {
@@ -51,8 +53,9 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	inner := openai.new_client_with_options(api_key, httputil.HTTPClient(HuggingFaceHTTPClient{
 		inner: http_client
 	}), openai.Options{
-		base_url: base_url
-		model:    model
+		base_url:  base_url
+		model:     model
+		callbacks: options.callbacks
 	})!
 	return Client{
 		inner:    inner

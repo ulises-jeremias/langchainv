@@ -27,3 +27,5 @@ on the selected inference provider. The legacy LangChainGo route and
 provider-specific selection options are not implemented. Chat streaming works
 when the injected HTTP transport implements the streaming contract. Tests use
 a fake transport and do not call Hugging Face.
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

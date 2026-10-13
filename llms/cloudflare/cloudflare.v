@@ -3,6 +3,7 @@ module cloudflare
 
 import context
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.openai
@@ -25,6 +26,7 @@ pub:
 	base_url   string = default_base_url
 	account_id string
 	model      string
+	callbacks  ?callbacks.Handler
 }
 
 struct CloudflareHTTPClient {
@@ -63,8 +65,9 @@ pub fn new_client_with_options(api_token string, http_client httputil.HTTPClient
 	inner := openai.new_client_with_options(api_token, httputil.HTTPClient(CloudflareHTTPClient{
 		inner: http_client
 	}), openai.Options{
-		base_url: base_url
-		model:    model
+		base_url:  base_url
+		model:     model
+		callbacks: options.callbacks
 	})!
 	return Client{
 		inner:      inner
