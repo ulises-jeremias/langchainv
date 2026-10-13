@@ -234,3 +234,51 @@ fn test_milvus_rejects_partial_insert_counts() {
 	}
 	assert false, 'expected a partial insert count to fail'
 }
+
+fn test_milvus_search_filters_l2_by_maximum_distance() {
+	mut state := &MilvusFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"code":0,"data":[{"id":"near","distance":0.25,"page_content":"near doc","metadata":{},"namespace":""},{"id":"far","distance":1.75,"page_content":"far doc","metadata":{},"namespace":""}]}'
+		}]
+	}
+	mut store := new_store(MilvusFixtureEmbedder{}, Options{
+		base_url:    'https://milvus.example.test'
+		collection:  'docs'
+		token:       'root:fixture'
+		metric_type: 'L2'
+	}) or { panic(err) }
+	store.http_client = httputil.HTTPClient(MilvusFixtureHTTP{
+		state: state
+	})
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.min_score = f32(1.0)
+	documents := store.similarity_search(mut ctx, 'query', 3, options) or { panic(err) }
+	assert documents.len == 1
+	assert documents[0].page_content == 'near doc'
+	assert documents[0].score == f32(0.25)
+}
+
+fn test_milvus_search_rejects_negative_l2_threshold() {
+	mut state := &MilvusFixtureState{}
+	mut store := new_store(MilvusFixtureEmbedder{}, Options{
+		base_url:    'https://milvus.example.test'
+		collection:  'docs'
+		token:       'root:fixture'
+		metric_type: 'L2'
+	}) or { panic(err) }
+	store.http_client = httputil.HTTPClient(MilvusFixtureHTTP{
+		state: state
+	})
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.min_score = f32(-0.5)
+	store.similarity_search(mut ctx, 'query', 3, options) or {
+		assert err.msg().contains('non-negative')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected a negative L2 threshold to fail'
+}

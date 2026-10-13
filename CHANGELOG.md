@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Milvus L2 score filtering: `min_score` now works with the L2 metric as a
+  maximum-distance threshold instead of being rejected.
+
 - Pinecone filter operators: comparison, membership, and existence
   operators plus bounded `$and`/`$or` groups in search filters, validated
   before any request.
