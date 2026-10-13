@@ -1,9 +1,10 @@
 # LangChainGo parity ledger
 
-Status values: `not started`, `partial`, `implemented`, `verified`. A package
-must not be called implemented until its public behavior and supported options
-are accounted for. `verified` requires behavior evidence at the same scope as
-the claim.
+Status values: `not started`, `partial`, `implemented`, `verified`, and
+`not applicable` when the pinned upstream snapshot exposes no implementation
+surface to port. A package must not be called implemented until its public
+behavior and supported options are accounted for. `verified` requires behavior
+evidence at the same scope as the claim.
 
 The inventory is based on upstream commit
 [`6351d0d03286ba1f8be78b572d88c9b43ed6b869`](https://github.com/tmc/langchaingo/commit/6351d0d03286ba1f8be78b572d88c9b43ed6b869)
@@ -40,6 +41,8 @@ inventory before a release.
 - The remaining changes in this range are mainly dependency/example refreshes,
   replay-fixture adjustments, and test robustness fixes; they do not add a new
   upstream framework package.
+- The upstream `exp` directory contains only its README and package comment at
+  this snapshot; it exposes no experimental API surface to port.
 
 ## Framework packages
 
@@ -62,7 +65,7 @@ inventory before a release.
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, request/response byte and timeout limits, bounded incremental response callbacks, a chunk-independent SSE decoder, and redacted logging decorators for streaming and non-streaming clients |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | partial: opt-in core generation and canceled-context checks, with capability checks for multiturn history, streaming chunks/error propagation, tool-call JSON/replay, and typed token usage; includes a configurable concurrency-safe `MockModel` with copied response snapshots; calling `test_model` against a live provider is explicit |
-| `exp` | experimental public API surface present upstream | not started |
+| `exp` | experimental public API surface | not applicable at the pinned snapshot: upstream contains only [`README.md`](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/exp/README.md) and [`doc.go`](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/exp/doc.go), with no Go implementation files |
 
 ## LLM providers
 
