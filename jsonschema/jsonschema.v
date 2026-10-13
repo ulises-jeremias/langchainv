@@ -57,6 +57,11 @@ pub:
 	min_items             ?int
 	max_items             ?int
 	additional_properties ?bool
+	format                string
+	all_of                []Definition
+	any_of                []Definition
+	one_of                []Definition
+	not                   ?&Definition
 }
 
 // to_any validates the definition and converts it to a JSON value.
@@ -83,6 +88,9 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	}
 	if definition.description != '' {
 		result['description'] = json2.Any(definition.description)
+	}
+	if definition.format != '' {
+		result['format'] = json2.Any(definition.format)
 	}
 	if minimum := definition.minimum {
 		result['minimum'] = json2.Any(minimum)
@@ -134,6 +142,30 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	}
 	if items := definition.items {
 		result['items'] = items.to_any_depth(depth + 1)!
+	}
+	if definition.all_of.len > 0 {
+		mut schemas := []json2.Any{cap: definition.all_of.len}
+		for sub_schema in definition.all_of {
+			schemas << sub_schema.to_any_depth(depth + 1)!
+		}
+		result['allOf'] = json2.Any(schemas)
+	}
+	if definition.any_of.len > 0 {
+		mut schemas := []json2.Any{cap: definition.any_of.len}
+		for sub_schema in definition.any_of {
+			schemas << sub_schema.to_any_depth(depth + 1)!
+		}
+		result['anyOf'] = json2.Any(schemas)
+	}
+	if definition.one_of.len > 0 {
+		mut schemas := []json2.Any{cap: definition.one_of.len}
+		for sub_schema in definition.one_of {
+			schemas << sub_schema.to_any_depth(depth + 1)!
+		}
+		result['oneOf'] = json2.Any(schemas)
+	}
+	if not_schema := definition.not {
+		result['not'] = not_schema.to_any_depth(depth + 1)!
 	}
 	return json2.Any(result)
 }
@@ -285,6 +317,43 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 			if number >= exclusive_maximum {
 				return error('JSON Schema number must be below exclusiveMaximum at ${path}')
 			}
+		}
+	}
+	for sub_schema in definition.all_of {
+		sub_schema.validate_instance_at(instance, path, depth + 1)!
+	}
+	if definition.any_of.len > 0 {
+		mut matched := false
+		for sub_schema in definition.any_of {
+			mut failed := false
+			sub_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+			if !failed {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return error('JSON Schema instance does not match any anyOf schema at ${path}')
+		}
+	}
+	if definition.one_of.len > 0 {
+		mut matches := 0
+		for sub_schema in definition.one_of {
+			mut failed := false
+			sub_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+			if !failed {
+				matches++
+			}
+		}
+		if matches != 1 {
+			return error('JSON Schema instance must match exactly one oneOf schema at ${path}')
+		}
+	}
+	if not_schema := definition.not {
+		mut failed := false
+		not_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+		if !failed {
+			return error('JSON Schema instance must not match the `not` schema at ${path}')
 		}
 	}
 }
@@ -487,6 +556,24 @@ fn (definition Definition) validate_depth(depth int) ! {
 		}
 		required_names[name] = true
 	}
+	if definition.format != '' {
+		if definition.format.len > 64 {
+			return error('JSON Schema format must be 1..64 letters, digits, dashes, underscores, or dots')
+		}
+		for character in definition.format.bytes() {
+			if !(character.is_letter() || character.is_digit() || character in [`-`, `_`, `.`]) {
+				return error('JSON Schema format must be 1..64 letters, digits, dashes, underscores, or dots')
+			}
+		}
+		if data_type := definition.type_ {
+			if data_type != .string {
+				return error('JSON Schema format is only valid for string definitions')
+			}
+		}
+		if definition.types.len > 0 && DataType.string !in definition.types {
+			return error('JSON Schema format is only valid for string definitions')
+		}
+	}
 	for name, property in definition.properties {
 		if name.trim_space() == '' {
 			return error('JSON Schema property names must not be empty')
@@ -495,5 +582,17 @@ fn (definition Definition) validate_depth(depth int) ! {
 	}
 	if items := definition.items {
 		items.validate_depth(depth + 1)!
+	}
+	for sub_schema in definition.all_of {
+		sub_schema.validate_depth(depth + 1)!
+	}
+	for sub_schema in definition.any_of {
+		sub_schema.validate_depth(depth + 1)!
+	}
+	for sub_schema in definition.one_of {
+		sub_schema.validate_depth(depth + 1)!
+	}
+	if not_schema := definition.not {
+		not_schema.validate_depth(depth + 1)!
 	}
 }
