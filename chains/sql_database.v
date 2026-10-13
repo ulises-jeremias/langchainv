@@ -55,7 +55,7 @@ pub fn new_sql_database_chain(database sqldatabase.SQLDatabase, model llms.Compl
 	}
 	if options.return_intermediate_steps
 		&& (options.intermediate_steps_key.trim_space() == ''
-		|| options.intermediate_steps_key in [options.question_key, options.output_key]) {
+			|| options.intermediate_steps_key in [options.question_key, options.output_key]) {
 		return error('SQL database chain intermediate steps key must be non-empty and distinct')
 	}
 	if options.max_question_bytes <= 0 || options.max_question_bytes > max_sql_question_bytes {
