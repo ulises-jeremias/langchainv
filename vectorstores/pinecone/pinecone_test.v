@@ -176,3 +176,71 @@ fn test_pinecone_rejects_invalid_hosts_and_limits() {
 	}
 	assert false, 'expected over-limit search to fail'
 }
+
+fn test_pinecone_query_sends_operator_filters() {
+	mut state := &PineconeFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"matches":[]}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'query', 3, vectorstores.SearchOptions{
+		filter: {
+			'year': json2.Any({
+				'$gte': json2.Any(2020)
+				'$lt':  json2.Any(2030)
+			})
+			'kind': json2.Any({
+				'$in': json2.Any([json2.Any('guide'), json2.Any('api')])
+			})
+			'$or':  json2.Any([
+				json2.Any({
+					'lang': json2.Any('v')
+				}),
+				json2.Any({
+					'lang': json2.Any('go')
+				}),
+			])
+		}
+	}) or { panic(err) }
+	assert documents.len == 0
+	body := state.requests[0].body
+	assert body.contains('"$gte":2020')
+	assert body.contains('"$in":["guide","api"]')
+	assert body.contains('"$or":[{"lang":{"$eq":"v"}},{"lang":{"$eq":"go"}}]')
+}
+
+fn test_pinecone_query_rejects_invalid_operator_filters() {
+	mut ctx := context.background()
+	for filter in [
+		{
+			'kind': json2.Any({
+				'$regex': json2.Any('^g')
+			})
+		},
+		{
+			'kind': json2.Any({
+				'$in': json2.Any([]json2.Any{})
+			})
+		},
+		{
+			'$nor': json2.Any([json2.Any({
+				'kind': json2.Any('guide')
+			})])
+		},
+	] {
+		mut state := &PineconeFixtureState{}
+		mut store := fixture_store(state) or { panic(err) }
+		store.similarity_search(mut ctx, 'query', 3, vectorstores.SearchOptions{
+			filter: filter
+		}) or {
+			assert err.msg().contains('Pinecone filter')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid Pinecone filter to fail'
+	}
+}

@@ -7,7 +7,8 @@ versioned HTTPS data plane and requires an API key; it does not create or
 configure indexes.
 
 The adapter supports upserts of up to 64 documents per request, vector query,
-namespace isolation, metadata equality filters, minimum-score filtering, and
+namespace isolation, metadata filters with equality, comparison, membership,
+existence, and bounded `$and`/`$or` operator objects, minimum-score filtering, and
 deletion by ID. Set `SearchOptions.include_vectors` to request returned values
 in `schema.Document.embedding`; the default omits vector payloads. Returned
 vectors are validated for numeric values and size. Request and response bodies
@@ -24,5 +25,5 @@ mut store := pinecone.new_store(embedder, pinecone.Options{
 ```
 
 Index creation and administration, text-search integrated inference, sparse or
-hybrid vectors, and metadata-filter operators beyond equality remain
+hybrid vectors remain
 unsupported.

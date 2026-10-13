@@ -157,10 +157,10 @@ validation for newly created collections; `SearchOptions.include_vectors`
 returns validated vectors from single-vector collections. Named or multi-vector
 search, the full filter DSL, and custom point IDs remain outstanding.
 Pinecone — partial: HTTPS upsert/query/delete against
-provisioned index hosts, API-key auth, namespaces, scalar metadata equality
-filters, injected embeddings/transport, and bounded requests; index management,
-sparse/hybrid vectors, full filter operators, and integrated text inference
-remain outstanding; `SearchOptions.include_vectors` returns validated values
+provisioned index hosts, API-key auth, namespaces, metadata filters with equality,
+comparison, membership, existence, and bounded $and/$or operator objects,
+injected embeddings/transport, and bounded requests; index management,
+sparse/hybrid vectors, and integrated text inference remain outstanding; `SearchOptions.include_vectors` returns validated values
 when requested.
 Milvus — partial: REST v2 insert/search/delete against an existing collection,
 bearer-token auth, scalar metadata equality filters, namespaces, COSINE/IP/L2

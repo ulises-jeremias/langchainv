@@ -143,11 +143,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if options.min_score != none && !math.is_finite(f64(options.min_score or { f32(0) })) {
 		return error('Pinecone minimum score must be finite')
 	}
-	for key, value in options.filter {
-		if key.trim_space() == '' || key == page_content_key || !valid_metadata_value(value) {
-			return error('Pinecone filters require non-empty metadata keys and scalar or string-array values')
-		}
-	}
+	validate_filter(options.filter, 0)!
 	vector := store.embedder.embed_query(mut ctx, query)!
 	if vector.len == 0 {
 		return error('Pinecone query embedding must not be empty')
@@ -285,11 +281,103 @@ fn (store Store) request(mut ctx context.Context, method http.Method, path strin
 fn make_filter(metadata map[string]json2.Any) map[string]json2.Any {
 	mut filter := map[string]json2.Any{}
 	for key, value in metadata {
+		if key.starts_with('$') {
+			children := value as []json2.Any
+			mut child_filters := []json2.Any{cap: children.len}
+			for child in children {
+				child_filters << json2.Any(make_filter(child as map[string]json2.Any))
+			}
+			filter[key] = json2.Any(child_filters)
+			continue
+		}
+		if value is map[string]json2.Any {
+			filter[key] = value
+			continue
+		}
 		filter[key] = json2.Any({
 			'\$eq': value
 		})
 	}
 	return filter
+}
+
+const max_filter_depth = 3
+const max_filter_children = 50
+const max_filter_list_items = 100
+
+fn validate_filter(filter map[string]json2.Any, depth int) ! {
+	if depth > max_filter_depth {
+		return error('Pinecone filter nesting exceeds the supported depth')
+	}
+	for key, value in filter {
+		if key.starts_with('$') {
+			if key !in ['$and', '$or'] {
+				return error('Pinecone filter supports only $and and $or logical operators')
+			}
+			if value !is []json2.Any {
+				return error('Pinecone filter ${key} requires an array of filter objects')
+			}
+			children := value as []json2.Any
+			if children.len == 0 || children.len > max_filter_children {
+				return error('Pinecone filter ${key} requires between 1 and 50 filter objects')
+			}
+			for child in children {
+				if child !is map[string]json2.Any {
+					return error('Pinecone filter ${key} requires an array of filter objects')
+				}
+				validate_filter(child as map[string]json2.Any, depth + 1)!
+			}
+			continue
+		}
+		if key.trim_space() == '' || key == page_content_key {
+			return error('Pinecone filters require non-empty metadata keys')
+		}
+		if value is map[string]json2.Any {
+			validate_operator_object(value as map[string]json2.Any)!
+		} else if !valid_metadata_value(value) {
+			return error('Pinecone filters require scalar or string-array values')
+		}
+	}
+}
+
+fn validate_operator_object(operators map[string]json2.Any) ! {
+	if operators.len == 0 {
+		return error('Pinecone filter operator objects must not be empty')
+	}
+	for operator, operand in operators {
+		if operator !in ['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin', '$exists'] {
+			return error('Pinecone filter operator ${operator} is not supported')
+		}
+		if operator in ['$in', '$nin'] {
+			if operand !is []json2.Any {
+				return error('Pinecone filter ${operator} requires an array operand')
+			}
+			items := operand as []json2.Any
+			if items.len == 0 || items.len > max_filter_list_items {
+				return error('Pinecone filter ${operator} requires between 1 and 100 items')
+			}
+			for item in items {
+				if !valid_filter_scalar(item) {
+					return error('Pinecone filter ${operator} requires scalar items')
+				}
+			}
+		} else if operator == '$exists' {
+			if operand !is bool {
+				return error('Pinecone filter $exists requires a boolean operand')
+			}
+		} else if !valid_filter_scalar(operand) {
+			return error('Pinecone filter ${operator} requires a scalar operand')
+		}
+	}
+}
+
+fn valid_filter_scalar(value json2.Any) bool {
+	return match value {
+		string, bool, int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		f64 { math.is_finite(value as f64) }
+		f32 { math.is_finite(f64(value as f32)) }
+		else { false }
+	}
 }
 
 fn valid_metadata_value(value json2.Any) bool {

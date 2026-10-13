@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Pinecone filter operators: comparison, membership, and existence
+  operators plus bounded `$and`/`$or` groups in search filters, validated
+  before any request.
+
 - Remote image URLs for Gemini: `schema.ImageURLPart` now maps to a
   `fileData` part for bounded HTTPS or `gs://` references without embedded
   credentials, in both the Google AI and Vertex clients.
