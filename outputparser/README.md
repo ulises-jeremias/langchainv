@@ -33,6 +33,9 @@ schema and decodes fenced JSON into the concrete struct type. It currently
 supports strings, booleans, numeric fields, their optional forms, slices,
 fixed arrays, and string-keyed maps of those primitives, enums, and nested
 structs. Slices and fixed arrays can also contain nested structs or enums.
+Optional scalar slices and string-keyed maps render as their container type
+or null. Nested scalar slices, slices of scalar maps, and string-keyed maps
+of scalar slices are supported one level deep.
 Fixed arrays of scalar values can contain strings, booleans, numbers, enums, or
 nullable versions of string, boolean, and numeric types. String-keyed maps also
 support scalar enum values and nullable primitive values. Unsupported V field

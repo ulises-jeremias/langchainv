@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- More `Defined` field types in `outputparser`: optional scalar slices and
+  maps, nested scalar slices, slices of scalar maps, and maps of scalar
+  slices, in generated schemas and typed decoding.
+
 - Lifecycle callbacks on the Bedrock client, and on the six OpenAI-compatible
   wrappers (Mistral, ERNIE, Maritaca, Hugging Face, Cloudflare, llamafile),
   which forward a handler from their own Options to the shared OpenAI client.
