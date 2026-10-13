@@ -16,8 +16,11 @@ const max_documents_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
 const max_embedding_values = 65536
+const max_index_dimensions = 4096
+const vector_algorithm_name = 'langchainv-hnsw-cosine'
+const vector_profile_name = 'langchainv-cosine-profile'
 
-// Store uses an existing Azure AI Search index with a key, content, vector,
+// Store uses an Azure AI Search index with a key, content, vector,
 // metadata string, and optional filterable namespace field.
 pub struct Store {
 pub:
@@ -92,6 +95,69 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 		namespace_field: options.namespace_field
 		embedder:        embedder
 		http_client:     http_client
+	}
+}
+
+// create_index explicitly creates an Azure AI Search index with the configured
+// field names and cosine HNSW profile. It uses the create-only REST operation:
+// an existing index causes an error and is never updated or replaced.
+pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
+	if dimensions < 2 || dimensions > max_index_dimensions {
+		return error('Azure AI Search index dimensions must be between 2 and ${max_index_dimensions}')
+	}
+	fields := [
+		json2.Any(map[string]json2.Any{
+			'name':        json2.Any(store.key_field)
+			'type':        json2.Any('Edm.String')
+			'key':         json2.Any(true)
+			'retrievable': json2.Any(true)
+		}),
+		json2.Any(map[string]json2.Any{
+			'name':        json2.Any(store.content_field)
+			'type':        json2.Any('Edm.String')
+			'searchable':  json2.Any(true)
+			'retrievable': json2.Any(true)
+		}),
+		json2.Any(map[string]json2.Any{
+			'name':                json2.Any(store.vector_field)
+			'type':                json2.Any('Collection(Edm.Single)')
+			'searchable':          json2.Any(true)
+			'retrievable':         json2.Any(true)
+			'dimensions':          json2.Any(dimensions)
+			'vectorSearchProfile': json2.Any(vector_profile_name)
+		}),
+		json2.Any(map[string]json2.Any{
+			'name':        json2.Any(store.metadata_field)
+			'type':        json2.Any('Edm.String')
+			'retrievable': json2.Any(true)
+		}),
+		json2.Any(map[string]json2.Any{
+			'name':        json2.Any(store.namespace_field)
+			'type':        json2.Any('Edm.String')
+			'filterable':  json2.Any(true)
+			'retrievable': json2.Any(true)
+		}),
+	]
+	body := json2.encode(map[string]json2.Any{
+		'name':         json2.Any(store.index_name)
+		'fields':       json2.Any(fields)
+		'vectorSearch': json2.Any(map[string]json2.Any{
+			'algorithms': json2.Any([json2.Any(map[string]json2.Any{
+				'name':           json2.Any(vector_algorithm_name)
+				'kind':           json2.Any('hnsw')
+				'hnswParameters': json2.Any(map[string]json2.Any{
+					'metric': json2.Any('cosine')
+				})
+			})])
+			'profiles':   json2.Any([json2.Any(map[string]json2.Any{
+				'name':      json2.Any(vector_profile_name)
+				'algorithm': json2.Any(vector_algorithm_name)
+			})])
+		})
+	}, json2.EncoderOptions{})
+	response := store.request_url(mut ctx, .post, '${store.endpoint}/indexes?api-version=${api_version}', body)!
+	if response.status_code != 201 {
+		return error('Azure AI Search create-index operation returned HTTP ${response.status_code}')
 	}
 }
 
@@ -302,10 +368,14 @@ pub fn (store Store) delete(mut ctx context.Context, ids []string, _options vect
 }
 
 fn (store Store) request(mut ctx context.Context, method http.Method, path string, body string) !httputil.Response {
+	url := "${store.endpoint}/indexes('${store.index_name}')${path}?api-version=${api_version}"
+	return store.request_url(mut ctx, method, url, body)
+}
+
+fn (store Store) request_url(mut ctx context.Context, method http.Method, url string, body string) !httputil.Response {
 	if body.len > max_payload_bytes {
 		return error('Azure AI Search request exceeds 4 MiB')
 	}
-	url := "${store.endpoint}/indexes('${store.index_name}')${path}?api-version=${api_version}"
 	response := store.http_client.do(mut ctx, httputil.Request{
 		method:  method
 		url:     url

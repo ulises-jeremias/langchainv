@@ -49,6 +49,72 @@ fn fixture_store(state &AzureFixtureState) !Store {
 	}))
 }
 
+fn test_azure_search_creates_a_cosine_hnsw_index_without_update_semantics() {
+	mut state := &AzureFixtureState{
+		responses: [httputil.Response{
+			status_code: 201
+			headers:     http.Header{}
+			body:        '{"name":"documents"}'
+		}]
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.create_index(mut ctx, 1536) or { panic(err) }
+	assert state.requests.len == 1
+	request := state.requests[0]
+	assert request.method == .post
+	assert request.url == 'https://example.search.windows.net/indexes?api-version=${api_version}'
+	assert (request.headers['api-key'] or { '' }) == 'fixture-key'
+	assert request.body.contains('"name":"documents"')
+	assert request.body.contains('"dimensions":1536')
+	assert request.body.contains('"vectorSearchProfile":"langchainv-cosine-profile"')
+	assert request.body.contains('"metric":"cosine"')
+	assert request.body.contains('"filterable":true')
+}
+
+fn test_azure_search_index_creation_rejects_invalid_dimensions_without_request() {
+	mut state := &AzureFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.create_index(mut ctx, 0) or {
+		assert err.msg().contains('dimensions')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected invalid Azure vector dimensions to fail'
+}
+
+fn test_azure_search_index_creation_rejects_one_dimension_without_request() {
+	mut state := &AzureFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.create_index(mut ctx, 1) or {
+		assert err.msg().contains('between 2 and 4096')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected one-dimensional Azure vector index creation to fail'
+}
+
+fn test_azure_search_create_only_operation_does_not_update_existing_index() {
+	mut state := &AzureFixtureState{
+		responses: [httputil.Response{
+			status_code: 409
+			headers:     http.Header{}
+			body:        '{"error":{"code":"indexAlreadyExists"}}'
+		}]
+	}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.create_index(mut ctx, 1536) or {
+		assert err.msg().contains('409')
+		assert state.requests.len == 1
+		assert state.requests[0].method == .post
+		return
+	}
+	assert false, 'expected create-only request to reject an existing index'
+}
+
 fn test_azure_search_uploads_embedded_documents_with_safe_bounds() {
 	mut state := &AzureFixtureState{
 		responses: [httputil.Response{

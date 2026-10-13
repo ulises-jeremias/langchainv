@@ -13,8 +13,10 @@ delete those records before exit. Both services may incur charges.
 
 ## Prepare the index
 
-Follow the [Azure AI Search adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/azureaisearch/README.md)
-to create the `knowledge` index. The example uses the default `id`, `content`,
+Use the [Azure AI Search adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/azureaisearch/README.md)
+to create the `knowledge` index. Call `store.create_index(mut ctx, 1536)!` to
+use Azure's create-only POST endpoint; it fails if the index already exists
+and never updates or replaces it. The example uses the default `id`, `content`,
 `contentVector`, `metadata`, and `namespace` fields with 1,536-dimensional
 cosine vectors. Use an Azure admin key because the example writes and deletes
 documents.
