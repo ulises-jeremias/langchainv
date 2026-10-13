@@ -25,17 +25,17 @@ import json2
 import ulises_jeremias.langchainv.llms.openai
 
 fn main() {
-	schema := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}', json2.DecoderOptions{}) or {
+	schema_definition := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}', json2.DecoderOptions{}) or {
 		panic(err)
 	}
 	options := openai.Options{
 		response_format: openai.ResponseFormat{
-			kind: 'json_schema'
+			kind:        'json_schema'
 			json_schema: openai.JSONSchemaResponseFormat{
-				name: 'answer'
+				name:        'answer'
 				description: 'A short answer'
-				schema: schema
-				strict: true
+				schema:      schema_definition
+				strict:      true
 			}
 		}
 	}

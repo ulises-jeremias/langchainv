@@ -544,16 +544,16 @@ fn validate_response_format(response_format ?ResponseFormat) ! {
 				}
 			}
 			'json_schema' {
-				schema := format.json_schema or {
+				schema_definition := format.json_schema or {
 					return error('OpenAI json_schema response format requires a schema definition')
 				}
-				if !valid_response_format_name(schema.name) {
+				if !valid_response_format_name(schema_definition.name) {
 					return error('OpenAI JSON schema name must be 1..64 ASCII letters, digits, underscores, or hyphens')
 				}
-				if schema.schema.len == 0 {
+				if schema_definition.schema.len == 0 {
 					return error('OpenAI JSON schema must not be an empty object')
 				}
-				schema_bytes := json2.encode(schema.schema, json2.EncoderOptions{}).len
+				schema_bytes := json2.encode(schema_definition.schema, json2.EncoderOptions{}).len
 				if schema_bytes > max_request_bytes {
 					return error('OpenAI JSON schema exceeds the 8 MiB request size limit')
 				}
@@ -582,17 +582,17 @@ fn encode_response_format(format ResponseFormat) !map[string]json2.Any {
 		'type': json2.Any(format.kind)
 	}
 	if format.kind == 'json_schema' {
-		schema := format.json_schema or {
+		schema_definition := format.json_schema or {
 			return error('OpenAI json_schema response format requires a schema definition')
 		}
 		mut json_schema := map[string]json2.Any{
-			'name':   json2.Any(schema.name)
-			'schema': json2.Any(schema.schema)
+			'name':   json2.Any(schema_definition.name)
+			'schema': json2.Any(schema_definition.schema)
 		}
-		if schema.description != '' {
-			json_schema['description'] = json2.Any(schema.description)
+		if schema_definition.description != '' {
+			json_schema['description'] = json2.Any(schema_definition.description)
 		}
-		if schema.strict {
+		if schema_definition.strict {
 			json_schema['strict'] = json2.Any(true)
 		}
 		result['json_schema'] = json2.Any(json_schema)

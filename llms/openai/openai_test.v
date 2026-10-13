@@ -62,7 +62,7 @@ fn new_fixture_client(body string, status int) (Client, &FakeHTTPState) {
 }
 
 fn sample_response_format() ResponseFormat {
-	schema := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}', json2.DecoderOptions{}) or {
+	schema_definition := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}', json2.DecoderOptions{}) or {
 		panic(err)
 	}
 	return ResponseFormat{
@@ -70,7 +70,7 @@ fn sample_response_format() ResponseFormat {
 		json_schema: JSONSchemaResponseFormat{
 			name:        'answer'
 			description: 'A short answer'
-			schema:      schema
+			schema:      schema_definition
 			strict:      true
 		}
 	}
