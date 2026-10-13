@@ -39,3 +39,9 @@ up to 30 matches, and vector return is opt-in through
 TAG equality expressions. The adapter supports cosine only and limits indexed
 metadata filters to scalar values. See the package guide for payload bounds,
 field naming rules, partial-write behavior, and index command details.
+
+Pass a namespace in `StoreOptions` when deleting IDs to ensure each Redis HASH
+still belongs to this adapter and the requested namespace. Redis checks the
+ownership marker and namespace and deletes each matching key atomically; the
+batch is sequential and can be partially applied if Redis returns an error.
+This path requires ACL permission for `EVAL`, `TYPE`, `HGET`, and `DEL`.

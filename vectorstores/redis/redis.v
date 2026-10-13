@@ -20,6 +20,7 @@ const max_document_field_bytes = 65536
 const max_hnsw_connections = 64
 const max_hnsw_ef_construction = 4096
 const max_hnsw_ef_runtime = 4096
+const namespace_delete_script = "if redis.call('TYPE', KEYS[1]).ok ~= 'hash' then return 0 end\nif redis.call('HGET', KEYS[1], ARGV[1]) ~= ARGV[2] then return 0 end\nif redis.call('HGET', KEYS[1], ARGV[3]) ~= ARGV[4] then return 0 end\nreturn redis.call('DEL', KEYS[1])"
 const source_field = 'lcg_source'
 const source_marker = 'langchainv'
 
@@ -310,7 +311,8 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	return parse_search_response(response, store, limit, options, max_payload_bytes)
 }
 
-// delete removes up to 1000 documents by their Redis HASH key.
+// delete removes up to 1000 documents by their Redis HASH key, optionally
+// requiring an exact namespace match for every key.
 pub fn (store Store) delete(mut _ctx context.Context, ids []string, options vectorstores.StoreOptions) ! {
 	if ids.len > 1000 {
 		return error('Redis delete is limited to 1000 IDs per call')
@@ -318,21 +320,48 @@ pub fn (store Store) delete(mut _ctx context.Context, ids []string, options vect
 	if ids.len == 0 {
 		return
 	}
-	ctx_error := _ctx.err()
+	if options.namespace.len > max_document_field_bytes {
+		return error('Redis namespace exceeds 64 KiB')
+	}
+	mut ctx_error := _ctx.err()
 	if ctx_error !is none {
 		return ctx_error
 	}
-	mut command := ['DEL']
 	for id in ids {
 		if !id.starts_with(store.key_prefix) || id.len > 512 {
 			return error('Redis delete IDs must use this store key prefix and be at most 512 bytes')
 		}
-		command << id
 	}
-	if options.namespace != '' {
-		return error('Redis deletion does not support namespace constraints')
+	if options.namespace == '' {
+		mut command := ['DEL']
+		for id in ids {
+			command << id
+		}
+		store.client.cmd(...command) or { return error('Redis DEL failed: ${err.msg()}') }
+		return
 	}
-	store.client.cmd(...command) or { return error('Redis DEL failed: ${err.msg()}') }
+	mut request_bytes := 0
+	for id in ids {
+		command := ['EVAL', namespace_delete_script, '1', id, source_field, source_marker,
+			store.namespace_field, options.namespace]
+		for arg in command {
+			request_bytes += arg.len + 24
+		}
+	}
+	if request_bytes > max_payload_bytes {
+		return error('Redis delete request exceeds 4 MiB')
+	}
+	for id in ids {
+		ctx_error = _ctx.err()
+		if ctx_error !is none {
+			return ctx_error
+		}
+		command := ['EVAL', namespace_delete_script, '1', id, source_field, source_marker,
+			store.namespace_field, options.namespace]
+		store.client.cmd(...command) or {
+			return error('Redis namespace-constrained delete failed: ${err.msg()}')
+		}
+	}
 }
 
 fn validate_vector(vector []f32, dimensions int) ! {

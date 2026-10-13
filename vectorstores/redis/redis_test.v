@@ -306,17 +306,65 @@ fn test_redis_rejects_malformed_returned_binary_vector() {
 	assert false, 'expected malformed Redis vector to fail'
 }
 
-fn test_redis_rejects_namespace_constrained_delete() {
+fn test_redis_namespace_constrained_delete_uses_atomic_single_key_scripts() {
 	mut state := &RedisFixtureState{}
 	store := fixture_store(state) or { panic(err) }
 	mut ctx := context.background()
-	store.delete(mut ctx, ['doc:langchainv:id'], vectorstores.StoreOptions{
+	store.delete(mut ctx, ['doc:langchainv:id-1', 'doc:langchainv:id-2'], vectorstores.StoreOptions{
+		namespace: 'tenant-1'
+	}) or { panic(err) }
+	assert state.commands.len == 2
+	for i, command in state.commands {
+		assert command[0] == 'EVAL'
+		assert command[1].contains("redis.call('TYPE', KEYS[1])")
+		assert command[1].contains("redis.call('HGET', KEYS[1], ARGV[1]) ~= ARGV[2]")
+		assert command[1].contains("redis.call('HGET', KEYS[1], ARGV[3]) ~= ARGV[4]")
+		assert command[1].contains("redis.call('DEL', KEYS[1])")
+		assert command[2] == '1'
+		assert command[3] == 'doc:langchainv:id-${i + 1}'
+		assert command[4..] == ['lcg_source', 'langchainv', 'namespace', 'tenant-1']
+	}
+}
+
+fn test_redis_delete_without_namespace_keeps_the_batched_del_path() {
+	mut state := &RedisFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.delete(mut ctx, ['doc:langchainv:id-1', 'doc:langchainv:id-2'],
+		vectorstores.StoreOptions{}) or { panic(err) }
+	assert state.commands == [['DEL', 'doc:langchainv:id-1', 'doc:langchainv:id-2']]
+}
+
+fn test_redis_delete_validates_all_ids_before_sending_commands() {
+	mut state := &RedisFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.delete(mut ctx, ['doc:langchainv:valid', 'other:invalid'], vectorstores.StoreOptions{
 		namespace: 'tenant-1'
 	}) or {
-		assert err.msg().contains('namespace constraints')
+		assert err.msg().contains('key prefix')
+		assert state.commands.len == 0
 		return
 	}
-	assert false
+	assert false, 'expected an invalid Redis key to fail before deleting records'
+}
+
+fn test_redis_namespace_delete_checks_total_payload_before_deleting() {
+	mut state := &RedisFixtureState{}
+	store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut ids := []string{}
+	for i in 0 .. 70 {
+		ids << 'doc:langchainv:id-${i}'
+	}
+	store.delete(mut ctx, ids, vectorstores.StoreOptions{
+		namespace: 'x'.repeat(65536)
+	}) or {
+		assert err.msg().contains('4 MiB')
+		assert state.commands.len == 0
+		return
+	}
+	assert false, 'expected an oversized Redis delete request to fail before deleting records'
 }
 
 fn test_redis_store_requires_a_valid_existing_index_configuration() {
