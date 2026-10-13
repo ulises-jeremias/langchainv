@@ -118,17 +118,11 @@ fn test_generate_content_supports_json_seed_and_multiple_candidates() {
 fn test_generate_content_supports_schema_structured_output() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"{\\"answer\\":\\"42\\"}"}]}}]}', 200)
+	response_schema := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}',
+		json2.DecoderOptions{}) or { panic(err) }
 	options := llms.CallOptions{
 		provider_options: {
-			'response_schema': json2.Any(map[string]json2.Any{
-				'type': json2.Any('object')
-				'properties': json2.Any(map[string]json2.Any{
-					'answer': json2.Any(map[string]json2.Any{
-						'type': json2.Any('string')
-					})
-				})
-				'required': json2.Any([json2.Any('answer')])
-			})
+			'response_schema': json2.Any(response_schema)
 		}
 	}
 	message := schema.text_message(.human, 'Answer with an object')
