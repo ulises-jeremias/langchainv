@@ -166,9 +166,10 @@ validated vectors when requested.
 OpenSearch — partial: bulk index/search/delete against an existing k-NN index,
 API-key or basic authentication, scalar metadata equality filters, namespaces,
 cosine scores, injected embeddings/transport, and bounded requests; index
-mapping management, alternate metrics, and advanced filters remain
-outstanding; `SearchOptions.include_vectors` returns validated vectors when
-requested.
+creation for cosine k-NN mappings, alternate metrics, and advanced filters
+remain outstanding; `SearchOptions.include_vectors` returns validated vectors
+when requested. Explicit initialization creates a mapping but does not manage,
+replace, or migrate existing indexes.
 pgvector — partial: parameterized insert/search/delete against an existing
 PostgreSQL table, cosine distance and scores, scalar JSONB equality filters,
 namespaces, injected embeddings/SQL engine, and bounded requests; schema/index
