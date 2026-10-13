@@ -7,6 +7,7 @@ import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
+@[heap]
 struct CallbackFakeState {
 mut:
 	response httputil.Response
@@ -25,6 +26,7 @@ struct CallbackRecorder {
 	state &CallbackRecorderState
 }
 
+@[heap]
 struct CallbackRecorderState {
 mut:
 	events  []string
