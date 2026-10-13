@@ -12,6 +12,7 @@ Examples are standalone V programs. CI compiles and runs every example with the 
 | [Azure AI Search retrieval](azure_retrieval/main.v) | Persistent vector search with Azure AI Search and OpenAI embeddings | Live opt-in; Azure admin key, OpenAI API key, network access, and usage charges |
 | [Conversation memory](conversation_memory/main.v) | Conversation chain with process-local history and a deterministic completion fake | Offline; no credentials |
 | [Tool-calling agent](tool_calling_agent/main.v) | Bounded executor, calculator tool, and staged fake model | Offline; no credentials |
+| [Zep chat history](zep_history/main.v) | Read bounded session memory and optionally append a message | Live opt-in; Zep API key, session ID, and network access; appending persists data |
 
 Run it from the repository root:
 
@@ -56,5 +57,16 @@ set `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and run:
 ```sh
 v run examples/azure_retrieval/main.v
 ```
+
+To opt in to the Zep history walkthrough, set `ZEP_API_KEY` and
+`LANGCHAINV_ZEP_SESSION_ID`, then set `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and
+run:
+
+```sh
+v run examples/zep_history/main.v
+```
+
+The example only reads by default. Set `LANGCHAINV_ZEP_APPEND_MESSAGE=1` as a
+second explicit opt-in to append its sample message to that session.
 
 Every `examples/*/main.v` must complete offline without credentials. CI compiles and runs these programs after removing `LANGCHAINV_ALLOW_LIVE_EXAMPLES`. A live provider demo must require `LANGCHAINV_ALLOW_LIVE_EXAMPLES=1` and valid credentials before sending a request. Document required environment variables, external services, expected cost, and network behavior. CI must never set the opt-in.

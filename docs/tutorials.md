@@ -25,6 +25,7 @@ Work through these recipes in order. Each section links to the package guide tha
 13. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
 14. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
 15. [Return stored vectors](returning-vectors/) when you need the original embeddings for inspection or downstream calculations.
+16. Persist bounded remote conversation history with the [Zep chat history tutorial](zep-chat-history/); the example reads by default and requires a second opt-in before writing.
 
 ## Recipes by task
 
@@ -37,6 +38,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Run retrieval QA against Azure AI Search | [Azure retrieval tutorial](azure-ai-search-retrieval/) | Explicit live opt-in; sends text to OpenAI and Azure and can incur usage charges. |
 | Map documents concurrently | [Concurrent mapping tutorial](concurrent-document-mapping/) | Uses a stateless offline model; the chain defaults to one worker and accepts at most five. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
+| Persist chat history remotely | [Zep chat history](zep-chat-history/) | Reads one Zep API v2 session by default; appending requires another explicit opt-in. |
 | Persist conversation history | [Memory backend guide](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md) | SQLite and bounded PostgreSQL history are session-isolated; PostgreSQL requires an application-provided engine. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
 | Keep history in a tool-using conversation | [Conversational ReAct agent](conversational-agent-memory/) | Uses executor memory and an offline model; swap in a provider only after reviewing its limits. |
