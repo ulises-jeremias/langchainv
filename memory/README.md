@@ -53,3 +53,12 @@ history object never closes the injected engine. Inserts and trimming are
 separate statements because `sqldatabase.Engine` does not expose transactions;
 an insert may remain stored if trimming fails. CI tests use a deterministic
 fake engine and do not require a PostgreSQL service.
+
+`memory/zep` implements the LangChainGo Zep chat-history behavior over the Zep
+API v2 session-memory endpoint. Configure an API key and session ID; reads
+request a bounded number of recent messages and prepend Zep facts and the
+latest summary as a system message. Writes accept human, assistant, and tool
+messages; `clear` deletes memory for that session. The default HTTP client
+requires HTTPS, disables redirects, applies a timeout, and caps responses.
+Tests inject a fake HTTP client and need no Zep account. See the
+[Zep history guide](zep/README.md) for setup and limits.
