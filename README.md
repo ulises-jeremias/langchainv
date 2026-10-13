@@ -4,10 +4,11 @@ LangChainV is a composable framework for building applications with language
 models in V. Its target is feature parity with the public LangChainGo API, with
 V-native interfaces, errors, options, and resource handling.
 
-The shared core contracts are the first implementation slice. The parity
-matrix in [`docs/LANGCHAINGO_PARITY.md`](docs/LANGCHAINGO_PARITY.md) is the
-source of truth for supported and outstanding features. A package is supported
-only when its implementation and documented validation are complete.
+The project includes framework primitives and a growing set of model,
+embedding, tool, loader, memory, and vector store adapters. Coverage varies by
+package: the [parity matrix](docs/LANGCHAINGO_PARITY.md) records what is
+implemented, verified, partial, and outstanding. Treat an adapter as supported
+only within the implementation and validation scope documented there.
 
 ## Documentation
 
