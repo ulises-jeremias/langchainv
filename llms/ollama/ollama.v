@@ -4,6 +4,7 @@ module ollama
 import context
 import encoding.base64
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -24,9 +25,11 @@ pub:
 	format        string
 	format_schema map[string]json2.Any
 	keep_alive    string
+pub mut:
+	callbacks ?callbacks.Handler
 }
 
-// Options configures the Ollama server, model, output format, and model lifetime.
+// Options configures the Ollama server, model, output format, model lifetime, and lifecycle callbacks.
 pub struct Options {
 pub:
 	base_url      string = default_base_url
@@ -34,6 +37,7 @@ pub:
 	format        string
 	format_schema string
 	keep_alive    string
+	callbacks     ?callbacks.Handler
 }
 
 struct ChatResponse {
@@ -107,6 +111,7 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 		format:        options.format
 		format_schema: format_schema
 		keep_alive:    options.keep_alive.trim_space()
+		callbacks:     options.callbacks
 	}
 }
 
@@ -128,6 +133,24 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 
 // generate_content implements streaming and non-streaming Ollama /api/chat requests.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
+	options.validate()!
+	llms.validate_messages(messages)!
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_start(mut ctx, messages)
+	}
+	response := client.generate_content_request(mut ctx, messages, options) or {
+		if mut handler := client.callbacks {
+			handler.llm_error(mut ctx, err)
+		}
+		return err
+	}
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_end(mut ctx, response)
+	}
+	return response
+}
+
+fn (client Client) generate_content_request(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	if messages.len > max_chat_messages {
 		return error('Ollama chat request exceeds the 1024-message limit')

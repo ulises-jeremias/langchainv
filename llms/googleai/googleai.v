@@ -4,6 +4,7 @@ module googleai
 import context
 import encoding.base64
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -74,13 +75,16 @@ pub struct Client {
 pub:
 	base_url string = default_base_url
 	model    string = default_model
+pub mut:
+	callbacks ?callbacks.Handler
 }
 
-// Options configures the Gemini API endpoint and model.
+// Options configures the Gemini API endpoint, model, and lifecycle callbacks.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url  string = default_base_url
+	model     string = default_model
+	callbacks ?callbacks.Handler
 }
 
 // new_client creates a client using explicit endpoint and model options.
@@ -115,6 +119,7 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 		http_client: http_client
 		base_url:    base_url
 		model:       model
+		callbacks:   options.callbacks
 	}
 }
 
@@ -129,6 +134,24 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 
 // generate_content implements bounded streaming and non-streaming Gemini content generation.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
+	options.validate()!
+	llms.validate_messages(messages)!
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_start(mut ctx, messages)
+	}
+	response := client.generate_content_request(mut ctx, messages, options) or {
+		if mut handler := client.callbacks {
+			handler.llm_error(mut ctx, err)
+		}
+		return err
+	}
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_end(mut ctx, response)
+	}
+	return response
+}
+
+fn (client Client) generate_content_request(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	llms.validate_messages(messages)!
 	if messages.len > max_messages {

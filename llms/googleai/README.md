@@ -50,3 +50,8 @@ fn main() {
 	println(options.provider_options.len)
 }
 ```
+
+Set `Options.callbacks` at construction, or assign the client's `callbacks`
+field, to receive one generate-content start event before each request and
+then either an end event with the response or an error event. Vertex clients
+keep their own handler; events are not dispatched twice.

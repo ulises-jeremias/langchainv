@@ -42,3 +42,8 @@ Inline image data is limited to 5 MiB per request; chat histories are capped at
 8 MiB and 16 MiB. Image URLs are rejected because Ollama's chat endpoint
 accepts base64 image data. See the [Ollama chat API](https://docs.ollama.com/api/chat)
 for the wire contract.
+
+Set `Options.callbacks` at construction, or assign the client's `callbacks`
+field, to receive one generate-content start event before each request and
+then either an end event with the response or an error event, for streaming
+and non-streaming calls alike.
