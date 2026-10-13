@@ -8,21 +8,28 @@ non-destructive `FT.CREATE` helper.
 
 ## Index setup
 
-For a supported flat-index schema, call `initialize_index(client, options,
-metadata_fields)` and pass the metadata keys your application filters. It creates
-an index whose prefix and field names match the options, scans existing matching
-HASH records, indexes content as TEXT, and adds the namespace/ownership and
-selected metadata keys as TAG fields. Existing indexes are never dropped or
-reconfigured; Redis returns an error if the name already exists. The vector
-field uses FLOAT32, COSINE, and the configured dimension. Explicitly plan for
-the initial scan and index memory on the Redis server before calling it.
+Call `initialize_index(client, options, metadata_fields)` and pass the metadata
+keys your application filters. The default `Options.algorithm` is `FLAT` for
+exact search; set it to `HNSW` to explicitly build an approximate index. For
+HNSW, `hnsw_m` defaults to 16 (adapter accepts 2..64) and
+`hnsw_ef_construction` defaults to 200 (adapter accepts `M`..4096). Higher
+values can cost more time and memory; see the [Redis vector index
+guide](https://redis.io/docs/latest/develop/ai/search-and-query/vectors/).
+The helper creates an index whose prefix and field names match the options,
+scans existing matching HASH records, indexes content as TEXT, and adds the
+namespace/ownership and selected metadata keys as TAG fields. Existing indexes
+are never dropped or reconfigured; Redis returns an error if the name already
+exists. The vector field uses FLOAT32, COSINE, and the configured dimension.
+Explicitly plan for the initial scan and index memory on the Redis server
+before calling it.
 
 To manage index lifecycle outside the adapter, the equivalent command is:
 
 ```text
 FT.CREATE langchainv_idx ON HASH PREFIX 1 doc:langchainv: SCHEMA \
   content TEXT namespace TAG lcg_source TAG meta_kind TAG \
-  content_vector VECTOR FLAT 6 TYPE FLOAT32 DIM 1536 DISTANCE_METRIC COSINE
+  content_vector VECTOR HNSW 10 TYPE FLOAT32 DIM 1536 DISTANCE_METRIC COSINE \
+  M 16 EF_CONSTRUCTION 200
 ```
 
 ## V usage
@@ -44,6 +51,7 @@ commands := redis_vector.StandardRedisClient{
 options := redis_vector.Options{
 	index:      'langchainv_idx'
 	dimensions: 1536
+	algorithm:  'HNSW'
 }
 redis_vector.initialize_index(commands, options, ['kind'])!
 store := redis_vector.new_store(embedder, commands, options)!
@@ -70,9 +78,10 @@ to `delete`.
   omitted by default and decoded with dimension and finite-value checks.
 - Delete accepts at most 1,000 returned Redis keys. Namespace-constrained
   deletion is rejected because read-then-delete would not be atomic.
-- `initialize_index` creates only a FLAT/COSINE index. Index deletion,
-  reconfiguration, HNSW, alternate metrics, and advanced RediSearch query
-  syntax are not implemented.
+- `initialize_index` creates a FLAT/COSINE index by default or an explicitly
+  configured HNSW/COSINE index. Index deletion/reconfiguration, alternate
+  metrics, HNSW runtime tuning, and advanced RediSearch query syntax are not
+  implemented.
 - Redis commands are sequential. If Redis fails partway through a multi-record
   write, earlier HSET commands may already have succeeded. The response cap is
   safe for records written through this adapter and assumes the Redis index is

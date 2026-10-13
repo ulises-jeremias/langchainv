@@ -17,6 +17,8 @@ const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 30
 const max_embedding_values = 2000
 const max_document_field_bytes = 65536
+const max_hnsw_connections = 64
+const max_hnsw_ef_construction = 4096
 const source_field = 'lcg_source'
 const source_marker = 'langchainv'
 
@@ -55,13 +57,16 @@ pub mut:
 // Options configures a Redis Stack RediSearch HASH index and its store fields.
 pub struct Options {
 pub:
-	index           string
-	key_prefix      string = 'doc:langchainv:'
-	content_field   string = 'content'
-	metadata_field  string = 'metadata'
-	namespace_field string = 'namespace'
-	vector_field    string = 'content_vector'
-	dimensions      int
+	index                string
+	key_prefix           string = 'doc:langchainv:'
+	content_field        string = 'content'
+	metadata_field       string = 'metadata'
+	namespace_field      string = 'namespace'
+	vector_field         string = 'content_vector'
+	dimensions           int
+	algorithm            string = 'FLAT'
+	hnsw_m               int    = 16
+	hnsw_ef_construction int    = 200
 }
 
 // new_store binds an embedder and Redis client to a HASH index. It never
@@ -82,10 +87,21 @@ pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Optio
 }
 
 // initialize_index explicitly creates a non-destructive RediSearch HASH index.
-// metadata_fields names scalar metadata keys to index as TAG fields. Redis
-// scans existing keys matching the prefix as part of FT.CREATE.
+// algorithm defaults to FLAT; HNSW uses the configured bounded M and
+// EF_CONSTRUCTION values. metadata_fields names scalar metadata keys to index
+// as TAG fields. Redis scans existing keys matching the prefix as part of
+// FT.CREATE, so choose a suitable maintenance window and server capacity.
 pub fn initialize_index(client RedisClient, options Options, metadata_fields []string) ! {
 	validate_options(options)!
+	algorithm := options.algorithm.to_upper()
+	if algorithm !in ['FLAT', 'HNSW'] {
+		return error('Redis vector index algorithm must be FLAT or HNSW')
+	}
+	if algorithm == 'HNSW' && (options.hnsw_m < 2 || options.hnsw_m > max_hnsw_connections
+		|| options.hnsw_ef_construction < options.hnsw_m
+		|| options.hnsw_ef_construction > max_hnsw_ef_construction) {
+		return error('Redis HNSW M must be 2..${max_hnsw_connections} and EF_CONSTRUCTION must be M..${max_hnsw_ef_construction}')
+	}
 	if metadata_fields.len > 128 {
 		return error('Redis index supports at most 128 metadata TAG fields')
 	}
@@ -102,8 +118,14 @@ pub fn initialize_index(client RedisClient, options Options, metadata_fields []s
 		command << 'meta_${field}'
 		command << 'TAG'
 	}
-	command << [options.vector_field, 'VECTOR', 'FLAT', '6', 'TYPE', 'FLOAT32', 'DIM',
-		options.dimensions.str(), 'DISTANCE_METRIC', 'COSINE']
+	command << [options.vector_field, 'VECTOR', algorithm, if algorithm == 'HNSW' {
+		'10'
+	} else {
+		'6'
+	}, 'TYPE', 'FLOAT32', 'DIM', options.dimensions.str(), 'DISTANCE_METRIC', 'COSINE']
+	if algorithm == 'HNSW' {
+		command << ['M', options.hnsw_m.str(), 'EF_CONSTRUCTION', options.hnsw_ef_construction.str()]
+	}
 	client.cmd(...command) or { return error('could not create Redis Stack index: ${err.msg()}') }
 }
 
