@@ -37,7 +37,7 @@ pub fn (client StandardRedisClient) cmd(command ...string) !redis_client.RedisVa
 	return db.cmd(...command)
 }
 
-// Store uses a preconfigured Redis Stack HASH index and does not close the client.
+// Store uses a Redis Stack HASH index and does not close the client.
 pub struct Store {
 pub:
 	index           string
@@ -52,7 +52,7 @@ pub mut:
 	client   RedisClient
 }
 
-// Options configures an existing RediSearch HASH index.
+// Options configures a Redis Stack RediSearch HASH index and its store fields.
 pub struct Options {
 pub:
 	index           string
@@ -64,8 +64,50 @@ pub:
 	dimensions      int
 }
 
-// new_store binds an embedder and Redis client to a preconfigured HASH index.
+// new_store binds an embedder and Redis client to a HASH index. It never
+// creates, alters, or drops the index.
 pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Options) !Store {
+	validate_options(options)!
+	return Store{
+		index:           options.index
+		key_prefix:      options.key_prefix
+		content_field:   options.content_field
+		metadata_field:  options.metadata_field
+		namespace_field: options.namespace_field
+		vector_field:    options.vector_field
+		dimensions:      options.dimensions
+		embedder:        embedder
+		client:          client
+	}
+}
+
+// initialize_index explicitly creates a non-destructive RediSearch HASH index.
+// metadata_fields names scalar metadata keys to index as TAG fields. Redis
+// scans existing keys matching the prefix as part of FT.CREATE.
+pub fn initialize_index(client RedisClient, options Options, metadata_fields []string) ! {
+	validate_options(options)!
+	if metadata_fields.len > 128 {
+		return error('Redis index supports at most 128 metadata TAG fields')
+	}
+	mut seen_metadata := map[string]bool{}
+	mut command := ['FT.CREATE', options.index, 'ON', 'HASH', 'PREFIX', '1', options.key_prefix,
+		'SCHEMA', options.content_field, 'TEXT', options.namespace_field, 'TAG', source_field,
+		'TAG']
+	for field in metadata_fields {
+		if !valid_token(field, false) || field in [options.content_field, options.metadata_field,
+			options.namespace_field, options.vector_field, source_field] || field in seen_metadata {
+			return error('Redis metadata index fields must be unique simple names, separate from store fields')
+		}
+		seen_metadata[field] = true
+		command << 'meta_${field}'
+		command << 'TAG'
+	}
+	command << [options.vector_field, 'VECTOR', 'FLAT', '6', 'TYPE', 'FLOAT32', 'DIM',
+		options.dimensions.str(), 'DISTANCE_METRIC', 'COSINE']
+	client.cmd(...command) or { return error('could not create Redis Stack index: ${err.msg()}') }
+}
+
+fn validate_options(options Options) ! {
 	if !valid_token(options.index, false) || !valid_token(options.key_prefix, true) {
 		return error('Redis index and key prefix must contain only letters, digits, underscore, colon, or hyphen')
 	}
@@ -83,17 +125,6 @@ pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Optio
 	}
 	if options.dimensions <= 0 || options.dimensions > max_embedding_values {
 		return error('Redis vector dimensions must be between 1 and 2000')
-	}
-	return Store{
-		index:           options.index
-		key_prefix:      options.key_prefix
-		content_field:   options.content_field
-		metadata_field:  options.metadata_field
-		namespace_field: options.namespace_field
-		vector_field:    options.vector_field
-		dimensions:      options.dimensions
-		embedder:        embedder
-		client:          client
 	}
 }
 

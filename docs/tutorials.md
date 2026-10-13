@@ -27,6 +27,7 @@ Work through these recipes in order. Each section links to the package guide tha
 15. [Return stored vectors](returning-vectors/) when you need the original embeddings for inspection or downstream calculations.
 16. Persist bounded remote conversation history with the [Zep chat history tutorial](zep-chat-history/); the example reads by default and requires a second opt-in before writing.
 17. Connect an existing Dolt database with [Dolt vector search](dolt-vector-search/) after reviewing the explicit index-build cost and approximate-recall behavior.
+18. Set up a Redis Stack HASH vector index with the [Redis vector search guide](redis-vector-search/) before binding the adapter to it.
 
 ## Recipes by task
 
@@ -41,6 +42,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
 | Persist chat history remotely | [Zep chat history](zep-chat-history/) | Reads one Zep API v2 session by default; appending requires another explicit opt-in. |
 | Retrieve from Dolt | [Dolt vector search](dolt-vector-search/) | Requires an injected MySQL-compatible engine; table initialization and alpha vector-index creation are explicit operations. |
+| Retrieve from Redis Stack | [Redis vector search](redis-vector-search/) | Explicit FLAT/COSINE index creation scans matching HASH records and consumes Redis server memory. |
 | Persist conversation history | [Memory backend guide](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md) | SQLite and bounded PostgreSQL history are session-isolated; PostgreSQL requires an application-provided engine. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
 | Keep history in a tool-using conversation | [Conversational ReAct agent](conversational-agent-memory/) | Uses executor memory and an offline model; swap in a provider only after reviewing its limits. |

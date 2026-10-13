@@ -43,6 +43,43 @@ fn fixture_store(state &RedisFixtureState) !Store {
 	})
 }
 
+fn test_redis_explicitly_initializes_a_non_destructive_hash_index() {
+	mut state := &RedisFixtureState{}
+	initialize_index(RedisFixtureClient{
+		state: state
+	}, Options{
+		index:      'langchainv_idx'
+		key_prefix: 'doc:langchainv:'
+		dimensions: 2
+	}, ['kind', 'category']) or { panic(err) }
+	assert state.commands.len == 1
+	command := state.commands[0]
+	assert command[0..8] == ['FT.CREATE', 'langchainv_idx', 'ON', 'HASH', 'PREFIX', '1',
+		'doc:langchainv:', 'SCHEMA']
+	assert command.contains('content')
+	assert command.contains('namespace')
+	assert command.contains('lcg_source')
+	assert command.contains('meta_kind')
+	assert command.contains('meta_category')
+	assert command[command.len - 10..] == ['content_vector', 'VECTOR', 'FLAT', '6', 'TYPE', 'FLOAT32',
+		'DIM', '2', 'DISTANCE_METRIC', 'COSINE']
+}
+
+fn test_redis_index_initialization_rejects_duplicate_or_reserved_metadata_fields() {
+	mut state := &RedisFixtureState{}
+	initialize_index(RedisFixtureClient{
+		state: state
+	}, Options{
+		index:      'langchainv_idx'
+		dimensions: 2
+	}, ['kind', 'kind']) or {
+		assert err.msg().contains('unique simple names')
+		assert state.commands.len == 0
+		return
+	}
+	assert false, 'expected duplicate metadata fields to fail'
+}
+
 fn test_redis_add_documents_writes_bounded_hash_records() {
 	mut state := &RedisFixtureState{}
 	store := fixture_store(state) or { panic(err) }

@@ -61,7 +61,7 @@ inventory before a release.
 | `schema` | documents, messages, agent actions/steps, memory and retriever contracts, output parser contracts | partial: documents with optional retrieval scores and embeddings, typed multimodal messages, memory/history/retriever contracts |
 | `textsplitter` | recursive character, token, Markdown, document splitting and options | partial: recursive character and document splitting; token windows via injected tokenizer; Markdown heading/paragraph/fence/table boundaries, heading hierarchy, and optional source-scanned reference-link rewriting; full CommonMark block fidelity, built-in token encodings, and complete option parity remain outstanding |
 | `tools` | tool contract/calculator plus integrations below | partial: provider-neutral tool contract, bounded arithmetic calculator for `+`, `-`, `*`, `/`, `%`, `**`, parentheses, and the Starlark math module's functions/constants, bounded Perplexity Sonar search through the OpenAI-compatible chat API, bounded DuckDuckGo HTML search, bounded Wikipedia MediaWiki REST search, bounded SerpApi Google search, bounded Exa (Metaphor successor) semantic search, bounded sequential same-origin HTML crawling, Zapier MCP Streamable HTTP tool discovery/calls, and SQLDatabase table inventory/schema/sample/query APIs over V's SQLite driver with optional PostgreSQL/MySQL drivers; SQL tests use in-memory SQLite, while database driver calls materialize rows before output caps and cannot be interrupted mid-query through `context.Context` |
-| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store with optional embedding return, bounded Azure AI Search/Chroma/Dolt/MariaDB/Milvus/OpenSearch/pgvector/Qdrant/Pinecone/Weaviate adapters, and bounded Redis Stack adapter; Dolt has explicit non-destructive table setup and opt-in approximate index creation, while MariaDB requires an existing table and pgvector requires an existing schema/index; persistent stores beyond these and full filter/distance parity remain outstanding |
+| `vectorstores` | vector store contract/options, query/add/delete/search, metadata filters, distance strategies, all stores below | partial: add/search/delete contract, options, retriever adapter, bounded process-local cosine-similarity store with optional embedding return, bounded Azure AI Search/Chroma/Dolt/MariaDB/Milvus/OpenSearch/pgvector/Qdrant/Pinecone/Weaviate adapters, and bounded Redis Stack adapter with explicit non-destructive FLAT/COSINE index creation; Dolt has explicit non-destructive table setup and opt-in approximate index creation, while MariaDB requires an existing table and pgvector requires an existing schema/index; persistent stores beyond these and full filter/distance parity remain outstanding |
 | `httputil` | shared HTTP client/transport, user-agent, logging transport | partial: injectable default transport with composed user-agent, TLS validation, URL checks, disabled redirects/retries, request/response byte and timeout limits, bounded incremental response callbacks, a chunk-independent SSE decoder, and redacted logging decorators for streaming and non-streaming clients |
 | `util` | AlloyDB and Cloud SQL helpers | not started |
 | `testing/llmtest` | LLM provider compliance and test helpers | partial: opt-in core generation and canceled-context checks, with capability checks for multiturn history, streaming chunks/error propagation, tool-call JSON/replay, and typed token usage; includes a configurable concurrency-safe `MockModel` with copied response snapshots; calling `test_model` against a live provider is explicit |
@@ -175,12 +175,13 @@ namespaces, injected embeddings/SQL engine, and bounded requests; schema/index
 management, alternate distance strategies, and advanced filters remain
 outstanding; `SearchOptions.include_vectors` returns validated vectors when
 requested.
-Redis — partial: HSET document writes and RediSearch KNN over an existing HASH
-index, cosine scores, exact scalar TAG filters, namespaces, injected embeddings
-and Redis command client, and bounded requests; index management, alternate
-distance strategies, advanced filter syntax, and namespace-constrained deletion
-remain outstanding; `SearchOptions.include_vectors` returns validated stored
-vectors when requested.
+Redis — partial: HSET document writes and RediSearch KNN over a HASH index,
+explicit non-destructive FLAT/COSINE index creation, cosine scores, exact scalar
+TAG filters, namespaces, injected embeddings and Redis command client, and
+bounded requests; index deletion/reconfiguration, HNSW, alternate distance
+strategies, advanced filter syntax, and namespace-constrained deletion remain
+outstanding; `SearchOptions.include_vectors` returns validated stored vectors
+when requested.
 Weaviate — partial: batch object upsert and delete against a provisioned class,
 GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
 certainty thresholds, injected embeddings/transport, and bounded requests;

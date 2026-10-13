@@ -1,17 +1,23 @@
 # Redis Stack vector store
 
-This adapter targets a preconfigured Redis Stack HASH index using RediSearch
-vector KNN. It uses `db.redis` from the V standard library and accepts an
-injected command client for offline tests. The store does not open or close the
-connection and does not create or drop indexes.
+This adapter targets a Redis Stack HASH index using RediSearch vector KNN. It
+uses `db.redis` from the V standard library and accepts an injected command
+client for offline tests. The store does not open or close the connection.
+`new_store` never manages indexes; `initialize_index` is an explicit,
+non-destructive `FT.CREATE` helper.
 
 ## Index setup
 
-Create an index whose prefix and field names match the store options. `content`
-can be indexed as text or left unindexed; `metadata` is returned as a stored
-HASH field. The namespace and ownership fields must be TAG fields. Configure the
-vector field for FLOAT32 and COSINE with the exact dimension used by the
-embedder. Add each metadata filter field as a TAG using the `meta_` prefix.
+For a supported flat-index schema, call `initialize_index(client, options,
+metadata_fields)` and pass the metadata keys your application filters. It creates
+an index whose prefix and field names match the options, scans existing matching
+HASH records, indexes content as TEXT, and adds the namespace/ownership and
+selected metadata keys as TAG fields. Existing indexes are never dropped or
+reconfigured; Redis returns an error if the name already exists. The vector
+field uses FLOAT32, COSINE, and the configured dimension. Explicitly plan for
+the initial scan and index memory on the Redis server before calling it.
+
+To manage index lifecycle outside the adapter, the equivalent command is:
 
 ```text
 FT.CREATE langchainv_idx ON HASH PREFIX 1 doc:langchainv: SCHEMA \
@@ -31,12 +37,16 @@ mut client := redis_client.connect(redis_client.Config{
 	tls:      true
 	password: '...'
 })!
-store := redis_vector.new_store(embedder, redis_vector.StandardRedisClient{
+
+commands := redis_vector.StandardRedisClient{
 	db: &client
-}, redis_vector.Options{
+}
+options := redis_vector.Options{
 	index:      'langchainv_idx'
 	dimensions: 1536
-})!
+}
+redis_vector.initialize_index(commands, options, ['kind'])!
+store := redis_vector.new_store(embedder, commands, options)!
 ```
 
 Records use keys under `doc:langchainv:` and include content, JSON metadata,
@@ -60,8 +70,9 @@ to `delete`.
   omitted by default and decoded with dimension and finite-value checks.
 - Delete accepts at most 1,000 returned Redis keys. Namespace-constrained
   deletion is rejected because read-then-delete would not be atomic.
-- The configured index must exist and match the HASH schema. Index management,
-  alternate metrics, and advanced RediSearch query syntax are not implemented.
+- `initialize_index` creates only a FLAT/COSINE index. Index deletion,
+  reconfiguration, HNSW, alternate metrics, and advanced RediSearch query
+  syntax are not implemented.
 - Redis commands are sequential. If Redis fails partway through a multi-record
   write, earlier HSET commands may already have succeeded. The response cap is
   safe for records written through this adapter and assumes the Redis index is

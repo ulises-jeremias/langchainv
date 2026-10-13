@@ -28,7 +28,7 @@ and `weaviate` subpackages provide bounded REST adapters for existing remote
 collections or indexes. Each accepts an injected embedder and HTTP client for
 offline tests. The `dolt`, `mariadb`, and `pgvector` subpackages use an injected SQL
 engine. The `redis` subpackage uses the V standard Redis client with an injected
-command interface and a preconfigured Redis Stack HASH index. See package
+command interface and an explicitly initialized Redis Stack HASH index. See package
 README files for supported filters, limits, authentication, and server setup.
 Remote adapters support `include_vectors` only when their package guide says
 the backend returns stored vectors; unsupported adapters reject the option.
