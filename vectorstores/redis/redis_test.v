@@ -195,6 +195,61 @@ fn test_redis_search_parses_score_metadata_and_escapes_filter_values() {
 	assert command[17].len == 8
 }
 
+fn test_redis_hnsw_search_passes_bounded_runtime_ef() {
+	mut response := []redis_client.RedisValue{}
+	response << redis_client.RedisValue(i64(1))
+	response << redis_client.RedisValue('doc:langchainv:fixed-id')
+	response << redis_client.RedisValue([
+		redis_client.RedisValue('content'),
+		redis_client.RedisValue('answer'),
+		redis_client.RedisValue('metadata'),
+		redis_client.RedisValue('{}'),
+		redis_client.RedisValue('distance'),
+		redis_client.RedisValue('0.09'),
+	])
+	mut state := &RedisFixtureState{
+		response: redis_client.RedisValue(response)
+	}
+	store := new_store(RedisFixtureEmbedder{}, RedisFixtureClient{
+		state: state
+	}, Options{
+		index:                'langchainv_idx'
+		dimensions:           2
+		algorithm:            'HNSW'
+		hnsw_ef_construction: 200
+		hnsw_ef_runtime:      150
+	}) or { panic(err) }
+	mut ctx := context.background()
+	documents := store.similarity_search(mut ctx, 'question', 4, vectorstores.SearchOptions{}) or {
+		panic(err)
+	}
+	assert documents.len == 1
+	command := state.commands[0]
+	assert command[2].contains('EF_RUNTIME $ef_runtime AS distance')
+	assert command[14] == 'PARAMS'
+	assert command[15] == '4'
+	assert command[18] == 'ef_runtime'
+	assert command[19] == '150'
+}
+
+fn test_redis_hnsw_store_rejects_invalid_runtime_ef() {
+	mut state := &RedisFixtureState{}
+	new_store(RedisFixtureEmbedder{}, RedisFixtureClient{
+		state: state
+	}, Options{
+		index:                'langchainv_idx'
+		dimensions:           2
+		algorithm:            'HNSW'
+		hnsw_ef_construction: 200
+		hnsw_ef_runtime:      0
+	}) or {
+		assert err.msg().contains('EF_RUNTIME')
+		assert state.commands.len == 0
+		return
+	}
+	assert false, 'expected an invalid HNSW runtime setting to fail'
+}
+
 fn test_redis_search_returns_binary_vector_when_requested() {
 	mut response := []redis_client.RedisValue{}
 	response << redis_client.RedisValue(i64(1))
