@@ -14,7 +14,8 @@ only when its implementation and documented validation are complete.
 Visit the [LangChainV documentation site](https://ulises-jeremias.github.io/langchainv/)
 for the quick start, tutorials, component map, searchable generated
 [API reference](https://ulises-jeremias.github.io/langchainv/api/), and
-compatibility reference.
+compatibility reference. The [production guide](https://ulises-jeremias.github.io/langchainv/production/)
+covers data handling, resource limits, cancellation, retries, and tool access.
 The [`examples/`](examples/) directory contains standalone programs; the
 [example catalog](examples/README.md) lists their requirements.
 

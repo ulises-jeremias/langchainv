@@ -19,6 +19,7 @@ layout_class: home
   <article class="card"><h3>Find a component</h3><p>Browse package responsibilities and their focused reference documentation.</p><a href="{{ '/components/' | relative_url }}">Component map →</a></article>
   <article class="card"><h3>Search the V API</h3><p>Browse public symbols and module documentation generated from the current source.</p><a href="{{ '/api/' | relative_url }}">API reference →</a></article>
   <article class="card"><h3>Choose an integration</h3><p>Browse model, embedding, and vector store adapters and open their setup guides.</p><a href="{{ '/providers/' | relative_url }}">Integration catalog →</a></article>
+  <article class="card"><h3>Prepare for production</h3><p>Review data handling, resource limits, cancellation, retries, and tool permissions.</p><a href="{{ '/production/' | relative_url }}">Production guide →</a></article>
   <article class="card"><h3>Check compatibility</h3><p>See what is implemented, partial, verified, or still outstanding.</p><a href="{{ '/reference/' | relative_url }}">Parity and project status →</a></article>
 </div>
 
