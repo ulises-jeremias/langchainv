@@ -80,8 +80,15 @@ to `delete`.
   can return fewer than the requested count. Set `SearchOptions.include_vectors`
   to return the stored binary vector in `schema.Document.embedding`; it is
   omitted by default and decoded with dimension and finite-value checks.
-- Delete accepts at most 1,000 returned Redis keys. Namespace-constrained
-  deletion is rejected because read-then-delete would not be atomic.
+- Delete accepts at most 1,000 returned Redis keys. Without a namespace, keys
+  are deleted in one `DEL` command. With a namespace, each key is checked for
+  this adapter's ownership marker and exact namespace, then deleted atomically
+  by a one-key Lua script; its total request is limited to 4 MiB. One-key
+  scripts avoid cross-slot errors in Redis
+  Cluster when the client routes each call to the key's owning node; a command
+  failure or cancellation can leave earlier keys in the batch deleted. ACL
+  users need permission for `EVAL`, `TYPE`, `HGET`, and `DEL` for
+  namespace-constrained deletion.
 - `initialize_index` creates a FLAT/COSINE index by default or an explicitly
   configured HNSW/COSINE index. Index deletion/reconfiguration, alternate
   metrics, and advanced RediSearch query syntax are not implemented.
