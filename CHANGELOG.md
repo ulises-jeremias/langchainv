@@ -8,6 +8,8 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Lifecycle callbacks on the Anthropic and Cohere clients, following the
+  OpenAI pattern: start, end, and error events around `generate_content`.
 - Lifecycle callbacks on the OpenAI client: a `callbacks.Handler` set
   through `Options` or the client field receives generate-content start,
   end, and error events.
