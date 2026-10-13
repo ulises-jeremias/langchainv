@@ -76,6 +76,11 @@ fn sample_response_format() ResponseFormat {
 	}
 }
 
+fn response_format_from_request(body string) map[string]json2.Any {
+	request := json2.decode[map[string]json2.Any](body, json2.DecoderOptions{}) or { panic(err) }
+	return (request['response_format'] or { panic('missing response format') }).as_map()
+}
+
 fn test_generate_content_sends_text_chat_and_maps_usage() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"choices":[{"index":0,"message":{"role":"assistant","content":"hello","tool_calls":[]},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}', 200)
@@ -106,7 +111,8 @@ fn test_generate_content_encodes_json_schema_response_format() {
 		json_mode: true
 	}) or { panic(err) }
 	body := state.requests[0].body
-	assert body.contains('"response_format":{"type":"json_schema"')
+	response_format := response_format_from_request(body)
+	assert response_format['type'].str() == 'json_schema'
 	assert body.contains('"name":"answer"')
 	assert body.contains('"description":"A short answer"')
 	assert body.contains('"strict":true')
@@ -124,7 +130,8 @@ fn test_client_accepts_json_object_response_format() {
 	configured.generate_content(mut ctx, [schema.text_message(.human, 'answer')], llms.CallOptions{}) or {
 		panic(err)
 	}
-	assert state.requests[0].body.contains('"response_format":{"type":"json_object"}')
+	response_format := response_format_from_request(state.requests[0].body)
+	assert response_format['type'].str() == 'json_object'
 }
 
 fn test_generate_content_streams_configured_json_schema_response_format() {
@@ -138,7 +145,8 @@ fn test_generate_content_streams_configured_json_schema_response_format() {
 		streaming_func: stream
 	}) or { panic(err) }
 	body := state.requests[0].body
-	assert body.contains('"response_format":{"type":"json_schema"')
+	response_format := response_format_from_request(body)
+	assert response_format['type'].str() == 'json_schema'
 	assert body.contains('"stream":true')
 }
 
