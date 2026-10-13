@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Agent executor parsing-error recovery: with `handle_parsing_errors`, a
+  failed plan becomes a bounded `_invalid_output` step and the agent retries
+  within the iteration limit instead of failing the run.
 - SQL database chain in `chains`: generates one read-only query, runs it,
   and answers from the result, with optional intermediate steps.
 - Gemini `countTokens` support in the Google AI and Vertex clients through

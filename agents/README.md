@@ -51,6 +51,14 @@ agent can recover. Cancellation is checked between planning and tool calls.
 Callbacks receive agent actions/finishes and tool start/end/error events.
 
 Set `return_intermediate_steps` to add an `intermediate_steps` JSON value to
-the result. Agent setup remains explicit; there is no automatic tool
+the result. Set `handle_parsing_errors` to keep a run alive when a plan call
+fails, for example when model text matches neither an action nor a final
+answer. The executor records the failure as a bounded `_invalid_output` step
+with an observation that asks for one Action and Action Input, or one Final
+Answer, and plans again. Each recovery spends one iteration, so a model that
+never produces valid output still ends with the iteration-limit error. The
+default is off, and plan errors fail the call immediately.
+
+Agent setup remains explicit; there is no automatic tool
 discovery. Tests use deterministic fake agents, models, and tools; no provider
 API is called.
