@@ -12,6 +12,12 @@ inject an `httputil.HTTPClient` with `new_client` for offline tests or a custom
 transport. Do not put API keys in source control or use live credentials in
 tests. Provider error bodies are omitted from returned status errors.
 
+Set `Options.callbacks` at construction, or assign the client's `callbacks`
+field, to receive lifecycle events. The handler gets one
+`llm_generate_content_start` before the request, then either
+`llm_generate_content_end` with the response or `llm_error` with the returned
+error, for streaming and non-streaming calls alike.
+
 Configure a JSON Schema response format once when constructing a client. The
 schema must be a non-empty JSON object, and its name must contain 1–64 ASCII
 letters, digits, underscores, or hyphens. A configured response format takes

@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Lifecycle callbacks on the OpenAI client: a `callbacks.Handler` set
+  through `Options` or the client field receives generate-content start,
+  end, and error events.
+
 - JSON Schema composition in `jsonschema`: `all_of`, `any_of`, `one_of`, and
   `not` on `Definition`, plus string `format` names, all encoded and
   enforced during instance validation.

@@ -4,6 +4,7 @@ module openai
 import context
 import encoding.base64
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -22,14 +23,17 @@ pub struct Client {
 pub:
 	base_url string = default_base_url
 	model    string = default_model
+pub mut:
+	callbacks ?callbacks.Handler
 }
 
-// Options configures endpoint and default model.
+// Options configures endpoint, default model, and lifecycle callbacks.
 pub struct Options {
 pub:
 	base_url        string = default_base_url
 	model           string = default_model
 	response_format ?ResponseFormat
+	callbacks       ?callbacks.Handler
 }
 
 // JSONSchemaResponseFormat configures OpenAI structured output.
@@ -157,6 +161,7 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 		response_format: options.response_format
 		base_url:        options.base_url.trim_space().trim_right('/')
 		model:           options.model.trim_space()
+		callbacks:       options.callbacks
 	}
 }
 
@@ -169,8 +174,27 @@ pub fn (client Client) complete(mut ctx context.Context, prompt string, options 
 	return response.choices[0].content
 }
 
-// generate_content implements non-streaming OpenAI Chat Completions.
+// generate_content implements OpenAI Chat Completions and dispatches the
+// configured lifecycle callbacks around the request.
 pub fn (client Client) generate_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
+	options.validate()!
+	llms.validate_messages(messages)!
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_start(mut ctx, messages)
+	}
+	response := client.generate_chat_content(mut ctx, messages, options) or {
+		if mut handler := client.callbacks {
+			handler.llm_error(mut ctx, err)
+		}
+		return err
+	}
+	if mut handler := client.callbacks {
+		handler.llm_generate_content_end(mut ctx, response)
+	}
+	return response
+}
+
+fn (client Client) generate_chat_content(mut ctx context.Context, messages []schema.Message, options llms.CallOptions) !llms.Response {
 	options.validate()!
 	llms.validate_messages(messages)!
 	if options.top_k != 0 || options.min_length != 0 || options.max_length != 0
