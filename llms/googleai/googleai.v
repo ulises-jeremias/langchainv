@@ -570,7 +570,12 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 					})
 				}
 				schema.ImageURLPart {
-					return error('Google AI image URLs must be converted to bounded inline data first')
+					validate_image_url(part.url)!
+					parts << json2.Any({
+						'fileData': json2.Any({
+							'fileUri': json2.Any(part.url)
+						})
+					})
 				}
 				else { return error('Google AI message part is not supported') }
 			}
@@ -683,6 +688,35 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 		})
 	}
 	return request
+}
+
+const max_image_url_bytes = 8192
+
+// validate_image_url accepts only bounded HTTPS or Google Cloud Storage
+// image references without embedded credentials, so a message cannot point
+// the provider at a local or credentialed address.
+fn validate_image_url(url string) ! {
+	if url.len == 0 || url.len > max_image_url_bytes {
+		return error('Google AI image URL must contain 1..8192 bytes')
+	}
+	for character in url.bytes() {
+		if character <= ` ` || character == 0x7f {
+			return error('Google AI image URL must not contain whitespace or control characters')
+		}
+	}
+	if url.starts_with('gs://') {
+		if url.len == 'gs://'.len {
+			return error('Google AI image URL must name a Cloud Storage object')
+		}
+		return
+	}
+	if !url.starts_with('https://') {
+		return error('Google AI image URL must use HTTPS or gs://')
+	}
+	authority := url['https://'.len..].split('/')[0]
+	if authority == '' || authority.contains('@') {
+		return error('Google AI image URL must not contain credentials')
+	}
 }
 
 fn validate_model(model string) ! {

@@ -362,3 +362,63 @@ fn test_new_client_rejects_non_https_and_invalid_model() {
 	}
 	assert false, 'expected HTTP endpoint to be rejected'
 }
+
+fn test_generate_content_maps_remote_image_url_to_file_data() {
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"described"}]},"finishReason":"STOP"}]}', 200)
+	mut ctx := context.background()
+	messages := [
+		schema.Message{
+			role:  .human
+			parts: [
+				schema.ContentPart(schema.ImageURLPart{
+					url: 'https://images.test/cat.png'
+				}),
+			]
+		},
+	]
+	response := client.generate_content(mut ctx, messages, llms.CallOptions{}) or { panic(err) }
+	assert response.choices[0].content == 'described'
+	assert state.requests[0].body.contains('"fileData":{"fileUri":"https://images.test/cat.png"}')
+	assert !state.requests[0].body.contains('inlineData')
+}
+
+fn test_generate_content_maps_cloud_storage_image_url() {
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]}', 200)
+	mut ctx := context.background()
+	messages := [
+		schema.Message{
+			role:  .human
+			parts: [
+				schema.ContentPart(schema.ImageURLPart{
+					url: 'gs://bucket/cat.png'
+				}),
+			]
+		},
+	]
+	client.generate_content(mut ctx, messages, llms.CallOptions{}) or { panic(err) }
+	assert state.requests[0].body.contains('"fileUri":"gs://bucket/cat.png"')
+}
+
+fn test_generate_content_rejects_unsafe_image_urls() {
+	mut ctx := context.background()
+	for url in ['http://images.test/cat.png', 'https://user:pass@images.test/cat.png',
+		'images.test/cat.png', 'https://images.test/cat .png'] {
+		client, state := new_fixture_client('{"candidates":[]}', 200)
+		messages := [
+			schema.Message{
+				role:  .human
+				parts: [
+					schema.ContentPart(schema.ImageURLPart{
+						url: url
+					}),
+				]
+			},
+		]
+		client.generate_content(mut ctx, messages, llms.CallOptions{}) or {
+			assert err.msg().contains('image URL')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected image URL ${url} to fail'
+	}
+}
