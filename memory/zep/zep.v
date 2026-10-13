@@ -88,7 +88,11 @@ pub fn new_chat_message_history_with_client(options Options, http_client httputi
 	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	session_id := if options.session_id == '' { 'default' } else { options.session_id }
-	max_messages := if options.max_messages == 0 { default_max_messages } else { options.max_messages }
+	max_messages := if options.max_messages == 0 {
+		default_max_messages
+	} else {
+		options.max_messages
+	}
 	if api_key == '' || api_key.len > 16 * 1024 || api_key.contains('\r') || api_key.contains('\n') {
 		return error('Zep API key must be configured and contain no line breaks')
 	}
@@ -234,7 +238,7 @@ pub fn (history ChatMessageHistory) add_message(mut ctx context.Context, message
 			return error('Zep history supports human, assistant, and tool messages only')
 		}
 	}
-	request_body := json2.encode(ZepAddMemoryRequest{messages: [remote]}, json2.EncoderOptions{})
+	request_body := json2.encode(ZepAddMemoryRequest{ messages: [remote] }, json2.EncoderOptions{})
 	response := state.request(mut ctx, .post, memory_url(state), request_body)!
 	if response.status_code < 200 || response.status_code >= 300 {
 		return error('Zep memory write returned HTTP ${response.status_code}')
