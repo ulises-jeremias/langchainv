@@ -54,6 +54,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 |---|---|
 | Azure AI Search | [Azure AI Search](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/azureaisearch/README.md) |
 | Chroma | [Chroma](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/chroma/README.md) |
+| Dolt | [Dolt vector store](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/dolt/README.md) |
 | MariaDB Vector | [MariaDB](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/mariadb/README.md) |
 | Milvus | [Milvus](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/milvus/README.md) |
 | OpenSearch | [OpenSearch](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/opensearch/README.md) |
