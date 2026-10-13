@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Alternate string template formats in `prompts`: `prompts.Template` renders
+  Go-template and Jinja variable syntax alongside the existing f-string
+  format, with strict rejection of filters and statements.
+
 - Agent executor parsing-error recovery: with `handle_parsing_errors`, a
   failed plan becomes a bounded `_invalid_output` step and the agent retries
   within the iteration limit instead of failing the run.
