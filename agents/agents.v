@@ -32,6 +32,7 @@ pub struct ExecutorOptions {
 pub:
 	max_iterations            int = default_max_iterations
 	return_intermediate_steps bool
+	handle_parsing_errors     bool
 	call_options              llms.CallOptions
 	memory                    ?schema.Memory
 	callbacks_handler         ?callbacks.Handler
@@ -42,6 +43,7 @@ pub struct Executor {
 	// These fields stay private so callers cannot bypass constructor validation.
 	max_iterations            int = default_max_iterations
 	return_intermediate_steps bool
+	handle_parsing_errors     bool
 	call_options              llms.CallOptions
 	memory_store              ?schema.Memory
 	callbacks_handler         ?callbacks.Handler
@@ -58,6 +60,7 @@ pub fn new_executor(agent Agent, options ExecutorOptions) !Executor {
 		agent:                     agent
 		max_iterations:            options.max_iterations
 		return_intermediate_steps: options.return_intermediate_steps
+		handle_parsing_errors:     options.handle_parsing_errors
 		call_options:              options.call_options
 		memory_store:              options.memory
 		callbacks_handler:         options.callbacks_handler
@@ -106,6 +109,10 @@ pub fn (executor Executor) call(mut ctx context.Context, values map[string]json2
 			return ctx_error
 		}
 		result := executor.agent.plan(mut ctx, steps, inputs, executor.call_options) or {
+			if executor.handle_parsing_errors {
+				steps << parsing_error_step(err.msg())
+				continue
+			}
 			return error('agent planning failed: ${err.msg()}')
 		}
 		if finish := result.finish {
@@ -154,6 +161,27 @@ pub fn (executor Executor) call(mut ctx context.Context, values map[string]json2
 		}
 	}
 	return error('agent did not finish within ${executor.max_iterations} iterations')
+}
+
+const max_parsing_error_bytes = 1024
+const parsing_error_observation = 'Invalid or incomplete response. Respond with one Action and Action Input, or one Final Answer.'
+
+// parsing_error_step records a failed plan as a bounded synthetic step so the
+// next plan call can see what failed and correct its output format.
+fn parsing_error_step(message string) schema.AgentStep {
+	bounded := if message.len > max_parsing_error_bytes {
+		message[..max_parsing_error_bytes]
+	} else {
+		message
+	}
+	return schema.AgentStep{
+		action:      schema.AgentAction{
+			tool:       '_invalid_output'
+			tool_input: bounded
+			log:        bounded
+		}
+		observation: parsing_error_observation
+	}
 }
 
 fn strip_observation_suffix(input string) string {
