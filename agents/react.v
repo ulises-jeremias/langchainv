@@ -272,7 +272,7 @@ fn validate_react_prompt_size(template prompts.StringTemplate, values map[string
 
 fn parse_react_output(output string, output_key string) !PlanResult {
 	lower_output := output.to_lower()
-	action_marker := lower_output.index('action:')
+	action_marker := find_react_marker(lower_output, 'action:')
 	if answer_marker := find_react_final_answer_marker(output) {
 		mut final_answer_first := true
 		if action_index := action_marker {
@@ -280,7 +280,7 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 		}
 		if final_answer_first {
 			answer := output[answer_marker.index + answer_marker.value.len..].trim_space()
-			if answer.to_lower().contains('\naction:') {
+			if find_react_marker(answer.to_lower(), 'action:') != none {
 				return error('ReAct output contains a final answer followed by another action')
 			}
 			return react_finish(answer, output_key)
@@ -289,10 +289,10 @@ fn parse_react_output(output string, output_key string) !PlanResult {
 	if action_index := action_marker {
 		after_action := action_index + 'action:'.len
 		remainder := lower_output[after_action..]
-		input_relative := remainder.index('action input:') or {
+		input_relative := find_react_marker(remainder, 'action input:') or {
 			return error('ReAct output has Action but no Action Input field')
 		}
-		if second_action := remainder.index('action:') {
+		if second_action := find_react_marker(remainder, 'action:') {
 			if second_action < input_relative {
 				return error('ReAct output has Action but no Action Input field')
 			}
@@ -345,7 +345,7 @@ fn find_react_final_answer_marker(output string) ?ReactFinalAnswerMarker {
 	lower_output := output.to_lower()
 	mut found := ?ReactFinalAnswerMarker(none)
 	for marker in ['final answer:', 'final answer :', 'the final answer is:', 'the answer is:'] {
-		if index := lower_output.index(marker) {
+		if index := find_react_marker(lower_output, marker) {
 			if current := found {
 				if index < current.index {
 					found = ReactFinalAnswerMarker{
@@ -362,6 +362,23 @@ fn find_react_final_answer_marker(output string) ?ReactFinalAnswerMarker {
 		}
 	}
 	return found
+}
+
+fn find_react_marker(output string, marker string) ?int {
+	mut search_index := 0
+	for search_index < output.len {
+		relative_index := output[search_index..].index(marker) or { return none }
+		index := search_index + relative_index
+		if index == 0 {
+			return index
+		}
+		previous := output[index - 1]
+		if !(previous.is_letter() || previous.is_digit() || previous == `_`) {
+			return index
+		}
+		search_index = index + 1
+	}
+	return none
 }
 
 fn react_finish(answer string, output_key string) !PlanResult {
