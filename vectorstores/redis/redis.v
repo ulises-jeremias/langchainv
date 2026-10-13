@@ -70,7 +70,7 @@ pub:
 	algorithm            string = 'FLAT'
 	hnsw_m               int    = 16
 	hnsw_ef_construction int    = 200
-	hnsw_ef_runtime     int    = 10
+	hnsw_ef_runtime      int    = 10
 }
 
 // new_store binds an embedder and Redis client to a HASH index. It never
@@ -286,14 +286,15 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	} else {
 		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]'
 	}
-	mut command := ['FT.SEARCH', store.index, vector_query, 'RETURN',
-		return_count, store.content_field, store.metadata_field, 'distance']
+	mut command := ['FT.SEARCH', store.index, vector_query, 'RETURN', return_count,
+		store.content_field, store.metadata_field, 'distance']
 	if options.include_vectors {
 		command << store.vector_field
 	}
 	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str()]
 	if store.algorithm == 'HNSW' {
-		command << ['PARAMS', '4', 'query_vector', vector_arg, 'ef_runtime', store.hnsw_ef_runtime.str()]
+		command << ['PARAMS', '4', 'query_vector', vector_arg, 'ef_runtime',
+			store.hnsw_ef_runtime.str()]
 	} else {
 		command << ['PARAMS', '2', 'query_vector', vector_arg]
 	}
