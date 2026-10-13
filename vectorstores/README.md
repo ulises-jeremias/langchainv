@@ -26,7 +26,7 @@ adapter-specific guides before enabling it remotely.
 The `azureaisearch`, `chroma`, `milvus`, `opensearch`, `qdrant`, `pinecone`,
 and `weaviate` subpackages provide bounded REST adapters for existing remote
 collections or indexes. Each accepts an injected embedder and HTTP client for
-offline tests. The `mariadb` and `pgvector` subpackages use an injected SQL
+offline tests. The `dolt`, `mariadb`, and `pgvector` subpackages use an injected SQL
 engine. The `redis` subpackage uses the V standard Redis client with an injected
 command interface and a preconfigured Redis Stack HASH index. See package
 README files for supported filters, limits, authentication, and server setup.
