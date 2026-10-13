@@ -162,6 +162,32 @@ fn test_generate_content_encodes_inline_image_and_json_mode() {
 	assert state.requests[0].body.contains('"images":["AQI="]')
 }
 
+fn test_generate_content_sends_schema_valued_format() {
+	mut state := &FakeHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"message":{"role":"assistant","content":"{\\"name\\":\\"Ada\\"}"}}'
+		}
+	}
+	client := new_client(FakeHTTPClient{
+		state: state
+	}, Options{
+		base_url:      'http://ollama.test:11434'
+		model:         'gemma4'
+		format_schema: '{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}'
+	}) or { panic(err) }
+	mut ctx := context.background()
+	client.generate_content(mut ctx, [schema.text_message(.human, 'return a name')], llms.CallOptions{
+		json_mode: true
+	}) or { panic(err) }
+	assert state.requests.len == 1
+	assert state.requests[0].body.contains('"format":{')
+	assert state.requests[0].body.contains('"type":"object"')
+	assert state.requests[0].body.contains('"properties":{"name":{"type":"string"}}')
+	assert state.requests[0].body.contains('"required":["name"]')
+}
+
 fn test_generate_content_rejects_unsupported_provider_options_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
@@ -251,7 +277,7 @@ fn test_generate_content_rejects_image_urls_and_redacts_http_errors() {
 	assert false, 'expected an HTTP status error'
 }
 
-fn test_client_rejects_invalid_model_format_and_userinfo() {
+fn test_client_rejects_empty_model() {
 	new_client(FakeHTTPClient{
 		state: &FakeHTTPState{}
 	}, Options{}) or {
@@ -259,6 +285,9 @@ fn test_client_rejects_invalid_model_format_and_userinfo() {
 		return
 	}
 	assert false, 'expected an empty model to fail'
+}
+
+fn test_client_rejects_unsupported_format() {
 	new_client(FakeHTTPClient{
 		state: &FakeHTTPState{}
 	}, Options{
@@ -269,6 +298,49 @@ fn test_client_rejects_invalid_model_format_and_userinfo() {
 		return
 	}
 	assert false, 'expected an unsupported format to fail'
+}
+
+fn test_client_rejects_non_object_format_schema() {
+	new_client(FakeHTTPClient{
+		state: &FakeHTTPState{}
+	}, Options{
+		model:         'gemma4'
+		format_schema: '[]'
+	}) or {
+		assert err.msg().contains('valid JSON object')
+		return
+	}
+	assert false, 'expected a non-object format schema to fail'
+}
+
+fn test_client_rejects_empty_format_schema() {
+	new_client(FakeHTTPClient{
+		state: &FakeHTTPState{}
+	}, Options{
+		model:         'gemma4'
+		format_schema: '{}'
+	}) or {
+		assert err.msg().contains('must not be an empty JSON object')
+		return
+	}
+	assert false, 'expected an empty format schema to fail'
+}
+
+fn test_client_rejects_conflicting_formats() {
+	new_client(FakeHTTPClient{
+		state: &FakeHTTPState{}
+	}, Options{
+		model:         'gemma4'
+		format:        'json'
+		format_schema: '{"type":"object"}'
+	}) or {
+		assert err.msg().contains('cannot both be configured')
+		return
+	}
+	assert false, 'expected conflicting output formats to fail'
+}
+
+fn test_client_rejects_base_url_userinfo() {
 	new_client(FakeHTTPClient{
 		state: &FakeHTTPState{}
 	}, Options{

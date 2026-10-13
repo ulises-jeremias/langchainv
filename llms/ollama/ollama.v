@@ -19,19 +19,21 @@ const max_tools = 128
 pub struct Client {
 	http_client httputil.HTTPClient
 pub:
-	base_url   string = default_base_url
-	model      string
-	format     string
-	keep_alive string
+	base_url      string = default_base_url
+	model         string
+	format        string
+	format_schema map[string]json2.Any
+	keep_alive    string
 }
 
 // Options configures the Ollama server, model, output format, and model lifetime.
 pub struct Options {
 pub:
-	base_url   string = default_base_url
-	model      string
-	format     string
-	keep_alive string
+	base_url      string = default_base_url
+	model         string
+	format        string
+	format_schema string
+	keep_alive    string
 }
 
 struct ChatResponse {
@@ -78,16 +80,33 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 		return error('Ollama base URL must not be empty')
 	}
 	if options.format !in ['', 'json'] {
-		return error('Ollama format must be empty or `json`')
+		return error('Ollama format must be empty or `json`; use format_schema for a JSON Schema')
+	}
+	if options.format != '' && options.format_schema.trim_space() != '' {
+		return error('Ollama format and format_schema cannot both be configured')
+	}
+	mut format_schema := map[string]json2.Any{}
+	if options.format_schema.trim_space() != '' {
+		if options.format_schema.len > max_request_bytes {
+			return error('Ollama format_schema exceeds the 8 MiB request size limit')
+		}
+		format_schema = json2.decode[map[string]json2.Any](options.format_schema,
+			json2.DecoderOptions{}) or {
+			return error('Ollama format_schema must be a valid JSON object: ${err.msg()}')
+		}
+		if format_schema.len == 0 {
+			return error('Ollama format_schema must not be an empty JSON object')
+		}
 	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, '') or { return error('invalid Ollama base URL: ${err.msg()}') }
 	return Client{
-		http_client: http_client
-		base_url:    base_url
-		model:       options.model.trim_space()
-		format:      options.format
-		keep_alive:  options.keep_alive.trim_space()
+		http_client:   http_client
+		base_url:      base_url
+		model:         options.model.trim_space()
+		format:        options.format
+		format_schema: format_schema
+		keep_alive:    options.keep_alive.trim_space()
 	}
 }
 
@@ -377,13 +396,17 @@ fn make_request(client Client, model string, messages []schema.Message, options 
 		'messages': json2.Any(wire_messages)
 		'stream':   json2.Any(false)
 	}
-	format := if options.json_mode || options.response_mime_type == 'application/json' {
-		'json'
+	if client.format_schema.len > 0 {
+		request['format'] = json2.Any(client.format_schema)
 	} else {
-		client.format
-	}
-	if format != '' {
-		request['format'] = json2.Any(format)
+		format := if options.json_mode || options.response_mime_type == 'application/json' {
+			'json'
+		} else {
+			client.format
+		}
+		if format != '' {
+			request['format'] = json2.Any(format)
+		}
 	}
 	if client.keep_alive != '' {
 		request['keep_alive'] = json2.Any(client.keep_alive)
