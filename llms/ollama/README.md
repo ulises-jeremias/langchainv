@@ -22,10 +22,19 @@ bound. When configured, it takes precedence over per-call JSON mode. Otherwise,
 `Options.format: 'json'` or `CallOptions.json_mode` selects ordinary JSON mode.
 
 ```v
-client := ollama.new_client(http_client, ollama.Options{
-	model: 'gemma4'
-	format_schema: '{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}'
-})!
+module main
+
+import ulises_jeremias.langchainv.httputil
+import ulises_jeremias.langchainv.llms.ollama
+
+fn main() {
+	client := ollama.new_client(httputil.HTTPClient(httputil.new_default_client()),
+		ollama.Options{
+			model:         'gemma4'
+			format_schema: '{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}'
+		}) or { panic(err) }
+	println(client.model)
+}
 ```
 
 Inline image data is limited to 5 MiB per request; chat histories are capped at
