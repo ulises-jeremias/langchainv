@@ -92,7 +92,7 @@ fn test_redis_hnsw_index_validation_fails_before_sending_commands() {
 		dimensions:           2
 		algorithm:            'HNSW'
 		hnsw_m:               64
-		hnsw_ef_construction:  16
+		hnsw_ef_construction: 16
 	}, []) or {
 		assert err.msg().contains('EF_CONSTRUCTION')
 		assert state.commands.len == 0
