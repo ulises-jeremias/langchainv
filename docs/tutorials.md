@@ -23,7 +23,7 @@ Work through these recipes in order. Each section links to the package guide tha
 11. Run the [offline conversation memory tutorial](conversation-memory/) to see how a chain carries history between turns.
 12. Run the [offline tool-calling tutorial](tool-calling-agent/) before connecting live services.
 13. Initialize a [conversational ReAct agent with memory](conversational-agent-memory/) and inspect how `chains.call` moves prior turns through the executor.
-14. Read [security guidance](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and the [parity ledger](../reference/) before production use.
+14. Review the [production guide](../production/), [security policy](https://github.com/ulises-jeremias/langchainv/blob/main/SECURITY.md), [contribution and validation](https://github.com/ulises-jeremias/langchainv/blob/main/CONTRIBUTING.md), and [parity ledger](../reference/) before deployment.
 15. [Return stored vectors](returning-vectors/) when you need the original embeddings for inspection or downstream calculations.
 16. Persist bounded remote conversation history with the [Zep chat history tutorial](zep-chat-history/); the example reads by default and requires a second opt-in before writing.
 17. Connect an existing Dolt database with [Dolt vector search](dolt-vector-search/) after reviewing the explicit index-build cost and approximate-recall behavior.
@@ -59,5 +59,9 @@ Work through these recipes in order. Each section links to the package guide tha
 | Use Cloud SQL for PostgreSQL or AlloyDB for vectors | [pgvector adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/pgvector/README.md#cloud-sql-and-alloydb) | Supply a compatible PostgreSQL engine and provision the vector schema; Cloud-specific connection, auth, and embedding features are outside the adapter. |
 | Load files | [documentloaders](https://github.com/ulises-jeremias/langchainv/blob/main/documentloaders/README.md) | Limits and external runtime requirements are documented per loader. |
 | Add SQL tools | [SQL database tools](https://github.com/ulises-jeremias/langchainv/blob/main/tools/sqldatabase/README.md) | Use parameterized queries and least-privilege credentials. |
+| Prepare a service for deployment | [Production guide](../production/) | Review data handling, resource bounds, cancellation, retries, and tool access. |
 
-Tutorials are being expanded alongside API coverage. A package marked partial in the parity ledger may have important unsupported behavior; treat its README as the precise contract.
+The tutorials favor offline, runnable examples where practical. A package
+marked partial in the parity ledger may have important unsupported behavior;
+use its README as the precise contract. Review the [production guide](../production/)
+before exposing tools or provider-backed workflows to users.
