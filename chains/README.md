@@ -108,6 +108,19 @@ and `output` keys, regardless of each child's internal key names.
 function. It gives the function a copy of the input map and checks that all
 declared outputs exist before returning.
 
+`new_sql_database_chain(database, model, options)` answers a question in
+three bounded steps. It reads the schema of the configured tables from a
+`sqldatabase.SQLDatabase`, asks the model for one SQL query, runs it, and
+asks the model to write the final answer from the tab-separated result. The
+chain only runs a single read-only `SELECT` or `WITH` statement. Anything
+else the model returns is rejected before it reaches the database, and
+fenced replies and `SQLQuery:` prefixes are accepted. Question and formatted
+prompt sizes have validated caps, the SQL and answer prompts can be replaced
+when they keep the required variables, and `return_intermediate_steps` adds
+the executed query and its result to the outputs. Writes, schema changes,
+and multi-statement SQL belong in the `tools/sqldatabase` API used directly,
+not in this chain.
+
 The chain uses default `llms.CallOptions`. Change `options` before execution to
 set provider-neutral controls. The broader LangChainGo chain family remains
 tracked in the parity ledger.
