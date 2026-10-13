@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Ollama model management: `list_models`, `show_model`, `pull_model`, and
+  `delete_model` with validated model names and bounded responses.
+
 - Embedding request options: Voyage output dimensions and truncation
   control, and Jina task, dimensions, and late chunking, all sent only when
   configured and validated at construction.
