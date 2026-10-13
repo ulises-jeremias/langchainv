@@ -232,6 +232,7 @@ pub fn (history ChatMessageHistory) add_message(mut ctx context.Context, message
 		}
 		.system, .generic {
 			return error('Zep history supports human, assistant, and tool messages only')
+		}
 	}
 	request_body := json2.encode(ZepAddMemoryRequest{messages: [remote]}, json2.EncoderOptions{})
 	response := state.request(mut ctx, .post, memory_url(state), request_body)!

@@ -27,8 +27,9 @@ fn main() {
 	messages := history.get_messages(mut ctx) or { panic(err) }
 	println('Loaded ${messages.len} Zep messages for ${session_id}.')
 	if os.getenv('LANGCHAINV_ZEP_APPEND_MESSAGE') == '1' {
-		history.add_message(mut ctx, schema.text_message(.human, 'LangChainV Zep history example.'))
-			or { panic(err) }
+		history.add_message(mut ctx, schema.text_message(.human, 'LangChainV Zep history example.')) or {
+			panic(err)
+		}
 		println('Appended the sample message to the selected session.')
 	}
 }
