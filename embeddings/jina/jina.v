@@ -28,15 +28,21 @@ pub struct Client {
 	api_key     string
 	http_client httputil.HTTPClient
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url      string = default_base_url
+	model         string = default_model
+	task          string
+	dimensions    int
+	late_chunking bool
 }
 
-// Options configures the Jina API endpoint and embedding model.
+// Options configures the Jina API endpoint, embedding model, and request options.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url      string = default_base_url
+	model         string = default_model
+	task          string
+	dimensions    int
+	late_chunking bool
 }
 
 // new_client configures a Jina client with the default endpoint and model.
@@ -57,13 +63,24 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	if options.base_url.trim_space() == '' || options.model.trim_space() == '' {
 		return error('Jina base URL and embedding model must not be empty')
 	}
+	if options.dimensions < 0 || options.dimensions > 4096 {
+		return error('Jina dimensions must be between 1 and 4096 when set')
+	}
+	task := options.task.trim_space()
+	if task !in ['', 'retrieval.query', 'retrieval.passage', 'text-matching', 'classification',
+		'separation'] {
+		return error('Jina task must be one of retrieval.query, retrieval.passage, text-matching, classification, or separation')
+	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, 'https') or { return error('invalid Jina base URL: ${err.msg()}') }
 	return Client{
-		api_key:     api_key
-		http_client: http_client
-		base_url:    base_url
-		model:       options.model.trim_space()
+		api_key:       api_key
+		http_client:   http_client
+		base_url:      base_url
+		model:         options.model.trim_space()
+		task:          task
+		dimensions:    options.dimensions
+		late_chunking: options.late_chunking
 	}
 }
 
@@ -93,11 +110,21 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 	for text in texts {
 		input << json2.Any(text)
 	}
-	body := json2.encode({
+	mut request := {
 		'model':          json2.Any(client.model)
 		'input':          json2.Any(input)
 		'embedding_type': json2.Any('float')
-	}, json2.EncoderOptions{})
+	}
+	if client.task != '' {
+		request['task'] = json2.Any(client.task)
+	}
+	if client.dimensions > 0 {
+		request['dimensions'] = json2.Any(client.dimensions)
+	}
+	if client.late_chunking {
+		request['late_chunking'] = json2.Any(true)
+	}
+	body := json2.encode(request, json2.EncoderOptions{})
 	if body.len > max_request_bytes {
 		return error('Jina embedding request exceeds the 8 MiB size limit')
 	}

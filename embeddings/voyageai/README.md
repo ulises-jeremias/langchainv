@@ -14,3 +14,8 @@ Use `new_default_client(api_key)` for the shared bounded HTTP transport, or
 inject an `httputil.HTTPClient` with `new_client` for offline tests. Custom
 endpoints must use HTTPS. The default model matches LangChainGo's
 `voyage-2`; set `Options.model` to choose another Voyage model.
+
+Set `Options.dimensions` to request a specific output size, sent as
+`output_dimension`, and `Options.truncation` to control input truncation.
+Both are sent only when configured. Dimensions must be between 1 and 4096;
+models support only specific sizes and reject others server-side.

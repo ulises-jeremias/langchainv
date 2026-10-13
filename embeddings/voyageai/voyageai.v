@@ -27,15 +27,19 @@ pub struct Client {
 	api_key     string
 	http_client httputil.HTTPClient
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url   string = default_base_url
+	model      string = default_model
+	dimensions int
+	truncation ?bool
 }
 
-// Options configures the Voyage endpoint and model.
+// Options configures the Voyage endpoint, model, and request options.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url   string = default_base_url
+	model      string = default_model
+	dimensions int
+	truncation ?bool
 }
 
 // Embedder adapts Voyage document/query modes to the common Embedder contract.
@@ -63,6 +67,9 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	if options.base_url.trim_space() == '' || options.model.trim_space() == '' {
 		return error('Voyage base URL and embedding model must not be empty')
 	}
+	if options.dimensions < 0 || options.dimensions > 4096 {
+		return error('Voyage dimensions must be between 1 and 4096 when set')
+	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, 'https') or { return error('invalid Voyage base URL: ${err.msg()}') }
 	return Client{
@@ -70,6 +77,8 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 		http_client: http_client
 		base_url:    base_url
 		model:       options.model.trim_space()
+		dimensions:  options.dimensions
+		truncation:  options.truncation
 	}
 }
 
@@ -113,12 +122,19 @@ fn (client Client) create_embedding_with_type(mut ctx context.Context, texts []s
 	if ctx_error !is none {
 		return ctx_error
 	}
-	body := json2.encode({
+	mut request := {
 		'model':        json2.Any(client.model)
 		'input':        json2.Any(input)
 		'input_type':   json2.Any(input_type)
 		'output_dtype': json2.Any('float')
-	}, json2.EncoderOptions{})
+	}
+	if client.dimensions > 0 {
+		request['output_dimension'] = json2.Any(client.dimensions)
+	}
+	if truncation := client.truncation {
+		request['truncation'] = json2.Any(truncation)
+	}
+	body := json2.encode(request, json2.EncoderOptions{})
 	if body.len > max_request_bytes {
 		return error('Voyage embedding request exceeds the 8 MiB size limit')
 	}
