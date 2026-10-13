@@ -25,6 +25,13 @@ CREATE INDEX langchainv_documents_embedding_hnsw
     ON langchainv_documents USING hnsw (embedding vector_cosine_ops);
 ```
 
+For a new table, `pgvector.initialize_table(mut ctx, engine,
+pgvector.Options{}, 1536)!` creates the default columns with `CREATE TABLE IF
+NOT EXISTS`. The vector extension must already be installed. This helper does
+not change or validate an existing table and does not create indexes; size the
+vector to the configured embedder and create the index strategy appropriate to
+your workload. Provisioning databases remains an explicit application step.
+
 ## Cloud SQL and AlloyDB
 
 This same adapter can use a PostgreSQL-compatible `sqldatabase.Engine` that

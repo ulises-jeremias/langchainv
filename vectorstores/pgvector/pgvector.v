@@ -41,11 +41,40 @@ pub:
 	vector_column    string = 'embedding'
 }
 
+// initialize_table creates the default pgvector table when it does not exist.
+// It does not enable extensions, alter an existing table, or create indexes.
+// The configured embedding dimension must match the embedder and pgvector limit.
+pub fn initialize_table(mut ctx context.Context, engine sqldatabase.Engine, options Options, dimension int) ! {
+	if engine.dialect() !in ['pgx', 'postgresql'] {
+		return error('pgvector requires a PostgreSQL engine')
+	}
+	validate_options(options)!
+	if dimension < 1 || dimension > max_embedding_values {
+		return error('pgvector table dimension must be between 1 and ${max_embedding_values}')
+	}
+	statement := "CREATE TABLE IF NOT EXISTS ${quote(options.table)} (${quote(options.id_column)} text PRIMARY KEY, ${quote(options.text_column)} text NOT NULL, ${quote(options.metadata_column)} jsonb NOT NULL DEFAULT '{}'::jsonb, ${quote(options.namespace_column)} text NOT NULL DEFAULT '', ${quote(options.vector_column)} vector(${dimension}) NOT NULL)"
+	engine.query(mut ctx, statement)!
+}
+
 // new_store binds an embedder to an existing PostgreSQL pgvector engine.
 pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, options Options) !Store {
 	if engine.dialect() !in ['pgx', 'postgresql'] {
 		return error('pgvector requires a PostgreSQL engine')
 	}
+	validate_options(options)!
+	return Store{
+		table:            options.table
+		id_column:        options.id_column
+		text_column:      options.text_column
+		metadata_column:  options.metadata_column
+		namespace_column: options.namespace_column
+		vector_column:    options.vector_column
+		embedder:         embedder
+		engine:           engine
+	}
+}
+
+fn validate_options(options Options) ! {
 	if !valid_identifier(options.table) {
 		return error('pgvector table and column names must be simple SQL identifiers')
 	}
@@ -60,16 +89,6 @@ pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, option
 		if column in columns[i + 1..] {
 			return error('pgvector table and column names must be distinct')
 		}
-	}
-	return Store{
-		table:            options.table
-		id_column:        options.id_column
-		text_column:      options.text_column
-		metadata_column:  options.metadata_column
-		namespace_column: options.namespace_column
-		vector_column:    options.vector_column
-		embedder:         embedder
-		engine:           engine
 	}
 }
 
