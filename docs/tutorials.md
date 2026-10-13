@@ -37,6 +37,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Run retrieval QA against Azure AI Search | [Azure retrieval tutorial](azure-ai-search-retrieval/) | Explicit live opt-in; sends text to OpenAI and Azure and can incur usage charges. |
 | Map documents concurrently | [Concurrent mapping tutorial](concurrent-document-mapping/) | Uses a stateless offline model; the chain defaults to one worker and accepts at most five. |
 | Carry conversation history | [Conversation memory](conversation-memory/) | Uses an in-memory buffer and a deterministic completion fake; history is process-local. |
+| Persist conversation history | [Memory backend guide](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md) | SQLite and bounded PostgreSQL history are session-isolated; PostgreSQL requires an application-provided engine. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
 | Keep history in a tool-using conversation | [Conversational ReAct agent](conversational-agent-memory/) | Uses executor memory and an offline model; swap in a provider only after reviewing its limits. |
 | Split plain text or Markdown | [textsplitter](https://github.com/ulises-jeremias/langchainv/blob/main/textsplitter/README.md) | Token chunking uses an injected tokenizer; no tokenizer data downloads. |

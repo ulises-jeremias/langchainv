@@ -39,6 +39,9 @@ and option support vary, so check that adapter's guide.
 - `memory.new_token_buffer_memory` evicts old turns using an injected token
   counter. No provider tokenizer is bundled.
 - `memory/sqlite` persists typed messages and isolates them by session ID.
+- `memory/sqlhistory` stores bounded typed messages in PostgreSQL through an
+  existing `sqldatabase.Engine`; the caller configures the connection and can
+  use a compatible Cloud SQL or AlloyDB PostgreSQL connection.
 
 In-memory history disappears when the process exits. Persistent history needs
 session ownership, retention, and data-protection decisions in the application.
