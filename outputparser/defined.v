@@ -12,7 +12,8 @@ pub struct Defined[T] {
 
 // new_defined derives a prompt schema from a non-empty struct value.
 // Primitive fields, primitive options, slices/maps/fixed arrays of supported
-// scalars, enums, and nested structs are supported. Unsupported field types
+// scalars, optional and nested scalar containers, enums, and nested structs
+// are supported. Unsupported field types
 // return an error rather than silently producing an inaccurate schema.
 pub fn new_defined[T](source T) !Defined[T] {
 	$if T !is $struct {
@@ -105,6 +106,36 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = 'boolean[]'
 			} $else $if field.typ is []int || field.typ is []i64 || field.typ is []i32 || field.typ is []i16 || field.typ is []i8 || field.typ is []u64 || field.typ is []u32 || field.typ is []u16 || field.typ is []u8 || field.typ is []f32 || field.typ is []f64 {
 				field_type = 'number[]'
+			} $else $if field.typ is ?[]string {
+				field_type = 'string[] | null'
+			} $else $if field.typ is ?[]bool {
+				field_type = 'boolean[] | null'
+			} $else $if field.typ is ?[]int || field.typ is ?[]i64 || field.typ is ?[]i32 || field.typ is ?[]i16 || field.typ is ?[]i8 || field.typ is ?[]u64 || field.typ is ?[]u32 || field.typ is ?[]u16 || field.typ is ?[]u8 || field.typ is ?[]f32 || field.typ is ?[]f64 {
+				field_type = 'number[] | null'
+			} $else $if field.typ is ?map[string]string {
+				field_type = 'Record<string, string> | null'
+			} $else $if field.typ is ?map[string]bool {
+				field_type = 'Record<string, boolean> | null'
+			} $else $if field.typ is ?map[string]int || field.typ is ?map[string]i64 || field.typ is ?map[string]i32 || field.typ is ?map[string]i16 || field.typ is ?map[string]i8 || field.typ is ?map[string]u64 || field.typ is ?map[string]u32 || field.typ is ?map[string]u16 || field.typ is ?map[string]u8 || field.typ is ?map[string]f32 || field.typ is ?map[string]f64 {
+				field_type = 'Record<string, number> | null'
+			} $else $if field.typ is [][]string {
+				field_type = 'string[][]'
+			} $else $if field.typ is [][]bool {
+				field_type = 'boolean[][]'
+			} $else $if field.typ is [][]int || field.typ is [][]i64 || field.typ is [][]i32 || field.typ is [][]i16 || field.typ is [][]i8 || field.typ is [][]u64 || field.typ is [][]u32 || field.typ is [][]u16 || field.typ is [][]u8 || field.typ is [][]f32 || field.typ is [][]f64 {
+				field_type = 'number[][]'
+			} $else $if field.typ is []map[string]string {
+				field_type = 'Record<string, string>[]'
+			} $else $if field.typ is []map[string]bool {
+				field_type = 'Record<string, boolean>[]'
+			} $else $if field.typ is []map[string]int || field.typ is []map[string]i64 || field.typ is []map[string]i32 || field.typ is []map[string]i16 || field.typ is []map[string]i8 || field.typ is []map[string]u64 || field.typ is []map[string]u32 || field.typ is []map[string]u16 || field.typ is []map[string]u8 || field.typ is []map[string]f32 || field.typ is []map[string]f64 {
+				field_type = 'Record<string, number>[]'
+			} $else $if field.typ is map[string][]string {
+				field_type = 'Record<string, string[]>'
+			} $else $if field.typ is map[string][]bool {
+				field_type = 'Record<string, boolean[]>'
+			} $else $if field.typ is map[string][]int || field.typ is map[string][]i64 || field.typ is map[string][]i32 || field.typ is map[string][]i16 || field.typ is map[string][]i8 || field.typ is map[string][]u64 || field.typ is map[string][]u32 || field.typ is map[string][]u16 || field.typ is map[string][]u8 || field.typ is map[string][]f32 || field.typ is map[string][]f64 {
+				field_type = 'Record<string, number[]>'
 			} $else $if field.typ is $array {
 				nested_name := '${name}_${field.name.capitalize()}'
 				container_schema := defined_container_schema(source.$(field.name), nested_name)!
@@ -140,7 +171,7 @@ fn defined_struct_schema[T](source T, name string) !string {
 				field_type = '${name}_${field.name.capitalize()}'
 				nested_schemas << defined_struct_schema(source.$(field.name), field_type)!
 			} $else {
-				return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices, fixed arrays and maps, enums, and nested structs')
+				return error('unsupported field type on ${T.name}.${field.name}; supported types are strings, booleans, numbers, primitive options, primitive slices, fixed arrays and maps, optional and nested scalar containers, enums, and nested structs')
 			}
 			mut line := '\t"${field_name}": ${field_type};'
 			if description != '' {
