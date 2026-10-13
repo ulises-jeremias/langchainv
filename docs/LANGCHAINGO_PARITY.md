@@ -174,9 +174,10 @@ manage, replace, or migrate existing indexes.
 pgvector — partial: parameterized insert/search/delete against an existing
 PostgreSQL table, cosine distance and scores, scalar JSONB equality filters,
 namespaces, injected embeddings/SQL engine, and bounded requests; schema/index
-management, alternate distance strategies, and advanced filters remain
-outstanding; `SearchOptions.include_vectors` returns validated vectors when
-requested.
+initialization for a dimensioned table and a separately invoked idempotent
+cosine HNSW index creation are supported; table migration, index replacement,
+alternate distance strategies, and advanced filters remain outstanding.
+`SearchOptions.include_vectors` returns validated vectors when requested.
 Redis — partial: HSET document writes and RediSearch KNN over a HASH index,
 explicit non-destructive FLAT/COSINE index creation, cosine scores, exact scalar
 TAG filters, namespaces, injected embeddings and Redis command client, and

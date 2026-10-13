@@ -16,7 +16,7 @@ const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
 const max_embedding_values = 2000
 
-// Store uses an existing PostgreSQL table with a pgvector `vector` column.
+// Store uses a PostgreSQL table with a pgvector `vector` column.
 pub struct Store {
 pub:
 	table            string
@@ -30,15 +30,48 @@ pub mut:
 	engine   sqldatabase.Engine
 }
 
-// Options configures an existing table and its document/vector columns.
+// Options configures a table, cosine HNSW index, and document/vector columns.
 pub struct Options {
 pub:
 	table            string = 'langchainv_documents'
+	index_name       string = 'langchainv_documents_embedding_hnsw'
 	id_column        string = 'id'
 	text_column      string = 'page_content'
 	metadata_column  string = 'metadata'
 	namespace_column string = 'namespace'
 	vector_column    string = 'embedding'
+}
+
+// create_vector_index explicitly creates an approximate cosine HNSW index.
+// HNSW builds can take time and substantial memory; invoke this separately
+// when the database can absorb the indexing work. Existing matching indexes
+// are left in place; a same-name index with a different definition is an error.
+pub fn create_vector_index(mut ctx context.Context, engine sqldatabase.Engine, options Options) ! {
+	if engine.dialect() !in ['pgx', 'postgresql'] {
+		return error('pgvector requires a PostgreSQL engine')
+	}
+	validate_options(options)!
+	result := engine.query_params(mut ctx, 'SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = $1 AND indexname = $2', [
+		options.table,
+		options.index_name,
+	]) or { return error('could not inspect the pgvector HNSW index') }
+	if result.rows.len > 1 || (result.rows.len == 1 && result.rows[0].len != 1) {
+		return error('PostgreSQL returned an invalid pgvector index inventory')
+	}
+	if result.rows.len == 1 {
+		definition := result.rows[0][0].to_lower()
+		column_definition := '(${options.vector_column.to_lower()} vector_cosine_ops)'
+		quoted_column_definition := '(${quote(options.vector_column).to_lower()} vector_cosine_ops)'
+		if definition.contains('using hnsw')
+			&& (definition.contains(column_definition) || definition.contains(quoted_column_definition)) {
+			return
+		}
+		return error('pgvector index name already exists with a different definition')
+	}
+	statement := 'CREATE INDEX ${quote(options.index_name)} ON ${quote(options.table)} USING hnsw (${quote(options.vector_column)} vector_cosine_ops)'
+	engine.query(mut ctx, statement) or {
+		return error('could not create the pgvector cosine HNSW index')
+	}
 }
 
 // initialize_table creates the default pgvector table when it does not exist.
@@ -75,8 +108,8 @@ pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, option
 }
 
 fn validate_options(options Options) ! {
-	if !valid_identifier(options.table) {
-		return error('pgvector table and column names must be simple SQL identifiers')
+	if !valid_identifier(options.table) || !valid_identifier(options.index_name) {
+		return error('pgvector table, index, and column names must be simple SQL identifiers')
 	}
 	columns := [options.id_column, options.text_column, options.metadata_column,
 		options.namespace_column, options.vector_column]

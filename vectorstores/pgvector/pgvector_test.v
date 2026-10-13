@@ -76,6 +76,47 @@ fn test_pgvector_initializes_a_missing_table_without_overwrite() {
 	assert state.statements == ['CREATE TABLE IF NOT EXISTS "documents" ("id" text PRIMARY KEY, "page_content" text NOT NULL, "metadata" jsonb NOT NULL DEFAULT \'{}\'::jsonb, "namespace" text NOT NULL DEFAULT \'\', "embedding" vector(1536) NOT NULL)']
 }
 
+fn test_pgvector_explicitly_builds_cosine_hnsw_index() {
+	mut state := &PgvectorFixtureState{
+		result: sqldatabase.QueryResult{}
+	}
+	engine := PgvectorFixtureEngine{ state: state }
+	mut ctx := context.background()
+	create_vector_index(mut ctx, engine, Options{ table: 'documents' }) or { panic(err) }
+	assert state.statements.len == 2
+	assert state.statements[0].contains('FROM pg_indexes')
+	assert state.parameters[0] == ['documents', 'langchainv_documents_embedding_hnsw']
+	assert state.statements[1] == 'CREATE INDEX "langchainv_documents_embedding_hnsw" ON "documents" USING hnsw ("embedding" vector_cosine_ops)'
+}
+
+fn test_pgvector_index_initializer_is_idempotent_for_matching_definition() {
+	mut state := &PgvectorFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['CREATE INDEX name ON documents USING hnsw (embedding vector_cosine_ops)']]
+		}
+	}
+	engine := PgvectorFixtureEngine{ state: state }
+	mut ctx := context.background()
+	create_vector_index(mut ctx, engine, Options{ table: 'documents' }) or { panic(err) }
+	assert state.statements.len == 1
+}
+
+fn test_pgvector_index_initializer_rejects_same_name_with_other_definition() {
+	mut state := &PgvectorFixtureState{
+		result: sqldatabase.QueryResult{
+			rows: [['CREATE INDEX name ON documents USING btree (embedding)']]
+		}
+	}
+	engine := PgvectorFixtureEngine{ state: state }
+	mut ctx := context.background()
+	create_vector_index(mut ctx, engine, Options{ table: 'documents' }) or {
+		assert err.msg().contains('different definition')
+		assert state.statements.len == 1
+		return
+	}
+	assert false, 'expected an existing incompatible index to fail'
+}
+
 fn test_pgvector_table_initialization_rejects_unsafe_identifiers() {
 	mut state := &PgvectorFixtureState{}
 	engine := PgvectorFixtureEngine{
