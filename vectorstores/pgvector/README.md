@@ -3,8 +3,8 @@
 The `pgvector` package uses an injected PostgreSQL `sqldatabase.Engine` and
 `embeddings.Embedder`. It works with the existing `pgx` or `postgresql` engine
 returned by `sqldatabase.new_driver_engine`; it does not open or close the
-connection. The database must have the pgvector extension installed and the
-configured table created in advance.
+connection. The database must have the pgvector extension installed. The
+explicit table and index helpers do not run from the store constructor.
 
 The default table is `langchainv_documents`, with columns `id` (text primary
 key), `page_content` (text), `metadata` (JSONB), `namespace` (text), and
@@ -28,9 +28,13 @@ CREATE INDEX langchainv_documents_embedding_hnsw
 For a new table, `pgvector.initialize_table(mut ctx, engine,
 pgvector.Options{}, 1536)!` creates the default columns with `CREATE TABLE IF
 NOT EXISTS`. The vector extension must already be installed. This helper does
-not change or validate an existing table and does not create indexes; size the
-vector to the configured embedder and create the index strategy appropriate to
-your workload. Provisioning databases remains an explicit application step.
+not change or validate an existing table and does not create indexes. To build
+the adapter's cosine HNSW index, call
+`pgvector.create_vector_index(mut ctx, engine, options)!` after checking that
+the database can absorb its build time and memory use. It leaves a matching
+index untouched and rejects a same-name index with a different definition.
+See the [pgvector setup tutorial](../../docs/tutorials/pgvector-vector-search.md)
+for the explicit provisioning sequence.
 
 ## Cloud SQL and AlloyDB
 

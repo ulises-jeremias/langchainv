@@ -30,6 +30,7 @@ Work through these recipes in order. Each section links to the package guide tha
 18. Set up a Redis Stack HASH vector index with the [Redis vector search guide](redis-vector-search/) before binding the adapter to it.
 19. Provision a cosine k-NN mapping with the [OpenSearch vector search guide](opensearch-vector-search/) before indexing documents.
 20. Provision a MariaDB vector table and separately schedule its cosine index build with the [MariaDB vector search guide](mariadb-vector-search/).
+21. Set up a dimensioned PostgreSQL vector table and schedule its cosine HNSW index with the [pgvector tutorial](pgvector-vector-search/).
 
 ## Recipes by task
 
@@ -47,6 +48,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Retrieve from Redis Stack | [Redis vector search](redis-vector-search/) | Explicit FLAT/COSINE index creation scans matching HASH records and consumes Redis server memory. |
 | Retrieve from OpenSearch | [OpenSearch vector search](opensearch-vector-search/) | Explicit cosine k-NN index creation; choose a matching embedding dimension before provisioning. |
 | Retrieve from MariaDB | [MariaDB vector search](mariadb-vector-search/) | Explicit table setup and separately invoked approximate index build; index work uses database resources. |
+| Retrieve from PostgreSQL with pgvector | [pgvector search](pgvector-vector-search/) | Install the extension first; HNSW creation is an explicit database resource operation. |
 | Persist conversation history | [Memory backend guide](https://github.com/ulises-jeremias/langchainv/blob/main/memory/README.md) | SQLite and bounded PostgreSQL history are session-isolated; PostgreSQL requires an application-provided engine. |
 | Dispatch model tool calls | [Tool-calling agent](tool-calling-agent/) | Uses the bounded calculator and a staged fake model; no provider requests. |
 | Keep history in a tool-using conversation | [Conversational ReAct agent](conversational-agent-memory/) | Uses executor memory and an offline model; swap in a provider only after reviewing its limits. |
