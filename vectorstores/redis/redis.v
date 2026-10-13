@@ -70,7 +70,7 @@ pub:
 	algorithm            string = 'FLAT'
 	hnsw_m               int    = 16
 	hnsw_ef_construction int    = 200
-	hnsw_ef_runtime      int    = 10
+	hnsw_ef_runtime     int    = 10
 }
 
 // new_store binds an embedder and Redis client to a HASH index. It never
