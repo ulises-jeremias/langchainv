@@ -28,6 +28,8 @@ fn main() {
 	mut ctx := context.background()
 	println('Visible tables: ${database.table_names()}')
 	println(database.table_info(mut ctx, ['customers']) or { panic(err) })
-	println(database.query_with_params(mut ctx, 'SELECT name FROM customers WHERE id = ?', ['1'])
-		or { panic(err) })
+	query := 'SELECT name FROM customers WHERE id = ?'
+	params := ['1']
+	query_result := database.query_with_params(mut ctx, query, params) or { panic(err) }
+	println(query_result)
 }

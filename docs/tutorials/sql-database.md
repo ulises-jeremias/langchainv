@@ -35,5 +35,5 @@ so use a least-privilege account when connecting to a persistent database.
 
 Read the [SQL database package guide](https://github.com/ulises-jeremias/langchainv/blob/main/tools/sqldatabase/README.md)
 for driver setup, ownership, result limits, and cancellation boundaries. See
-the [production guide](../production/) for tool authorization and deployment
+the [production guide](../../production/) for tool authorization and deployment
 considerations.
