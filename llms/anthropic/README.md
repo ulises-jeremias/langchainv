@@ -18,3 +18,8 @@ implemented. Streaming requires a transport implementing the streaming HTTP
 contract. HTTPS image URLs are limited to 8192 bytes and may not include user
 information; image detail hints are rejected. Unsupported common options return
 errors instead of being silently ignored.
+
+Set `Options.callbacks` at construction, or assign the client's `callbacks`
+field, to receive one generate-content start event before each request and
+then either an end event with the response or an error event, for streaming
+and non-streaming calls alike.

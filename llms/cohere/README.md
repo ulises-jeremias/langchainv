@@ -30,3 +30,8 @@ The older LangChainGo adapter used Cohere's `/v1/generate` endpoint. Cohere now
 marks that endpoint deprecated, so this V adapter targets the supported
 [`/v2/chat` API](https://docs.cohere.com/v2/reference/chat) instead of directing
 users to the legacy generation route.
+
+Set `Options.callbacks` at construction, or assign the client's `callbacks`
+field, to receive one generate-content start event before each request and
+then either an end event with the response or an error event, for streaming
+and non-streaming calls alike.
