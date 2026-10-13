@@ -47,3 +47,11 @@ Set `Options.callbacks` at construction, or assign the client's `callbacks`
 field, to receive one generate-content start event before each request and
 then either an end event with the response or an error event, for streaming
 and non-streaming calls alike.
+
+Model management uses the server endpoints directly: `list_models` reads
+`/api/tags`, `show_model` reads `/api/show`, `pull_model` downloads through
+`/api/pull` with streaming progress disabled, and `delete_model` removes a
+model through `/api/delete`. Names are validated (1 to 256 bytes, no control
+characters) before any request, and responses share the 16 MiB cap. Pulling a
+large model can take a long time; the transport timeout and context bound
+the call.
