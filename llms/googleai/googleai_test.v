@@ -302,6 +302,54 @@ fn test_generate_content_replays_tool_history_and_encodes_inline_image() {
 	assert state.requests[0].body.contains('"data":"AQI="')
 }
 
+fn test_count_tokens_maps_total_and_uses_count_tokens_endpoint() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"totalTokens":42,"totalBillableCharacters":10}', 200)
+	count := client.count_tokens(mut ctx, [
+		schema.text_message(.system, 'Be brief'),
+		schema.text_message(.human, 'Count me'),
+	], '') or { panic(err) }
+	assert count == 42
+	assert state.requests.len == 1
+	assert state.requests[0].url == 'https://generativelanguage.test/v1beta/models/gemini-test:countTokens'
+	assert state.requests[0].headers['x-goog-api-key'] == 'secret-key'
+	assert state.requests[0].body.contains('"contents"')
+	assert state.requests[0].body.contains('"systemInstruction"')
+	assert !state.requests[0].body.contains('"generationConfig"')
+	assert !state.requests[0].url.contains('secret-key')
+}
+
+fn test_count_tokens_uses_explicit_model_override() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"totalTokens":7}', 200)
+	count := client.count_tokens(mut ctx, [schema.text_message(.human, 'Hi')], 'gemini-other') or {
+		panic(err)
+	}
+	assert count == 7
+	assert state.requests[0].url.ends_with('/models/gemini-other:countTokens')
+}
+
+fn test_count_tokens_rejects_empty_messages_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"totalTokens":1}', 200)
+	client.count_tokens(mut ctx, []schema.Message{}, '') or {
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected empty messages to fail'
+}
+
+fn test_count_tokens_hides_http_error_body() {
+	mut ctx := context.background()
+	client, _ := new_fixture_client('secret response', 500)
+	client.count_tokens(mut ctx, [schema.text_message(.human, 'Hi')], '') or {
+		assert err.msg().contains('HTTP 500')
+		assert !err.msg().contains('secret response')
+		return
+	}
+	assert false, 'expected HTTP error to fail'
+}
+
 fn test_new_client_rejects_non_https_and_invalid_model() {
 	mut state := &FakeHTTPState{}
 	new_client_with_options('key', FakeHTTPClient{

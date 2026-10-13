@@ -112,6 +112,12 @@ pub fn (mut client Client) generate_content(mut ctx context.Context, messages []
 	return response
 }
 
+// count_tokens implements llms.TokenCounter through the Vertex countTokens endpoint.
+// An empty model uses the client's configured model.
+pub fn (client Client) count_tokens(mut ctx context.Context, messages []schema.Message, model string) !int {
+	return client.inner.count_tokens(mut ctx, messages, model)
+}
+
 fn valid_resource_component(value string) bool {
 	if value == '' || value.len > 128 {
 		return false
@@ -160,7 +166,8 @@ fn (transport VertexTransport) vertex_request(request httputil.Request) !httputi
 	}
 	model := model_and_action[..action_separator]
 	action := model_and_action[action_separator + 1..]
-	if !valid_resource_component(model) || action !in ['generateContent', 'streamGenerateContent']
+	if !valid_resource_component(model) || action !in ['generateContent', 'streamGenerateContent',
+		'countTokens']
 		|| query !in ['', '?alt=sse'] || (query != '' && action != 'streamGenerateContent') {
 		return error('invalid Vertex AI model request path')
 	}
