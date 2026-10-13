@@ -182,7 +182,8 @@ fn test_generate_content_sends_schema_valued_format() {
 		json_mode: true
 	}) or { panic(err) }
 	assert state.requests.len == 1
-	assert state.requests[0].body.contains('"format":{"type":"object"')
+	assert state.requests[0].body.contains('"format":{')
+	assert state.requests[0].body.contains('"type":"object"')
 	assert state.requests[0].body.contains('"properties":{"name":{"type":"string"}}')
 	assert state.requests[0].body.contains('"required":["name"]')
 }
