@@ -1,18 +1,26 @@
 # Azure AI Search vector store
 
 `azureaisearch.new_store` implements the shared vector-store contract over the
-Azure AI Search data-plane REST API. It targets an existing index; it does not
-create, update, or delete index schemas. The adapter pins REST API version
+Azure AI Search data-plane REST API. The explicit `Store.create_index` helper
+creates a new cosine HNSW schema but never updates or deletes index schemas.
+The adapter pins REST API version
 `2026-04-01` and uses Azure's `api-key` request header. See Microsoft's guides
-for [document indexing](https://learn.microsoft.com/en-us/rest/api/searchservice/documents/?view=rest-searchservice-2026-04-01),
+for [create-only index provisioning](https://learn.microsoft.com/en-us/rest/api/searchservice/indexes/create?view=rest-searchservice-2026-04-01),
+[document indexing](https://learn.microsoft.com/en-us/rest/api/searchservice/documents/?view=rest-searchservice-2026-04-01),
 [vector search](https://learn.microsoft.com/en-us/rest/api/searchservice/documents/search-post?view=rest-searchservice-2026-04-01),
 and [API key permissions](https://learn.microsoft.com/en-us/azure/search/search-security-api-keys).
 
 ## Index requirements
 
-Create fields matching `Options` before connecting. This minimal REST request
-creates an index for 1,536-dimensional embeddings; change that dimension to
-match the selected embedding model:
+For an explicit create-only setup, `store.create_index(mut ctx, dimensions)!`
+creates the fields matching `Options`; Azure returns a conflict when that
+index already exists, so existing schemas and documents are not replaced. The
+helper accepts dimensions from 1 to 4,096. It requires an admin key and creates
+a cosine HNSW vector profile. Azure service vector quotas still apply.
+
+This minimal REST request is an equivalent manual create-only operation for
+1,536-dimensional embeddings; change that dimension to match the selected
+embedding model:
 
 - `id`: `Edm.String`, key field.
 - `content`: retrievable `Edm.String`.
@@ -24,8 +32,8 @@ match the selected embedding model:
 - `namespace`: `Edm.String`, retrievable and filterable.
 
 ```sh
-curl --fail-with-body --request PUT \
-  "https://${AZURE_SEARCH_SERVICE}.search.windows.net/indexes('knowledge')?api-version=2026-04-01" \
+curl --fail-with-body --request POST \
+  "https://${AZURE_SEARCH_SERVICE}.search.windows.net/indexes?api-version=2026-04-01" \
   --header "Content-Type: application/json" \
   --header "api-key: ${AZURE_SEARCH_ADMIN_KEY}" \
   --data-binary @- <<'JSON'

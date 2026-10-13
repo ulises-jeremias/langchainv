@@ -137,8 +137,10 @@ embeddings/HTTP transport, API-key authentication, namespace filtering and
 indexing-result validation. It requires configured key/content/vector/metadata/
 namespace fields; metadata is stored as JSON text, and `SearchOptions.include_vectors`
 returns dimension-checked finite vectors when the index vector field is
-retrievable. Metadata predicates, custom index management, and broader
-query/filter parity remain unsupported.
+retrievable. Explicit create-only provisioning of the configured cosine HNSW
+schema is supported; the existing index is never updated by this helper.
+Metadata predicates, arbitrary index schemas, index updates/deletion, and
+broader query/filter parity remain unsupported.
 Chroma — partial: v2 REST create/get-or-create and
 delete collection management, upsert/query/delete, injected embeddings and
 HTTP transport, loopback HTTP or remote HTTPS, token authentication, scalar
