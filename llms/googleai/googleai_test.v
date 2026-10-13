@@ -115,6 +115,77 @@ fn test_generate_content_supports_json_seed_and_multiple_candidates() {
 	assert state.requests[0].body.contains('"seed":9')
 }
 
+fn test_generate_content_supports_schema_structured_output() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"candidates":[{"content":{"parts":[{"text":"{\\"answer\\":\\"42\\"}"}]}}]}', 200)
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'Answer with an object')],
+		llms.CallOptions{
+			provider_options: {
+				'response_schema': json2.Any(map[string]json2.Any{
+					'type': json2.Any('object')
+					'properties': json2.Any(map[string]json2.Any{
+						'answer': json2.Any(map[string]json2.Any{
+							'type': json2.Any('string')
+						})
+					})
+					'required': json2.Any([json2.Any('answer')])
+				})
+			}
+		}) or { panic(err) }
+	assert response.choices[0].content == '{"answer":"42"}'
+	assert state.requests.len == 1
+	assert state.requests[0].body.contains('"responseFormat"')
+	assert state.requests[0].body.contains('"mimeType":"application/json"')
+	assert state.requests[0].body.contains('"schema":{')
+	assert state.requests[0].body.contains('"type":"object"')
+	assert state.requests[0].body.contains('"required":["answer"]')
+}
+
+fn test_generate_content_rejects_invalid_response_schema_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'Hi')], llms.CallOptions{
+		provider_options: {
+			'response_schema': json2.Any('not an object')
+		}
+	}) or {
+		assert err.msg().contains('response_schema must be a JSON object')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected a non-object response schema to fail'
+}
+
+fn test_generate_content_rejects_empty_response_schema_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'Hi')], llms.CallOptions{
+		provider_options: {
+			'response_schema': json2.Any(map[string]json2.Any{})
+		}
+	}) or {
+		assert err.msg().contains('response_schema must not be an empty object')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected an empty response schema to fail'
+}
+
+fn test_generate_content_rejects_unsupported_provider_option_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'Hi')], llms.CallOptions{
+		provider_options: {
+			'other': json2.Any(true)
+		}
+	}) or {
+		assert err.msg().contains('provider option `other` is unsupported')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected an unsupported provider option to fail'
+}
+
 fn test_generate_content_requires_candidate_response() {
 	mut ctx := context.background()
 	client, _ := new_fixture_client('{"candidates":[]}', 200)

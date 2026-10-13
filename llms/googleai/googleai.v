@@ -395,8 +395,23 @@ fn validate_options(options llms.CallOptions) ! {
 	if options.top_k < 0 || options.min_length > 0 || options.max_length > 0
 		|| options.repetition_penalty != 0 || options.frequency_penalty != 0
 		|| options.presence_penalty != 0 || options.functions.len > 0 || options.function_call_behavior != ''
-		|| options.web_search_options != none || options.provider_options.len > 0 {
+		|| options.web_search_options != none {
 		return error('Google AI requested option is unsupported by this client')
+	}
+	for key, value in options.provider_options {
+		if key != 'response_schema' {
+			return error('Google AI provider option `${key}` is unsupported')
+		}
+		match value {
+			map[string]json2.Any {
+				if value.len == 0 {
+					return error('Google AI response_schema must not be an empty object')
+				}
+			}
+			else {
+				return error('Google AI response_schema must be a JSON object')
+			}
+		}
 	}
 	if options.response_mime_type !in ['', 'application/json'] {
 		return error('Google AI response_mime_type only supports application/json')
@@ -542,7 +557,17 @@ fn make_request(messages []schema.Message, options llms.CallOptions) !map[string
 		}
 		generation['seed'] = json2.Any(seed)
 	}
-	if options.json_mode || options.response_mime_type == 'application/json' {
+	if options.provider_options.len > 0 {
+		response_schema := options.provider_options['response_schema'] or {
+			return error('Google AI response_schema is required')
+		}
+		generation['responseFormat'] = json2.Any(map[string]json2.Any{
+			'text': json2.Any(map[string]json2.Any{
+				'mimeType': json2.Any('application/json')
+				'schema':   response_schema
+			})
+		})
+	} else if options.json_mode || options.response_mime_type == 'application/json' {
 		generation['responseMimeType'] = json2.Any('application/json')
 	}
 	if generation.len > 0 {

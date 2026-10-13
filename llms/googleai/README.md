@@ -14,7 +14,41 @@ for custom endpoints and offline tests. Endpoints must use HTTPS. The current
 streaming requires an injected transport that supports incremental responses,
 and callback streaming is limited to one candidate because callbacks do not
 carry candidate indexes. The client explicitly rejects remote image URLs,
-JSON schema output, strict tool mode, and unsupported generation options; no
-API request is sent for unsupported options. Inline images are capped at 5 MiB
+strict tool mode, and unsupported generation options; no API request is sent
+for unsupported options. Inline images are capped at 5 MiB
 per image, requests at 8 MiB, and responses at 16 MiB. Candidate count is
 capped at 8 for non-streaming calls.
+
+Use `llms.CallOptions.provider_options['response_schema']` for Gemini structured
+output. Its value must be a non-empty `map[string]json2.Any`; it is sent as
+`generationConfig.responseFormat.text.schema` with the `application/json` MIME
+type. Other provider options are rejected. Gemini supports only a subset of
+JSON Schema, and accepted keywords vary by API/model; the service may reject
+schemas that it does not support. See Google's [structured output guide](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
+for supported types, fields, models, and limitations. This feature works with
+streaming and non-streaming generation.
+
+```v
+module main
+
+import json2
+import ulises_jeremias.langchainv.llms
+
+fn main() {
+	response_schema := json2.Any(map[string]json2.Any{
+		'type': json2.Any('object')
+		'properties': json2.Any(map[string]json2.Any{
+			'answer': json2.Any(map[string]json2.Any{
+				'type': json2.Any('string')
+			})
+		})
+		'required': json2.Any([json2.Any('answer')])
+	})
+	options := llms.CallOptions{
+		provider_options: {
+			'response_schema': response_schema
+		}
+	}
+	println(options.provider_options.len)
+}
+```
