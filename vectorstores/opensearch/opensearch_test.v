@@ -78,6 +78,40 @@ fn test_opensearch_bulk_indexes_documents_with_auth_metadata_and_namespace() {
 	assert request.body.contains('"kind":"guide"')
 }
 
+fn test_opensearch_explicitly_initializes_cosine_index() {
+	mut state := &OpenSearchFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"acknowledged":true}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.initialize_index(mut ctx, 384) or { panic(err) }
+	request := state.requests[0]
+	assert request.method == http.Method.put
+	assert request.url == 'https://search.example.test/docs'
+	assert request.body.contains('"knn_vector"')
+	assert request.body.contains('"dimension":384')
+	assert request.body.contains('"space_type":"cosinesimil"')
+	assert request.body.contains('"engine":"lucene"')
+	assert request.body.contains('"page_content":{"type":"text"}')
+	assert (request.headers['Authorization'] or { '' }) == 'ApiKey fixture-key'
+}
+
+fn test_opensearch_index_initialization_rejects_invalid_dimensions_without_request() {
+	mut state := &OpenSearchFixtureState{}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	store.initialize_index(mut ctx, 0) or {
+		assert err.msg().contains('dimensions')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected invalid dimensions to fail'
+}
+
 fn test_opensearch_search_sends_knn_filters_and_restores_document() {
 	mut state := &OpenSearchFixtureState{
 		responses: [httputil.Response{

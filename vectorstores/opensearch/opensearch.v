@@ -17,8 +17,9 @@ const max_documents_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
 const max_embedding_values = 16000
+const max_index_dimensions = 16000
 
-// Store connects to an existing OpenSearch index with a k-NN vector mapping.
+// Store connects to an OpenSearch index with a k-NN vector mapping.
 pub struct Store {
 pub:
 	base_url        string
@@ -119,6 +120,18 @@ pub fn new_store_with_client(embedder embeddings.Embedder, options Options, http
 		embedder:        embedder
 		http_client:     http_client
 	}
+}
+
+// initialize_index explicitly creates a non-destructive cosine k-NN index.
+// dimensions must match every vector produced by the configured embedder.
+// OpenSearch returns an error when the index already exists; this method never
+// deletes or replaces an existing index or mapping.
+pub fn (store Store) initialize_index(mut ctx context.Context, dimensions int) ! {
+	if dimensions <= 0 || dimensions > max_index_dimensions {
+		return error('OpenSearch index dimensions must be between 1 and ${max_index_dimensions}')
+	}
+	body := '{"settings":{"index":{"knn":true}},"mappings":{"properties":{"${store.vector_field}":{"type":"knn_vector","dimension":${dimensions},"method":{"name":"hnsw","engine":"lucene","space_type":"cosinesimil"}},"${store.text_field}":{"type":"text"},"${store.metadata_field}":{"type":"object","enabled":true},"${store.namespace_field}":{"type":"keyword"}}}}'
+	store.request(mut ctx, http.Method.put, '/${store.index}', body, 'application/json')!
 }
 
 // add_documents embeds and bulk-indexes up to 64 documents.
