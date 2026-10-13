@@ -26,7 +26,9 @@ Thought/Action/Observation steps. It parses either an Action/Action Input pair
 or a Final Answer and bounds tool count, description bytes, prompt bytes, and
 completion output bytes. Output recovery accepts case-insensitive and inline
 Action/Action Input or final-answer labels while preserving control-like text
-inside the tool input. Malformed or incomplete action output returns an error.
+inside the tool input. Labels must start at a word boundary, so prose such as
+`Interaction:` is not mistaken for `Action:`. Malformed or incomplete action
+output returns an error.
 Supply a custom `prompts.StringTemplate` when the default input-key layout does
 not fit. Its tests use an offline completion model and fake tools.
 

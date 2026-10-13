@@ -242,6 +242,22 @@ fn test_react_agent_rejects_second_action_before_input() {
 	assert false, 'expected a second action header to invalidate the first action'
 }
 
+fn test_react_agent_does_not_parse_action_suffix_inside_interaction() {
+	parse_react_output('Interaction: echo\nAction Input: value', 'output') or {
+		assert err.msg().contains('neither a final answer nor an action')
+		return
+	}
+	assert false, 'expected Interaction to remain prose instead of an Action header'
+}
+
+fn test_react_agent_does_not_parse_final_answer_suffix_inside_word() {
+	parse_react_output('This is a nonfinal answer: keep reading', 'output') or {
+		assert err.msg().contains('neither a final answer nor an action')
+		return
+	}
+	assert false, 'expected a final-answer label to start at a word boundary'
+}
+
 fn test_react_agent_preserves_control_text_inside_tool_input() {
 	parsed_action := parse_react_output("Action: echo\nAction Input: SELECT 'Final Answer: done'",
 		'output') or { panic(err) }
