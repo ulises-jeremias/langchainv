@@ -18,3 +18,5 @@ documentation recommends its OpenAI-compatible API; those legacy routes and
 llama.cpp-only options are not implemented here.
 
 Tests use an injected fake transport and make no local server or model calls.
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

@@ -3,6 +3,7 @@ module mistral
 
 import context
 import json2
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.openai
@@ -22,8 +23,9 @@ pub:
 // Options configures the Mistral endpoint and default model.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url  string = default_base_url
+	model     string = default_model
+	callbacks ?callbacks.Handler
 }
 
 struct MistralHTTPClient {
@@ -50,8 +52,9 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	inner := openai.new_client_with_options(api_key, httputil.HTTPClient(MistralHTTPClient{
 		inner: http_client
 	}), openai.Options{
-		base_url: base_url
-		model:    model
+		base_url:  base_url
+		model:     model
+		callbacks: options.callbacks
 	})!
 	return Client{
 		inner:    inner

@@ -26,3 +26,5 @@ behavior are not implemented here.
 
 Qianfan's current endpoint and Bearer authentication are documented in its
 [v2 chat API guide](https://ai.baidu.com/ai-doc/WENXINWORKSHOP/0m2vwrjws).
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

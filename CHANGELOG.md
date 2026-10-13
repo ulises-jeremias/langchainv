@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Lifecycle callbacks on the Bedrock client, and on the six OpenAI-compatible
+  wrappers (Mistral, ERNIE, Maritaca, Hugging Face, Cloudflare, llamafile),
+  which forward a handler from their own Options to the shared OpenAI client.
+  Every built-in provider adapter now exposes generate-content callbacks.
 - Lifecycle callbacks on the Google AI and Ollama clients, following the
   same pattern. Vertex keeps its own handler and does not double-dispatch.
 - Lifecycle callbacks on the Anthropic and Cohere clients, following the

@@ -18,3 +18,5 @@ credential discovery and SigV4 signing are not implemented. The adapter uses
 the current Converse API; reasoning replay, non-Converse InvokeModel providers,
 custom model ARNs, and remaining provider-specific options are not implemented.
 Bedrock API keys are not included in tests or source code.
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.

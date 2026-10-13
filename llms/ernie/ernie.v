@@ -2,6 +2,7 @@
 module ernie
 
 import context
+import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.openai
@@ -21,8 +22,9 @@ pub:
 // Options configures the Qianfan v2 endpoint and model.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url  string = default_base_url
+	model     string = default_model
+	callbacks ?callbacks.Handler
 }
 
 // new_client creates a client using Qianfan's default endpoint and model.
@@ -43,8 +45,9 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	base_url := options.base_url.trim_space().trim_right('/')
 	model := options.model.trim_space()
 	inner := openai.new_client_with_options(api_key, http_client, openai.Options{
-		base_url: base_url
-		model:    model
+		base_url:  base_url
+		model:     model
+		callbacks: options.callbacks
 	})!
 	return Client{
 		inner:    inner

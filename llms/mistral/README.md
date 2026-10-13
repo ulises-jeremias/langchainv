@@ -28,3 +28,5 @@ streamed requests.
 
 The upstream endpoint is documented as OpenAI-compatible at
 [`https://api.mistral.ai/v1`](https://docs.mistral.ai/resources/migration-guides).
+
+Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.
