@@ -8,9 +8,11 @@ evidence at the same scope as the claim.
 
 The inventory is based on upstream commit
 [`6351d0d03286ba1f8be78b572d88c9b43ed6b869`](https://github.com/tmc/langchaingo/commit/6351d0d03286ba1f8be78b572d88c9b43ed6b869)
-(`main`, 1,501 tree entries) inspected on 2026-10-12. This snapshot is 16
-commits ahead of the previous 2026-10-09 scan. Upstream can change; refresh this
-inventory before a release.
+(`main`, 1,501 tree entries) inspected on 2026-10-12 and rechecked on
+2026-10-13. GitHub still reports this SHA as the `main` head, so the upstream
+inventory has not changed since the previous scan. This snapshot is 16 commits
+ahead of the 2026-10-09 scan. Upstream can change; refresh this inventory before
+a release.
 
 ## Changes since the previous upstream scan
 
