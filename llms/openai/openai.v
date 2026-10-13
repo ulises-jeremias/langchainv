@@ -10,13 +10,15 @@ import ulises_jeremias.langchainv.schema
 
 const default_base_url = 'https://api.openai.com/v1'
 const default_model = 'gpt-4o-mini'
+const max_request_bytes = 8 * 1024 * 1024
 const max_response_bytes = 16 * 1024 * 1024
 const max_inline_image_bytes = 5 * 1024 * 1024
 
 // Client implements chat generation over the injectable bounded HTTP transport.
 pub struct Client {
-	api_key     string
-	http_client httputil.HTTPClient
+	api_key         string
+	http_client     httputil.HTTPClient
+	response_format ?ResponseFormat
 pub:
 	base_url string = default_base_url
 	model    string = default_model
@@ -25,8 +27,25 @@ pub:
 // Options configures endpoint and default model.
 pub struct Options {
 pub:
-	base_url string = default_base_url
-	model    string = default_model
+	base_url        string = default_base_url
+	model           string = default_model
+	response_format ?ResponseFormat
+}
+
+// JSONSchemaResponseFormat configures OpenAI structured output.
+pub struct JSONSchemaResponseFormat {
+pub:
+	name        string
+	description string
+	schema      map[string]json2.Any
+	strict      bool
+}
+
+// ResponseFormat selects ordinary JSON mode or JSON Schema constrained output.
+pub struct ResponseFormat {
+pub:
+	kind        string
+	json_schema ?JSONSchemaResponseFormat
 }
 
 struct ChatResponse {
@@ -131,11 +150,13 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	if options.base_url.trim_space() == '' || options.model.trim_space() == '' {
 		return error('OpenAI base URL and model must not be empty')
 	}
+	validate_response_format(options.response_format)!
 	return Client{
-		api_key:     api_key
-		http_client: http_client
-		base_url:    options.base_url.trim_space().trim_right('/')
-		model:       options.model.trim_space()
+		api_key:         api_key
+		http_client:     http_client
+		response_format: options.response_format
+		base_url:        options.base_url.trim_space().trim_right('/')
+		model:           options.model.trim_space()
 	}
 }
 
@@ -164,7 +185,7 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 	} else {
 		options.model.trim_space()
 	}
-	request := make_request(model, messages, options)!
+	request := make_request(model, messages, options, client.response_format)!
 	if _ := options.streaming_func {
 		return client.generate_stream(mut ctx, request, options)
 	}
@@ -172,6 +193,9 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 		return client.generate_stream(mut ctx, request, options)
 	}
 	body := json2.encode(request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('OpenAI chat completion request exceeds 8 MiB')
+	}
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
 		url:     '${client.base_url}/chat/completions'
@@ -232,6 +256,9 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		'Accept':        'text/event-stream'
 	}
 	body := json2.encode(stream_request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('OpenAI chat completion request exceeds 8 MiB')
+	}
 	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
 	mut state := &OpenAIStreamState{}
 	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, event []u8) {
@@ -372,7 +399,7 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 	}
 }
 
-fn make_request(model string, messages []schema.Message, options llms.CallOptions) !map[string]json2.Any {
+fn make_request(model string, messages []schema.Message, options llms.CallOptions, response_format ?ResponseFormat) !map[string]json2.Any {
 	mut wire_messages := []json2.Any{cap: messages.len}
 	for message in messages {
 		wire_messages << json2.Any(convert_message(message)!)
@@ -470,6 +497,9 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 			'type': json2.Any('json_object')
 		})
 	}
+	if format := response_format {
+		result['response_format'] = json2.Any(encode_response_format(format)!)
+	}
 	if options.max_tokens > 0 {
 		result['max_completion_tokens'] = json2.Any(options.max_tokens)
 	}
@@ -501,6 +531,71 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 	} else if options.temperature != 0 || options.top_p != 0 || options.presence_penalty != 0
 		|| options.frequency_penalty != 0 || options.seed != none {
 		return error('sampling controls are not supported for OpenAI reasoning models')
+	}
+	return result
+}
+
+fn validate_response_format(response_format ?ResponseFormat) ! {
+	if format := response_format {
+		match format.kind {
+			'json_object' {
+				if format.json_schema != none {
+					return error('OpenAI json_object response format cannot include a JSON schema')
+				}
+			}
+			'json_schema' {
+				schema_definition := format.json_schema or {
+					return error('OpenAI json_schema response format requires a schema definition')
+				}
+				if !valid_response_format_name(schema_definition.name) {
+					return error('OpenAI JSON schema name must be 1..64 ASCII letters, digits, underscores, or hyphens')
+				}
+				if schema_definition.schema.len == 0 {
+					return error('OpenAI JSON schema must not be an empty object')
+				}
+				schema_bytes := json2.encode(schema_definition.schema, json2.EncoderOptions{}).len
+				if schema_bytes > max_request_bytes {
+					return error('OpenAI JSON schema exceeds the 8 MiB request size limit')
+				}
+			}
+			else {
+				return error('OpenAI response format kind must be json_object or json_schema')
+			}
+		}
+	}
+}
+
+fn valid_response_format_name(name string) bool {
+	if name.len == 0 || name.len > 64 {
+		return false
+	}
+	for character in name.bytes() {
+		if !(character.is_letter() || character.is_digit() || character == `_` || character == `-`) {
+			return false
+		}
+	}
+	return true
+}
+
+fn encode_response_format(format ResponseFormat) !map[string]json2.Any {
+	mut result := map[string]json2.Any{
+		'type': json2.Any(format.kind)
+	}
+	if format.kind == 'json_schema' {
+		schema_definition := format.json_schema or {
+			return error('OpenAI json_schema response format requires a schema definition')
+		}
+		mut json_schema := map[string]json2.Any{
+			'name':   json2.Any(schema_definition.name)
+			'schema': json2.Any(schema_definition.schema)
+		}
+		if schema_definition.description != '' {
+			json_schema['description'] = json2.Any(schema_definition.description)
+		}
+		if schema_definition.strict {
+			json_schema['strict'] = json2.Any(true)
+		}
+		result['json_schema'] = json2.Any(json_schema)
 	}
 	return result
 }
