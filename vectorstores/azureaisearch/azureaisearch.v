@@ -107,9 +107,9 @@ pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
 	}
 	fields := [
 		json2.Any(map[string]json2.Any{
-			'name':       json2.Any(store.key_field)
-			'type':       json2.Any('Edm.String')
-			'key':        json2.Any(true)
+			'name':        json2.Any(store.key_field)
+			'type':        json2.Any('Edm.String')
+			'key':         json2.Any(true)
 			'retrievable': json2.Any(true)
 		}),
 		json2.Any(map[string]json2.Any{
@@ -119,11 +119,11 @@ pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
 			'retrievable': json2.Any(true)
 		}),
 		json2.Any(map[string]json2.Any{
-			'name':               json2.Any(store.vector_field)
-			'type':               json2.Any('Collection(Edm.Single)')
-			'searchable':         json2.Any(true)
-			'retrievable':        json2.Any(true)
-			'dimensions':         json2.Any(dimensions)
+			'name':                json2.Any(store.vector_field)
+			'type':                json2.Any('Collection(Edm.Single)')
+			'searchable':          json2.Any(true)
+			'retrievable':         json2.Any(true)
+			'dimensions':          json2.Any(dimensions)
 			'vectorSearchProfile': json2.Any(vector_profile_name)
 		}),
 		json2.Any(map[string]json2.Any{
@@ -139,8 +139,8 @@ pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
 		}),
 	]
 	body := json2.encode(map[string]json2.Any{
-		'name':   json2.Any(store.index_name)
-		'fields': json2.Any(fields)
+		'name':         json2.Any(store.index_name)
+		'fields':       json2.Any(fields)
 		'vectorSearch': json2.Any(map[string]json2.Any{
 			'algorithms': json2.Any([json2.Any(map[string]json2.Any{
 				'name':           json2.Any(vector_algorithm_name)
@@ -149,7 +149,7 @@ pub fn (store Store) create_index(mut ctx context.Context, dimensions int) ! {
 					'metric': json2.Any('cosine')
 				})
 			})])
-			'profiles': json2.Any([json2.Any(map[string]json2.Any{
+			'profiles':   json2.Any([json2.Any(map[string]json2.Any{
 				'name':      json2.Any(vector_profile_name)
 				'algorithm': json2.Any(vector_algorithm_name)
 			})])
