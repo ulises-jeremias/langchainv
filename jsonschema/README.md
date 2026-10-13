@@ -19,6 +19,8 @@ minItems/maxItems.
 Instances are capped at 10,000 nodes, 1 MiB of aggregate scalar/key bytes, and
 64 levels of nesting before schema evaluation.
 
-References, formats, schema-valued `additionalProperties`, and schema
-composition (`allOf`, `anyOf`, `oneOf`, and `not`) remain unsupported. Pass a
-raw schema to a tool when those features are needed.
+The upstream [LangChainGo `Definition` helper](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/jsonschema/json.go)
+does not model references, formats, schema-valued `additionalProperties`, or
+schema composition (`allOf`, `anyOf`, `oneOf`, and `not`). These features also
+remain outside LangChainV's typed `Definition` API. Pass a raw schema to a tool
+when the provider supports those features.
