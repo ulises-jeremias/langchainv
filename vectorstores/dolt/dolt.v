@@ -360,16 +360,11 @@ fn valid_identifier(value string) bool {
 }
 
 fn valid_scalar(value json2.Any) bool {
-	match value {
-		string, bool, int, i64, f64 {
-			if value is f64 && !math.is_finite(value as f64) {
-				return false
-			}
-			return true
-		}
-		else {
-			return false
-		}
+	return match value {
+		string, bool, int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		f32 { math.is_finite(f64(value)) }
+		f64 { math.is_finite(value) }
+		else { false }
 	}
 }
 
