@@ -65,6 +65,58 @@ fn test_redis_explicitly_initializes_a_non_destructive_hash_index() {
 		'DIM', '2', 'DISTANCE_METRIC', 'COSINE']
 }
 
+fn test_redis_explicitly_initializes_hnsw_with_bounded_parameters() {
+	mut state := &RedisFixtureState{}
+	initialize_index(RedisFixtureClient{
+		state: state
+	}, Options{
+		index:                'langchainv_idx'
+		key_prefix:           'doc:langchainv:'
+		dimensions:           2
+		algorithm:            'hnsw'
+		hnsw_m:               32
+		hnsw_ef_construction: 400
+	}, []) or { panic(err) }
+	assert state.commands.len == 1
+	command := state.commands[0]
+	assert command[command.len - 14..] == ['content_vector', 'VECTOR', 'HNSW', '10', 'TYPE', 'FLOAT32',
+		'DIM', '2', 'DISTANCE_METRIC', 'COSINE', 'M', '32', 'EF_CONSTRUCTION', '400']
+}
+
+fn test_redis_hnsw_index_validation_fails_before_sending_commands() {
+	mut state := &RedisFixtureState{}
+	initialize_index(RedisFixtureClient{
+		state: state
+	}, Options{
+		index:                'langchainv_idx'
+		dimensions:           2
+		algorithm:            'HNSW'
+		hnsw_m:               64
+		hnsw_ef_construction: 16
+	}, []) or {
+		assert err.msg().contains('EF_CONSTRUCTION')
+		assert state.commands.len == 0
+		return
+	}
+	assert false, 'expected invalid HNSW parameters to fail before Redis'
+}
+
+fn test_redis_index_initializer_rejects_unknown_algorithm_before_command() {
+	mut state := &RedisFixtureState{}
+	initialize_index(RedisFixtureClient{
+		state: state
+	}, Options{
+		index:      'langchainv_idx'
+		dimensions: 2
+		algorithm:  'SVS-VAMANA'
+	}, []) or {
+		assert err.msg().contains('FLAT or HNSW')
+		assert state.commands.len == 0
+		return
+	}
+	assert false, 'expected the unsupported Redis algorithm to fail'
+}
+
 fn test_redis_index_initialization_rejects_duplicate_or_reserved_metadata_fields() {
 	mut state := &RedisFixtureState{}
 	initialize_index(RedisFixtureClient{

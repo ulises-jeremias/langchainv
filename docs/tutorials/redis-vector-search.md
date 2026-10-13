@@ -14,14 +14,18 @@ tests run offline. The application owns the Redis connection and its lifecycle.
 
 Read the [Redis adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/redis/README.md)
 before connecting. `initialize_index(client, options, metadata_fields)` creates
-a FLAT/COSINE index that matches the configured prefix, fields, and embedding
-dimension. List each scalar metadata key that must be searchable; the adapter
-indexes it as a TAG field named `meta_<key>`.
+a FLAT/COSINE index by default. Set `Options.algorithm` to `HNSW` to explicitly
+create an approximate HNSW/COSINE index; tune it with bounded `hnsw_m` and
+`hnsw_ef_construction` values. Both algorithms match the configured prefix,
+fields, and embedding dimension. List each scalar metadata key that must be
+searchable; the adapter indexes it as a TAG field named `meta_<key>`.
 
 `FT.CREATE` scans existing HASH records matching the prefix and allocates index
-memory. Call it deliberately against the Redis server after considering the
-dataset size and server capacity. It does not drop or replace an existing
-index. `new_store` only binds an already-created index to an embedder/client.
+memory. HNSW's graph can use substantially more memory than FLAT, and its
+construction settings affect indexing time and search quality. Call it
+deliberately against the Redis server after considering the dataset size and
+server capacity. It does not drop or replace an existing index. `new_store`
+only binds an already-created index to an embedder/client.
 
 ## Store and retrieve
 
