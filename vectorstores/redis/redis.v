@@ -19,6 +19,7 @@ const max_embedding_values = 2000
 const max_document_field_bytes = 65536
 const max_hnsw_connections = 64
 const max_hnsw_ef_construction = 4096
+const max_hnsw_ef_runtime = 4096
 const source_field = 'lcg_source'
 const source_marker = 'langchainv'
 
@@ -49,6 +50,8 @@ pub:
 	namespace_field string
 	vector_field    string
 	dimensions      int
+	algorithm       string
+	hnsw_ef_runtime int
 pub mut:
 	embedder embeddings.Embedder
 	client   RedisClient
@@ -67,12 +70,14 @@ pub:
 	algorithm            string = 'FLAT'
 	hnsw_m               int    = 16
 	hnsw_ef_construction int    = 200
+	hnsw_ef_runtime      int    = 10
 }
 
 // new_store binds an embedder and Redis client to a HASH index. It never
 // creates, alters, or drops the index.
 pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Options) !Store {
 	validate_options(options)!
+	algorithm := validate_algorithm_options(options)!
 	return Store{
 		index:           options.index
 		key_prefix:      options.key_prefix
@@ -81,6 +86,8 @@ pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Optio
 		namespace_field: options.namespace_field
 		vector_field:    options.vector_field
 		dimensions:      options.dimensions
+		algorithm:       algorithm
+		hnsw_ef_runtime: options.hnsw_ef_runtime
 		embedder:        embedder
 		client:          client
 	}
@@ -88,20 +95,13 @@ pub fn new_store(embedder embeddings.Embedder, client RedisClient, options Optio
 
 // initialize_index explicitly creates a non-destructive RediSearch HASH index.
 // algorithm defaults to FLAT; HNSW uses the configured bounded M and
-// EF_CONSTRUCTION values. metadata_fields names scalar metadata keys to index
-// as TAG fields. Redis scans existing keys matching the prefix as part of
-// FT.CREATE, so choose a suitable maintenance window and server capacity.
+// EF_CONSTRUCTION values. new_store sends the bounded EF_RUNTIME option with
+// each HNSW query. metadata_fields names scalar metadata keys to index as TAG
+// fields. Redis scans existing keys matching the prefix as part of FT.CREATE,
+// so choose a suitable maintenance window and server capacity.
 pub fn initialize_index(client RedisClient, options Options, metadata_fields []string) ! {
 	validate_options(options)!
-	algorithm := options.algorithm.to_upper()
-	if algorithm !in ['FLAT', 'HNSW'] {
-		return error('Redis vector index algorithm must be FLAT or HNSW')
-	}
-	if algorithm == 'HNSW' && (options.hnsw_m < 2 || options.hnsw_m > max_hnsw_connections
-		|| options.hnsw_ef_construction < options.hnsw_m
-		|| options.hnsw_ef_construction > max_hnsw_ef_construction) {
-		return error('Redis HNSW M must be 2..${max_hnsw_connections} and EF_CONSTRUCTION must be M..${max_hnsw_ef_construction}')
-	}
+	algorithm := validate_algorithm_options(options)!
 	if metadata_fields.len > 128 {
 		return error('Redis index supports at most 128 metadata TAG fields')
 	}
@@ -127,6 +127,24 @@ pub fn initialize_index(client RedisClient, options Options, metadata_fields []s
 		command << ['M', options.hnsw_m.str(), 'EF_CONSTRUCTION', options.hnsw_ef_construction.str()]
 	}
 	client.cmd(...command) or { return error('could not create Redis Stack index: ${err.msg()}') }
+}
+
+fn validate_algorithm_options(options Options) !string {
+	algorithm := options.algorithm.to_upper()
+	if algorithm !in ['FLAT', 'HNSW'] {
+		return error('Redis vector index algorithm must be FLAT or HNSW')
+	}
+	if algorithm == 'HNSW' {
+		if options.hnsw_m < 2 || options.hnsw_m > max_hnsw_connections
+			|| options.hnsw_ef_construction < options.hnsw_m
+			|| options.hnsw_ef_construction > max_hnsw_ef_construction {
+			return error('Redis HNSW M must be 2..${max_hnsw_connections} and EF_CONSTRUCTION must be M..${max_hnsw_ef_construction}')
+		}
+		if options.hnsw_ef_runtime < 1 || options.hnsw_ef_runtime > max_hnsw_ef_runtime {
+			return error('Redis HNSW EF_RUNTIME must be between 1 and ${max_hnsw_ef_runtime}')
+		}
+	}
+	return algorithm
 }
 
 fn validate_options(options Options) ! {
@@ -263,14 +281,23 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	validate_vector(vector, store.dimensions)!
 	vector_arg := binary_vector(vector)
 	return_count := if options.include_vectors { '4' } else { '3' }
-	mut command := ['FT.SEARCH', store.index,
-		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]', 'RETURN',
+	vector_query := if store.algorithm == 'HNSW' {
+		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector EF_RUNTIME $ef_runtime AS distance]'
+	} else {
+		'(${filter})=>[KNN ${limit} @${store.vector_field} $query_vector AS distance]'
+	}
+	mut command := ['FT.SEARCH', store.index, vector_query, 'RETURN',
 		return_count, store.content_field, store.metadata_field, 'distance']
 	if options.include_vectors {
 		command << store.vector_field
 	}
-	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str(), 'PARAMS', '2', 'query_vector',
-		vector_arg, 'DIALECT', '2']
+	command << ['SORTBY', 'distance', 'ASC', 'LIMIT', '0', limit.str()]
+	if store.algorithm == 'HNSW' {
+		command << ['PARAMS', '4', 'query_vector', vector_arg, 'ef_runtime', store.hnsw_ef_runtime.str()]
+	} else {
+		command << ['PARAMS', '2', 'query_vector', vector_arg]
+	}
+	command << ['DIALECT', '2']
 	mut response_bytes := 0
 	for arg in command {
 		response_bytes += arg.len

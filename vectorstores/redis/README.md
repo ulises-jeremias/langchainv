@@ -15,6 +15,9 @@ HNSW, `hnsw_m` defaults to 16 (adapter accepts 2..64) and
 `hnsw_ef_construction` defaults to 200 (adapter accepts `M`..4096). Higher
 values can cost more time and memory; see the [Redis vector index
 guide](https://redis.io/docs/latest/develop/ai/search-and-query/vectors/).
+When binding a store, `hnsw_ef_runtime` defaults to 10 (adapter accepts
+1..4096) and is sent as a query-time parameter. Higher values can improve
+recall at the cost of latency.
 The helper creates an index whose prefix and field names match the options,
 scans existing matching HASH records, indexes content as TEXT, and adds the
 namespace/ownership and selected metadata keys as TAG fields. Existing indexes
@@ -52,6 +55,7 @@ options := redis_vector.Options{
 	index:      'langchainv_idx'
 	dimensions: 1536
 	algorithm:  'HNSW'
+	hnsw_ef_runtime: 150
 }
 redis_vector.initialize_index(commands, options, ['kind'])!
 store := redis_vector.new_store(embedder, commands, options)!
@@ -80,8 +84,7 @@ to `delete`.
   deletion is rejected because read-then-delete would not be atomic.
 - `initialize_index` creates a FLAT/COSINE index by default or an explicitly
   configured HNSW/COSINE index. Index deletion/reconfiguration, alternate
-  metrics, HNSW runtime tuning, and advanced RediSearch query syntax are not
-  implemented.
+  metrics, and advanced RediSearch query syntax are not implemented.
 - Redis commands are sequential. If Redis fails partway through a multi-record
   write, earlier HSET commands may already have succeeded. The response cap is
   safe for records written through this adapter and assumes the Redis index is

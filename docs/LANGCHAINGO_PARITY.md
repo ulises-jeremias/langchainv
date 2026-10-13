@@ -184,8 +184,8 @@ Redis — partial: HSET document writes and RediSearch KNN over a HASH index,
 explicit non-destructive FLAT or HNSW/COSINE index creation, bounded HNSW
 construction parameters, cosine scores, exact scalar TAG filters, namespaces,
 injected embeddings and Redis command client, and bounded requests; index
-deletion/reconfiguration, alternate distance strategies, HNSW runtime tuning,
-advanced filter syntax, and namespace-constrained deletion remain outstanding;
+deletion/reconfiguration, alternate distance strategies, advanced filter
+syntax, and namespace-constrained deletion remain outstanding;
 `SearchOptions.include_vectors` returns validated stored vectors when requested.
 Weaviate — partial: batch object upsert and delete against a provisioned class,
 GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
