@@ -61,6 +61,21 @@ fn new_fixture_client(body string, status int) (Client, &FakeHTTPState) {
 	return client, state
 }
 
+fn sample_response_format() ResponseFormat {
+	schema := json2.decode[map[string]json2.Any]('{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"],"additionalProperties":false}', json2.DecoderOptions{}) or {
+		panic(err)
+	}
+	return ResponseFormat{
+		kind: 'json_schema'
+		json_schema: JSONSchemaResponseFormat{
+			name: 'answer'
+			description: 'A short answer'
+			schema: schema
+			strict: true
+		}
+	}
+}
+
 fn test_generate_content_sends_text_chat_and_maps_usage() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"choices":[{"index":0,"message":{"role":"assistant","content":"hello","tool_calls":[]},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}', 200)
@@ -79,6 +94,82 @@ fn test_generate_content_sends_text_chat_and_maps_usage() {
 	assert state.requests[0].body.contains('"model":"gpt-test"')
 	assert state.requests[0].body.contains('"max_completion_tokens":32')
 	assert state.requests[0].body.contains('"content":"hi"')
+}
+
+fn test_generate_content_encodes_json_schema_response_format() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"choices":[{"index":0,"message":{"role":"assistant","content":"{}"},"finish_reason":"stop"}]}', 200)
+	configured_client := new_client_with_options('test-secret', client.http_client, Options{
+		response_format: sample_response_format()
+	}) or { panic(err) }
+	configured_client.generate_content(mut ctx, [schema.text_message(.human, 'answer')], llms.CallOptions{
+		json_mode: true
+	}) or { panic(err) }
+	body := state.requests[0].body
+	assert body.contains('"response_format":{"type":"json_schema"')
+	assert body.contains('"name":"answer"')
+	assert body.contains('"description":"A short answer"')
+	assert body.contains('"strict":true')
+	assert body.contains('"additionalProperties":false')
+}
+
+fn test_client_accepts_json_object_response_format() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"choices":[{"index":0,"message":{"role":"assistant","content":"{}"},"finish_reason":"stop"}]}', 200)
+	configured := new_client_with_options('test-secret', client.http_client, Options{
+		response_format: ResponseFormat{
+			kind: 'json_object'
+		}
+	}) or { panic(err) }
+	configured.generate_content(mut ctx, [schema.text_message(.human, 'answer')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	assert state.requests[0].body.contains('"response_format":{"type":"json_object"}')
+}
+
+fn test_generate_content_streams_configured_json_schema_response_format() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('data: {"choices":[{"index":0,"delta":{"content":"{}"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', 200)
+	configured_client := new_client_with_options('test-secret', client.http_client, Options{
+		response_format: sample_response_format()
+	}) or { panic(err) }
+	stream := llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	configured_client.generate_content(mut ctx, [schema.text_message(.human, 'answer')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	body := state.requests[0].body
+	assert body.contains('"response_format":{"type":"json_schema"')
+	assert body.contains('"stream":true')
+}
+
+fn test_client_rejects_invalid_json_schema_response_formats() {
+	client, _ := new_fixture_client('{}', 200)
+	invalid_formats := [
+		ResponseFormat{ kind: 'invalid' },
+		ResponseFormat{ kind: 'json_schema' },
+		ResponseFormat{
+			kind: 'json_schema'
+			json_schema: JSONSchemaResponseFormat{
+				name: 'answer'
+				schema: map[string]json2.Any{}
+			}
+		},
+		ResponseFormat{
+			kind: 'json_schema'
+			json_schema: JSONSchemaResponseFormat{
+				name: 'bad name'
+				schema: { 'type': json2.Any('object') }
+			}
+		},
+	]
+	for format in invalid_formats {
+		new_client_with_options('test-secret', client.http_client, Options{
+			response_format: format
+		}) or {
+			continue
+		}
+		assert false, 'expected invalid response format to be rejected'
+	}
 }
 
 fn test_generate_content_maps_tool_calls() {
