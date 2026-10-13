@@ -15,8 +15,9 @@ const max_documents_per_write = 64
 const max_payload_bytes = 4 * 1024 * 1024
 const max_search_limit = 1000
 const max_embedding_values = 2000
+const max_index_dimensions = 2000
 
-// Store uses an existing MariaDB table with a VECTOR column.
+// Store uses a MariaDB table with a VECTOR column.
 pub struct Store {
 pub:
 	table            string
@@ -30,10 +31,11 @@ pub mut:
 	engine   sqldatabase.Engine
 }
 
-// Options configures an existing table and its document/vector columns.
+// Options configures a MariaDB table, vector index, and document columns.
 pub struct Options {
 pub:
 	table            string = 'langchainv_documents'
+	vector_index     string = 'langchainv_embedding_idx'
 	id_column        string = 'id'
 	text_column      string = 'page_content'
 	metadata_column  string = 'metadata'
@@ -41,26 +43,46 @@ pub:
 	vector_column    string = 'embedding'
 }
 
+// initialize_table explicitly creates a table if missing, without adding an
+// index or changing an existing table. dimensions must match the embedder.
+pub fn initialize_table(mut ctx context.Context, engine sqldatabase.Engine, options Options, dimensions int) ! {
+	validate_options(options, dimensions)!
+	validate_engine(engine)!
+	statement := 'CREATE TABLE IF NOT EXISTS ${quote(options.table)} (${quote(options.id_column)} VARCHAR(36) NOT NULL PRIMARY KEY, ${quote(options.text_column)} LONGTEXT NOT NULL, ${quote(options.metadata_column)} JSON NOT NULL, ${quote(options.namespace_column)} TEXT NOT NULL, ${quote(options.vector_column)} VECTOR(${dimensions}) NOT NULL)'
+	engine.query(mut ctx, statement) or {
+		return error('could not initialize MariaDB vector table')
+	}
+}
+
+// create_vector_index explicitly adds an approximate cosine vector index.
+// Index builds may consume substantial server memory and scan existing rows.
+// Repeated calls are idempotent when information_schema reports this index.
+pub fn create_vector_index(mut ctx context.Context, engine sqldatabase.Engine, options Options) ! {
+	validate_options(options, 1)!
+	validate_engine(engine)!
+	result := engine.query_params(mut ctx, 'SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?', [
+		options.table,
+		options.vector_index,
+	]) or { return error('could not inspect the MariaDB vector index') }
+	if result.rows.len != 1 || result.rows[0].len != 1 {
+		return error('MariaDB returned an invalid vector index inventory')
+	}
+	count := strconv.atoi(result.rows[0][0]) or {
+		return error('MariaDB returned an invalid vector index count')
+	}
+	if count > 0 {
+		return
+	}
+	statement := 'ALTER TABLE ${quote(options.table)} ADD VECTOR INDEX ${quote(options.vector_index)} (${quote(options.vector_column)}) M=8 DISTANCE=cosine'
+	engine.query(mut ctx, statement) or {
+		return error('could not create the MariaDB cosine vector index')
+	}
+}
+
 // new_store binds an embedder to an existing MariaDB SQL engine.
 pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, options Options) !Store {
-	if engine.dialect() != 'mysql' {
-		return error('mariadb requires a MariaDB engine')
-	}
-	if !valid_identifier(options.table) {
-		return error('mariadb table and column names must be simple SQL identifiers')
-	}
-	columns := [options.id_column, options.text_column, options.metadata_column,
-		options.namespace_column, options.vector_column]
-	for field in columns {
-		if !valid_identifier(field) {
-			return error('mariadb table and column names must be simple SQL identifiers')
-		}
-	}
-	for i, column in columns {
-		if column in columns[i + 1..] {
-			return error('mariadb table and column names must be distinct')
-		}
-	}
+	validate_options(options, 1)!
+	validate_engine(engine)!
 	return Store{
 		table:            options.table
 		id_column:        options.id_column
@@ -70,6 +92,31 @@ pub fn new_store(embedder embeddings.Embedder, engine sqldatabase.Engine, option
 		vector_column:    options.vector_column
 		embedder:         embedder
 		engine:           engine
+	}
+}
+
+fn validate_options(options Options, dimensions int) ! {
+	if dimensions <= 0 || dimensions > max_index_dimensions {
+		return error('MariaDB vector dimensions must be between 1 and ${max_index_dimensions}')
+	}
+	identifiers := [options.table, options.vector_index, options.id_column, options.text_column,
+		options.metadata_column, options.namespace_column, options.vector_column]
+	for field in identifiers {
+		if !valid_identifier(field) {
+			return error('mariadb table, index, and column names must be simple SQL identifiers')
+		}
+	}
+	columns := identifiers[2..]
+	for i, column in columns {
+		if column in columns[i + 1..] {
+			return error('mariadb table and column names must be distinct')
+		}
+	}
+}
+
+fn validate_engine(engine sqldatabase.Engine) ! {
+	if engine.dialect() != 'mysql' {
+		return error('mariadb requires a MariaDB engine')
 	}
 }
 
