@@ -15,4 +15,6 @@ and make no Google Cloud requests.
 Requests use the REST `projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent`
 resource path. Model availability and supported generation features depend on
 the selected Vertex endpoint/model. Streaming requires a streaming-capable
-injected transport.
+injected transport. `count_tokens` implements the shared `llms.TokenCounter`
+interface through the corresponding Vertex `countTokens` action, using the
+same project/location routing and Bearer [REDACTED]

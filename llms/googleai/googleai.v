@@ -35,6 +35,10 @@ struct GoogleFunctionCall {
 	args map[string]json2.Any
 }
 
+struct CountTokensResponse {
+	total_tokens int @[json: 'totalTokens']
+}
+
 struct GenerateResponse {
 	candidates     []CandidateResponse
 	usage_metadata UsageMetadata @[json: 'usageMetadata']
@@ -220,6 +224,49 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 			total_tokens:      decoded.usage_metadata.total_token_count
 		}
 	}
+}
+
+// count_tokens implements llms.TokenCounter through the Gemini countTokens endpoint.
+// An empty model uses the client's configured model.
+pub fn (client Client) count_tokens(mut ctx context.Context, messages []schema.Message, model string) !int {
+	llms.validate_messages(messages)!
+	if messages.len > max_messages {
+		return error('Google AI request exceeds the 1024-message limit')
+	}
+	resolved_model := if model.trim_space() == '' { client.model } else { model.trim_space() }
+	validate_model(resolved_model)!
+	request := make_request(messages, llms.CallOptions{})!
+	body := json2.encode(request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('Google AI request exceeds the 8 MiB size limit')
+	}
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	response := client.http_client.do(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/models/${resolved_model}:countTokens'
+		headers: {
+			'x-goog-api-key': client.api_key
+			'Content-Type':   'application/json'
+			'Accept':         'application/json'
+		}
+		body:    body
+	}) or { return error('Google AI countTokens request failed: ${err.msg()}') }
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Google AI countTokens request returned HTTP ${response.status_code}')
+	}
+	if response.body.len > max_response_bytes {
+		return error('Google AI response exceeds 16 MiB')
+	}
+	decoded := json2.decode[CountTokensResponse](response.body, json2.DecoderOptions{}) or {
+		return error('could not decode Google AI countTokens response: ${err.msg()}')
+	}
+	if decoded.total_tokens < 0 {
+		return error('Google AI countTokens returned a negative token count')
+	}
+	return decoded.total_tokens
 }
 
 fn (client Client) generate_stream(mut ctx context.Context, model string, body string, options llms.CallOptions) !llms.Response {

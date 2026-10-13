@@ -22,7 +22,11 @@ capped at 8 for non-streaming calls.
 Use `llms.CallOptions.provider_options['response_schema']` for Gemini structured
 output. Its value must be a non-empty `map[string]json2.Any`; it is sent as
 `generationConfig.responseFormat.text.schema` with the `application/json` MIME
-type. Other provider options are rejected. Gemini supports only a subset of
+type. Other provider options are rejected. `count_tokens` implements the
+shared `llms.TokenCounter` interface through the Gemini `countTokens`
+endpoint: it sends the same bounded contents and system instruction as a
+generation request without generation configuration, returns `totalTokens`,
+and accepts an empty model to use the configured model. Gemini supports only a subset of
 JSON Schema, and accepted keywords vary by API/model; the service may reject
 schemas that it does not support. See Google's [structured output guide](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
 for supported types, fields, models, and limitations. This feature works with

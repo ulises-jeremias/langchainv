@@ -119,3 +119,29 @@ fn test_new_client_rejects_missing_token_and_non_https_endpoint() {
 	}
 	assert false, 'expected invalid Vertex AI endpoint to be rejected'
 }
+
+fn test_count_tokens_routes_to_vertex_model() {
+	mut state := &FixtureHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"totalTokens":13}'
+		}
+	}
+	mut client := new_client(Options{
+		project:      'sample-project'
+		location:     'europe-west4'
+		model:        'gemini-2.5-flash'
+		access_token: 'oauth-token'
+		endpoint:     'https://vertex.test'
+	}, httputil.HTTPClient(FixtureHTTPClient{
+		state: state
+	})) or { panic(err) }
+	mut ctx := context.background()
+	count := client.count_tokens(mut ctx, [schema.text_message(.human, 'hello')], '') or { panic(err) }
+	assert count == 13
+	assert state.requests.len == 1
+	assert state.requests[0].url == 'https://vertex.test/v1/projects/sample-project/locations/europe-west4/publishers/google/models/gemini-2.5-flash:countTokens'
+	assert state.requests[0].headers['Authorization'].starts_with('Bearer ')
+	assert 'x-goog-api-key' !in state.requests[0].headers
+}
