@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- JSON Schema composition in `jsonschema`: `all_of`, `any_of`, `one_of`, and
+  `not` on `Definition`, plus string `format` names, all encoded and
+  enforced during instance validation.
+
 - Alternate string template formats in `prompts`: `prompts.Template` renders
   Go-template and Jinja variable syntax alongside the existing f-string
   format, with strict rejection of filters and statements.
