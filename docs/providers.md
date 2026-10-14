@@ -38,9 +38,15 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 
 ## Embeddings
 
+Cloudflare Workers AI has a standalone embedding client and also implements the
+shared embedding contract on its chat client. See the
+[Cloudflare adapter guide](https://github.com/ulises-jeremias/langchainv/blob/main/llms/cloudflare/README.md)
+for model configuration and request limits.
+
 | Integration | Package guide |
 |---|---|
 | Amazon Bedrock | [Bedrock embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/bedrock/README.md) |
+| Cloudflare Workers AI | [Workers AI embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/llms/cloudflare/README.md) |
 | Google AI | [Google AI embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/googleai/README.md) |
 | Hugging Face | [Hugging Face feature extraction](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/huggingface/README.md) |
 | Jina AI | [Jina embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/jina/README.md) |

@@ -93,9 +93,10 @@ OpenAI · Anthropic · Amazon Bedrock · Google AI (Gemini) · Google Vertex AI 
 Ollama · Cohere · Mistral · Hugging Face · Cloudflare Workers AI · Baidu
 Qianfan (ERNIE) · Maritaca · IBM watsonx · llamafile · local executables
 
-Embeddings: OpenAI · Google AI · Ollama · Jina · Voyage AI · Hugging Face ·
-Amazon Bedrock. Every provider accepts an injectable transport, so the full
-test suite runs offline against fake transports, with no keys required.
+Embeddings: OpenAI · Cloudflare Workers AI · Google AI · Ollama · Jina ·
+Voyage AI · Hugging Face · Amazon Bedrock. Every provider accepts an injectable
+transport, so the full test suite runs offline against fake transports, with
+no keys required.
 
 Vector stores: in-memory · Azure AI Search · Chroma · Dolt · MariaDB ·
 Milvus · MongoDB · OpenSearch · pgvector · Pinecone · Qdrant · Redis Stack · Weaviate.
