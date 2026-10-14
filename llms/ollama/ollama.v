@@ -392,26 +392,26 @@ fn validate_call_options(options llms.CallOptions) ! {
 fn validate_provider_options(provider_options map[string]json2.Any) ! {
 	for key, value in provider_options {
 		match key {
-			'num_ctx', 'num_batch', 'num_gqa', 'num_gpu', 'main_gpu', 'num_thread', 'repeat_last_n',
-			'seed', 'top_k', 'num_keep', 'mirostat', 'num_predict' {
+			'num_ctx', 'num_batch', 'num_gpu', 'main_gpu', 'num_thread', 'repeat_last_n', 'seed',
+			'top_k', 'num_keep', 'num_predict', 'draft_num_predict', 'top_logprobs' {
 				if !is_integer_value(value) {
 					return error('Ollama provider_options ${key} must be an integer')
 				}
-				if key == 'mirostat' && value.int() !in [0, 1, 2] {
-					return error('Ollama provider_options mirostat must be 0, 1, or 2')
-				}
 			}
-			'rope_frequency_base', 'rope_frequency_scale', 'typical_p', 'repeat_penalty',
-			'presence_penalty', 'frequency_penalty', 'tfs_z', 'mirostat_tau', 'mirostat_eta',
-			'top_p', 'temperature' {
+			'typical_p', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'top_p',
+			'min_p', 'temperature' {
 				if !is_numeric_value(value) || !math.is_finite(value.f64()) {
 					return error('Ollama provider_options ${key} must be numeric')
 				}
 			}
-			'numa', 'logits_all', 'vocab_only', 'use_mmap', 'use_mlock', 'embedding_only', 'f16_kv',
-			'low_vram', 'penalize_newline', 'think' {
+			'use_mmap', 'logprobs', 'truncate', 'shift' {
 				if value !is bool {
 					return error('Ollama provider_options ${key} must be a boolean')
+				}
+			}
+			'think' {
+				if value !is bool && (value !is string || (value as string).trim_space() == '') {
+					return error('Ollama provider_options think must be a boolean or non-empty string')
 				}
 			}
 			else {
@@ -514,7 +514,11 @@ fn make_request(client Client, model string, messages []schema.Message, options 
 		generation_options['stop'] = json2.Any(stop_words)
 	}
 	for key, value in options.provider_options {
-		generation_options[key] = value
+		if key in ['think', 'logprobs', 'top_logprobs', 'truncate', 'shift'] {
+			request[key] = value
+		} else {
+			generation_options[key] = value
+		}
 	}
 	if generation_options.len > 0 {
 		request['options'] = json2.Any(generation_options)

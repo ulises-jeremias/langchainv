@@ -198,10 +198,9 @@ fn test_generate_content_sends_ollama_provider_options() {
 	}
 	options.provider_options['num_ctx'] = json2.Any(4096)
 	options.provider_options['num_thread'] = json2.Any(4)
-	options.provider_options['mirostat'] = json2.Any(2)
-	options.provider_options['typical_p'] = json2.Any(0.8)
-	options.provider_options['numa'] = json2.Any(false)
-	options.provider_options['think'] = json2.Any(true)
+	options.provider_options['min_p'] = json2.Any(0.1)
+	options.provider_options['think'] = json2.Any(false)
+	options.provider_options['logprobs'] = json2.Any(true)
 	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], options) or {
 		panic(err)
 	}
@@ -211,10 +210,10 @@ fn test_generate_content_sends_ollama_provider_options() {
 	assert body.contains('"stop":["END"]')
 	assert body.contains('"num_ctx":4096')
 	assert body.contains('"num_thread":4')
-	assert body.contains('"mirostat":2')
-	assert body.contains('"typical_p":0.8')
-	assert body.contains('"numa":false')
-	assert body.contains('"think":true')
+	assert body.contains('"min_p":0.1')
+	assert body.contains('"think":false')
+	assert body.contains('"logprobs":true')
+	assert !body.contains('"options":{"think"')
 }
 
 fn test_generate_content_rejects_invalid_provider_options_before_network() {
@@ -227,10 +226,13 @@ fn test_generate_content_rejects_invalid_provider_options_before_network() {
 			'num_ctx': json2.Any('large')
 		},
 		{
-			'numa': json2.Any(1)
+			'logprobs': json2.Any(1)
 		},
 		{
-			'mirostat': json2.Any(3)
+			'mirostat': json2.Any(2)
+		},
+		{
+			'num_gqa': json2.Any(8)
 		},
 	] {
 		client, state := new_fixture_client('{}', 200)
@@ -257,6 +259,7 @@ fn test_generate_content_streams_ndjson_content_and_usage() {
 		streaming_func:   stream
 		provider_options: {
 			'num_ctx': json2.Any(2048)
+			'think':   json2.Any(true)
 		}
 	}) or { panic(err) }
 	assert streamed.value == 'hello'
@@ -265,6 +268,7 @@ fn test_generate_content_streams_ndjson_content_and_usage() {
 	assert response.usage.total_tokens == 4
 	assert state.requests[0].body.contains('"stream":true')
 	assert state.requests[0].body.contains('"num_ctx":2048')
+	assert state.requests[0].body.contains('"think":true')
 	assert (state.requests[0].headers['Accept'] or { '' }) == 'application/x-ndjson'
 }
 

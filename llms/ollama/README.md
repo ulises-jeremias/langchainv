@@ -17,16 +17,20 @@ options return errors rather than being silently ignored.
 
 Ollama runner options can be supplied per call through
 `llms.CallOptions.provider_options`. Supported keys are `num_ctx`, `num_batch`,
-`num_gqa`, `num_gpu`, `main_gpu`, `num_thread`, `repeat_last_n`, `seed`,
-`top_k`, `num_keep`, `mirostat`, `num_predict`, `rope_frequency_base`,
-`rope_frequency_scale`, `typical_p`, `repeat_penalty`, `presence_penalty`,
-`frequency_penalty`, `tfs_z`, `mirostat_tau`, `mirostat_eta`, `top_p`,
-`temperature`, `numa`, `logits_all`, `vocab_only`, `use_mmap`, `use_mlock`,
-`embedding_only`, `f16_kv`, `low_vram`, `penalize_newline`, and `think`.
+`num_gpu`, `main_gpu`, `num_thread`, `repeat_last_n`, `seed`, `top_k`,
+`num_keep`, `num_predict`, `draft_num_predict`, `top_logprobs`, `typical_p`,
+`repeat_penalty`, `presence_penalty`, `frequency_penalty`, `top_p`, `min_p`,
+`temperature`, `use_mmap`, `logprobs`, `truncate`, `shift`, and `think`.
+`think`, `logprobs`, `top_logprobs`, `truncate`, and `shift` are sent as top-level
+chat request fields; generation controls are sent under `options`.
 Unknown keys and values with the wrong type fail before the request. Use the
 common `CallOptions.stop_words` field for stop sequences. Provider options are
 included in both streaming and non-streaming chat requests and take precedence
 over matching common generation fields when both are set.
+
+The option allowlist follows the current Ollama API. Legacy LangChainGo adapter
+fields removed from current Ollama (`num_gqa` and Mirostat controls) are not
+sent, because the current server does not define them.
 
 Set `Options.format_schema` to a JSON object string to send a schema as Ollama's
 `format` value. The schema is decoded and validated at client construction,
