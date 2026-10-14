@@ -6,6 +6,12 @@ import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
 @[heap]
+struct StreamTextCapture {
+mut:
+	value string
+}
+
+@[heap]
 struct ResponseCapture {
 mut:
 	mutex  sync.Mutex
@@ -59,15 +65,15 @@ fn test_cancelled_context_does_not_consume_response() {
 fn test_streaming_callback_receives_response() {
 	model := new_fake_llm(['stream me'])
 	mut ctx := context.background()
-	mut streamed := ''
+	mut streamed := &StreamTextCapture{}
 	stream := llms.StreamFunc(fn [mut streamed] (mut _ctx context.Context, chunk []u8) ! {
-		streamed += chunk.bytestr()
+		streamed.value += chunk.bytestr()
 	})
 	response := model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{
 		streaming_func: stream
 	})!
-	assert streamed == 'stream me'
-	assert response.choices[0].content == streamed
+	assert streamed.value == 'stream me'
+	assert response.choices[0].content == streamed.value
 }
 
 fn test_streaming_callback_error_is_returned_and_response_is_consumed() {
