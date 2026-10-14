@@ -13,8 +13,10 @@ Collection administration is intentionally outside this adapter.
 Writes and deletes are limited to 64 and 1,000 records per call. Requests and
 responses are capped at 4 MiB, vectors at 65,536 finite values, and searches at
 1,000 results. Searches support scalar metadata equality, namespaces, and
-COSINE, inner product, or L2 metrics. Minimum-score filtering is available for
-COSINE and inner product; L2 distances are not filtered using a minimum score.
+COSINE, inner product, or L2 metrics. Minimum-score filtering keeps matches
+at or above the threshold for COSINE and inner product. For L2, where the
+stored score is a distance and smaller is nearer, the same option is a
+maximum-distance threshold and must be non-negative.
 The returned score is Milvus's raw metric value: larger is more similar for
 COSINE/IP, while smaller is nearer for L2. Set `SearchOptions.include_vectors`
 to add each returned float vector to `schema.Document.embedding`; vectors are

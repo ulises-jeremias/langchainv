@@ -246,8 +246,8 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		if !math.is_finite(f64(minimum)) {
 			return error('Milvus minimum score must be finite')
 		}
-		if store.metric_type == 'L2' {
-			return error('Milvus minimum score filtering is not supported for L2 distance')
+		if store.metric_type == 'L2' && minimum < 0 {
+			return error('Milvus minimum score must be non-negative for L2 distance')
 		}
 	}
 	if options.filter.len > 128 || options.namespace.len > 65536 {
@@ -328,8 +328,17 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			return error('Milvus namespace field must be a string')
 		}
 		score := milvus_float(fields['distance'] or { return error('Milvus match has no distance') })!
-		if options.min_score != none && score < (options.min_score or { f32(0) }) {
-			continue
+		if options.min_score != none {
+			threshold := options.min_score or { f32(0) }
+			// For L2 the stored score is a distance, so the threshold is the
+			// largest distance to keep instead of the smallest similarity.
+			if store.metric_type == 'L2' {
+				if score > threshold {
+					continue
+				}
+			} else if score < threshold {
+				continue
+			}
 		}
 		if !options.include_metadata {
 			metadata = map[string]json2.Any{}
