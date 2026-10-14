@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Qdrant filter conditions: range, membership, existence, negation, and
+  bounded `$and`/`$or`/`$not` groups in search filters, validated before
+  any request.
+
 - Weaviate filter operators: comparison, `ContainsAny` membership,
   `IsNull` existence, and bounded `$and`/`$or` groups in search filters.
 

@@ -13,7 +13,8 @@ and [delete collection](https://api.qdrant.tech/api-reference/collections/delete
 REST endpoints.
 
 The adapter supports document upserts bounded to 64 points per call, similarity
-search, metadata equality filters, namespaces, minimum score filtering, and UUID
+search, metadata filters with equality, range, membership, existence, and
+logical condition groups, namespaces, minimum score filtering, and UUID
 deletion. Set `SearchOptions.include_vectors` to request each point's vector in
 `schema.Document.embedding`; vectors are omitted by default and validated for
 numeric values and size before being returned. Requests and responses are
