@@ -14,6 +14,7 @@ const default_model = 'claude-sonnet-4-6'
 const default_max_tokens = 1024
 const max_response_bytes = 16 * 1024 * 1024
 const max_inline_image_bytes = 5 * 1024 * 1024
+const max_reasoning_bytes = 1024 * 1024
 
 // Client implements Anthropic Messages over the bounded injectable transport.
 pub struct Client {
@@ -43,6 +44,9 @@ struct MessagesResponse {
 struct ContentBlock {
 	block_type string @[json: 'type']
 	text       string
+	thinking   string
+	signature  string
+	data       string
 	id         string
 	name       string
 	input      json2.Any
@@ -70,6 +74,7 @@ struct StreamDelta {
 	delta_type   string @[json: 'type']
 	text         string
 	thinking     string
+	signature    string
 	partial_json string
 	stop_reason  string
 }
@@ -78,6 +83,8 @@ struct AnthropicStreamBlock {
 mut:
 	block_type   string
 	text         string
+	signature    string
+	data         string
 	id           string
 	name         string
 	input        json2.Any
@@ -232,7 +239,9 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 				block := event.content_block
 				state.blocks[event.index] = AnthropicStreamBlock{
 					block_type: block.block_type
-					text:       block.text
+					text:       if block.thinking != '' { block.thinking } else { block.text }
+					signature:  block.signature
+					data:       block.data
 					id:         block.id
 					name:       block.name
 					input:      block.input
@@ -272,7 +281,9 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 							}
 						}
 					}
-					'signature_delta' {}
+					'signature_delta' {
+						block.signature += event.delta.signature
+					}
 					else {
 						state.error = 'Anthropic returned unsupported streaming delta `${event.delta.delta_type}`'
 						return
@@ -344,6 +355,8 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 		content << ContentBlock{
 			block_type: block.block_type
 			text:       block.text
+			signature:  block.signature
+			data:       block.data
 			id:         block.id
 			name:       block.name
 			input:      input
@@ -553,8 +566,27 @@ fn convert_message(message schema.Message) !map[string]json2.Any {
 					})
 				})
 			}
-			schema.ThinkingPart, schema.RedactedThinkingPart {
-				return error('Anthropic reasoning message replay is not supported yet')
+			schema.ThinkingPart {
+				if part.signature.trim_space() == '' {
+					return error('Anthropic thinking replay requires a signature from the original response')
+				}
+				if part.text.len > max_reasoning_bytes || part.signature.len > max_reasoning_bytes {
+					return error('Anthropic thinking replay exceeds the 1 MiB size limit')
+				}
+				content << json2.Any({
+					'type':      json2.Any('thinking')
+					'thinking':  json2.Any(part.text)
+					'signature': json2.Any(part.signature)
+				})
+			}
+			schema.RedactedThinkingPart {
+				if part.data.trim_space() == '' || part.data.len > max_reasoning_bytes {
+					return error('Anthropic redacted thinking replay requires opaque data up to 1 MiB')
+				}
+				content << json2.Any({
+					'type': json2.Any('redacted_thinking')
+					'data': json2.Any(part.data)
+				})
 			}
 		}
 	}
@@ -596,9 +628,16 @@ fn parse_choice(response MessagesResponse) !llms.Choice {
 				parts << schema.ContentPart(call)
 			}
 			'thinking' {
-				reasoning_parts << block.text
+				thinking_text := if block.thinking != '' { block.thinking } else { block.text }
+				reasoning_parts << thinking_text
 				parts << schema.ContentPart(schema.ThinkingPart{
-					text: block.text
+					text:      thinking_text
+					signature: block.signature
+				})
+			}
+			'redacted_thinking' {
+				parts << schema.ContentPart(schema.RedactedThinkingPart{
+					data: block.data
 				})
 			}
 			else {
@@ -606,7 +645,7 @@ fn parse_choice(response MessagesResponse) !llms.Choice {
 			}
 		}
 	}
-	if text_parts.len == 0 && reasoning_parts.len == 0 && tool_calls.len == 0 {
+	if text_parts.len == 0 && reasoning_parts.len == 0 && tool_calls.len == 0 && parts.len == 0 {
 		return error('Anthropic returned no text, reasoning, or tool-use content')
 	}
 	return llms.Choice{

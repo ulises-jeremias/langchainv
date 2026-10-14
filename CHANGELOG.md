@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Anthropic reasoning replay: thinking signatures and redacted thinking
+  data are parsed from responses (including streamed signature deltas) and
+  sent back on later turns, with size bounds and signature validation.
+
 - Google SQL connection helpers in `util/alloydbutil` and
   `util/cloudsqlutil`: validated instance connection names and
   percent-encoded PostgreSQL DSNs for use with the existing SQL adapters.
