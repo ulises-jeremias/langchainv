@@ -36,9 +36,9 @@ fn main() {
 	}
 	client := anthropic.new_default_client(api_key) or { panic(err) }
 	options := llms.CallOptions{
-		max_tokens: 2048
+		max_tokens:       2048
 		provider_options: {
-			'thinking': json2.Any(map[string]json2.Any{
+			'thinking':      json2.Any(map[string]json2.Any{
 				'type': json2.Any('adaptive')
 			})
 			'output_config': json2.Any(map[string]json2.Any{
