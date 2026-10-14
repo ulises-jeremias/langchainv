@@ -181,3 +181,75 @@ fn test_weaviate_rejects_remote_http_and_reserved_metadata() {
 	}
 	assert false, 'expected reserved metadata to fail'
 }
+
+fn test_weaviate_search_sends_operator_filters() {
+	mut state := &WeaviateFixtureState{
+		responses: [weaviate_response('{"data":{"Get":{"Guide":[]}}}')]
+	}
+	mut store := weaviate_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.filter['year'] = json2.Any({
+		'$gte': json2.Any(2020)
+		'$lt':  json2.Any(2030)
+	})
+	options.filter['category'] = json2.Any({
+		'$in': json2.Any([json2.Any('guide'), json2.Any('api')])
+	})
+	options.filter['archived'] = json2.Any({
+		'$exists': json2.Any(false)
+	})
+	documents := store.similarity_search(mut ctx, 'query', 3, options) or { panic(err) }
+	assert documents.len == 0
+	body := state.requests[0].body
+	assert body.contains('operator: GreaterThanEqual')
+	assert body.contains('operator: LessThan')
+	assert body.contains('operator: ContainsAny')
+	assert body.contains('valueTextArray')
+	assert body.contains('operator: IsNull')
+}
+
+fn test_weaviate_search_sends_or_groups() {
+	mut state := &WeaviateFixtureState{
+		responses: [weaviate_response('{"data":{"Get":{"Guide":[]}}}')]
+	}
+	mut store := weaviate_fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.filter['$or'] = json2.Any([
+		json2.Any({
+			'category': json2.Any('guide')
+		}),
+		json2.Any({
+			'category': json2.Any('api')
+		}),
+	])
+	store.similarity_search(mut ctx, 'query', 3, options) or { panic(err) }
+	assert state.requests[0].body.contains('operator: Or')
+}
+
+fn test_weaviate_search_rejects_invalid_operator_filters() {
+	mut ctx := context.background()
+	for filter_value in [
+		json2.Any({
+			'$regex': json2.Any('^g')
+		}),
+		json2.Any({
+			'$in': json2.Any([]json2.Any{})
+		}),
+		json2.Any({
+			'$in': json2.Any([json2.Any(true)])
+		}),
+	] {
+		mut state := &WeaviateFixtureState{}
+		mut store := weaviate_fixture_store(state) or { panic(err) }
+		mut options := vectorstores.SearchOptions{}
+		options.filter['category'] = filter_value
+		store.similarity_search(mut ctx, 'query', 3, options) or {
+			assert err.msg().contains('Weaviate filter')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid Weaviate filter to fail'
+	}
+}

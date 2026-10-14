@@ -276,11 +276,7 @@ pub fn (store Store) delete(mut ctx context.Context, ids []string, _options vect
 fn (store Store) where_clause(filters map[string]json2.Any, namespace string) !string {
 	mut operands := []string{}
 	for key, value in filters {
-		if !valid_property_name(key) || key == '_additional' || key == store.text_key
-			|| key == store.namespace_key {
-			return error('Weaviate filters require valid non-reserved property names')
-		}
-		operands << store.equal_filter(key, value)!
+		operands << store.filter_operand(key, value, 0)!
 	}
 	actual_namespace := if namespace == '' { store.namespace } else { namespace }
 	operands << store.equal_filter(store.namespace_key, json2.Any(actual_namespace))!
@@ -288,6 +284,153 @@ fn (store Store) where_clause(filters map[string]json2.Any, namespace string) !s
 		return operands[0]
 	}
 	return '{ operator: And, operands: [${operands.join(', ')}] }'
+}
+
+const max_filter_depth = 3
+const max_filter_children = 50
+const max_filter_list_items = 100
+
+fn (store Store) filter_operand(key string, value json2.Any, depth int) !string {
+	if depth > max_filter_depth {
+		return error('Weaviate filter nesting exceeds the supported depth')
+	}
+	if key.starts_with('$') {
+		if key !in ['$and', '$or'] {
+			return error('Weaviate filter supports only $and and $or logical operators')
+		}
+		if value !is []json2.Any {
+			return error('Weaviate filter ${key} requires an array of filter objects')
+		}
+		children := value as []json2.Any
+		if children.len == 0 || children.len > max_filter_children {
+			return error('Weaviate filter ${key} requires between 1 and 50 filter objects')
+		}
+		mut operands := []string{cap: children.len}
+		for child in children {
+			if child !is map[string]json2.Any {
+				return error('Weaviate filter ${key} requires an array of filter objects')
+			}
+			child_filters := child as map[string]json2.Any
+			mut child_operands := []string{cap: child_filters.len}
+			for child_key, child_value in child_filters {
+				child_operands << store.filter_operand(child_key, child_value, depth + 1)!
+			}
+			operands << if child_operands.len == 1 {
+				child_operands[0]
+			} else {
+				'{ operator: And, operands: [${child_operands.join(', ')}] }'
+			}
+		}
+		operator_name := if key == '$and' { 'And' } else { 'Or' }
+		return '{ operator: ${operator_name}, operands: [${operands.join(', ')}] }'
+	}
+	if !valid_property_name(key) || key == '_additional' || key == store.text_key
+		|| key == store.namespace_key {
+		return error('Weaviate filters require valid non-reserved property names')
+	}
+	if value is map[string]json2.Any {
+		operators := value as map[string]json2.Any
+		if operators.len == 0 {
+			return error('Weaviate filter operator objects must not be empty')
+		}
+		mut operands := []string{cap: operators.len}
+		for operator, operand in operators {
+			operands << store.operator_filter(key, operator, operand)!
+		}
+		if operands.len == 1 {
+			return operands[0]
+		}
+		return '{ operator: And, operands: [${operands.join(', ')}] }'
+	}
+	return store.equal_filter(key, value)
+}
+
+fn (_store Store) operator_filter(key string, operator string, operand json2.Any) !string {
+	operator_names := {
+		'$eq':  'Equal'
+		'$ne':  'NotEqual'
+		'$lt':  'LessThan'
+		'$lte': 'LessThanEqual'
+		'$gt':  'GreaterThan'
+		'$gte': 'GreaterThanEqual'
+	}
+	if operator == '$exists' {
+		if operand !is bool {
+			return error('Weaviate filter $exists requires a boolean operand')
+		}
+		return '{ path: [${graphql_string(key)}], operator: IsNull, valueBoolean: ${!(operand as bool)} }'
+	}
+	if operator == '$in' {
+		if operand !is []json2.Any {
+			return error('Weaviate filter $in requires an array operand')
+		}
+		items := operand as []json2.Any
+		if items.len == 0 || items.len > max_filter_list_items {
+			return error('Weaviate filter $in requires between 1 and 100 items')
+		}
+		field := filter_array_field(items)!
+		return '{ path: [${graphql_string(key)}], operator: ContainsAny, ${field}: ${json2.encode(operand, json2.EncoderOptions{})} }'
+	}
+	operator_name := operator_names[operator] or {
+		return error('Weaviate filter operator ${operator} is not supported')
+	}
+	field := filter_scalar_field(operand)!
+	return '{ path: [${graphql_string(key)}], operator: ${operator_name}, ${field}: ${json2.encode(operand, json2.EncoderOptions{})} }'
+}
+
+fn filter_scalar_field(value json2.Any) !string {
+	return match value {
+		string { 'valueText' }
+		bool { 'valueBoolean' }
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { 'valueInt' }
+		f64 {
+			if !math.is_finite(value as f64) {
+				return error('Weaviate filters must contain finite values')
+			}
+			'valueNumber'
+		}
+		f32 {
+			if !math.is_finite(f64(value as f32)) {
+				return error('Weaviate filters must contain finite values')
+			}
+			'valueNumber'
+		}
+		else {
+			return error('Weaviate filter operators support string, boolean, and numeric operands')
+		}
+	}
+}
+
+fn filter_array_field(items []json2.Any) !string {
+	mut has_string := false
+	mut has_int := false
+	mut has_float := false
+	for item in items {
+		match item {
+			string { has_string = true }
+			int, i64, i32, i16, i8, u64, u32, u16, u8 { has_int = true }
+			f64 {
+				if !math.is_finite(item as f64) {
+					return error('Weaviate filters must contain finite values')
+				}
+				has_float = true
+			}
+			f32 {
+				if !math.is_finite(f64(item as f32)) {
+					return error('Weaviate filters must contain finite values')
+				}
+				has_float = true
+			}
+			else { return error('Weaviate filter $in supports string and numeric items') }
+		}
+	}
+	if has_string && (has_int || has_float) {
+		return error('Weaviate filter $in items must share one type')
+	}
+	if has_string {
+		return 'valueTextArray'
+	}
+	return if has_float { 'valueNumberArray' } else { 'valueIntArray' }
 }
 
 fn (_store Store) equal_filter(key string, value json2.Any) !string {
