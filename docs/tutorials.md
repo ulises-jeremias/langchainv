@@ -38,6 +38,7 @@ Work through these recipes in order. Each section links to the package guide tha
 | Task | Start here | Notes |
 |---|---|---|
 | Make a first chat request | [First chat tutorial](first-chat/) | Sends a billable live request; keep the API key in the environment. |
+| Configure Anthropic thinking | [Anthropic thinking tutorial](anthropic-thinking/) | Sends one live request; supported models, effort levels, and thinking modes vary. |
 | Test model-dependent code offline | [Mock model tutorial](offline-model-tests/) | No API key or network calls; adapter HTTP behavior should use an injected fake transport. |
 | Build retrieval QA | [Retrieval tutorial](retrieval-qa/) | Uses in-memory storage and deliberately simple fakes; no semantic embeddings or external services. |
 | Inspect search embeddings | [Return stored vectors](returning-vectors/) | Shows opt-in result vectors with an offline in-memory store; remote adapters have backend-specific limits. |
