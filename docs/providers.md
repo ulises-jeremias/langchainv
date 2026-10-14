@@ -36,6 +36,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 | Ollama | [Ollama](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md) | Local server |
 | OpenAI | [Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md) | Hosted API or compatible endpoint |
 | Offline fake model | [Canned responses](https://github.com/ulises-jeremias/langchainv/blob/main/llms/fake/README.md) | In-process test fixture |
+| Response cache | [Model response cache](https://github.com/ulises-jeremias/langchainv/blob/main/llms/cache/README.md) | Pluggable backend; bounded in-memory FIFO included |
 
 ## Embeddings
 
