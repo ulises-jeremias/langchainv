@@ -117,7 +117,7 @@ wrapping training layers or downloading weights during ordinary checks.
 ## Vector stores
 
 Dedicated AlloyDB and Cloud SQL adapters, Bedrock Knowledge Bases, and MongoDB
-vector search remain not started. The generic pgvector adapter can
+vector search is implemented in `vectorstores/mongodb` over an injected collection interface with a bounded in-process cosine scan (not Atlas $vectorSearch). The generic pgvector adapter can
 connect to Cloud SQL for PostgreSQL or AlloyDB when the application supplies a
 compatible PostgreSQL engine and matching `vector` schema; it does not provide
 Cloud-specific connection/authentication, embedding, indexing, or query APIs.

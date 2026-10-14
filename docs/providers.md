@@ -63,6 +63,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 | Redis Stack | [Redis](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/redis/README.md) |
 | Qdrant | [Qdrant](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/qdrant/README.md) |
 | Weaviate | [Weaviate](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/weaviate/README.md) |
+| MongoDB | [MongoDB](https://github.com/ulises-jeremias/langchainv/blob/main/vectorstores/mongodb/README.md) |
 
 ## Before connecting a service
 
