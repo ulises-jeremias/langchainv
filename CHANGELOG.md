@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Mistral `safe_prompt` option, applied to streamed and non-streamed
+  requests through the shared payload translation.
+
 - Multimodal chat prompt templates in `prompts`: text and image URL part
   templates rendered into typed message parts.
 

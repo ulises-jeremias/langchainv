@@ -30,3 +30,7 @@ The upstream endpoint is documented as OpenAI-compatible at
 [`https://api.mistral.ai/v1`](https://docs.mistral.ai/resources/migration-guides).
 
 Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.
+
+Set `Options.safe_prompt` to make Mistral prepend its safety prompt to every
+request; it is applied to streamed and non-streamed calls and omitted by
+default.
