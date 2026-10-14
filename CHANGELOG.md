@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- MongoDB vector store in `vectorstores/mongodb`, over an injected
+  collection interface with bounded cosine scanning.
+
 - MongoDB chat message history in `memory/mongodb`, over an injected
   collection interface with bounded sessions and trimming.
 
@@ -83,5 +86,4 @@ uses conventional commit prefixes in its history.
 
 First tracked state of the module: framework packages for chains, agents,
 prompts, output parsing, memory, document loaders, text splitting, tools,
-and vector stores, with 15 chat providers, 7 embedding providers, and 12
-vector store adapters, all tested offline with fake transports.
+and vector stores, with 15 chat providers, 7 embedding providers, and its vector store adapters, all tested offline with fake transports.

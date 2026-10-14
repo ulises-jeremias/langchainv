@@ -80,7 +80,7 @@ retrieval QA, tool-calling agents, memory, and provider recipes.
 | Agents | `agents`, `callbacks` | ReAct/MRKL, conversational ReAct, provider-neutral tool-calling and OpenAI-functions presets, bounded executor with memory, callbacks, and intermediate steps |
 | Prompts & parsing | `prompts`, `outputparser`, `jsonschema` | Validated string/chat templates, few-shot selectors, typed structured output parsers, recursive JSON-Schema subset |
 | Memory | `memory` | Conversation buffer, window and token buffers, SQLite/PostgreSQL chat history, Zep history |
-| Retrieval | `vectorstores`, `documentloaders`, `textsplitter` | 12 vector-store adapters, bounded PDF/HTML/CSV/text/directory loaders, recursive, token, and Markdown splitters |
+| Retrieval | `vectorstores`, `documentloaders`, `textsplitter` | 13 vector-store adapters, bounded PDF/HTML/CSV/text/directory loaders, recursive, token, and Markdown splitters |
 | Tools | `tools` | Calculator, web search (DuckDuckGo, SerpApi, Exa, Perplexity, Wikipedia), page scraping, SQL database, Zapier MCP |
 | Testing | `testing/llmtest`, `httputil` | Concurrency-safe mock model, opt-in live contract checks, injectable bounded HTTP transports used by every provider test |
 
@@ -98,7 +98,7 @@ Amazon Bedrock. Every provider accepts an injectable transport, so the full
 test suite runs offline against fake transports, with no keys required.
 
 Vector stores: in-memory · Azure AI Search · Chroma · Dolt · MariaDB ·
-Milvus · OpenSearch · pgvector · Pinecone · Qdrant · Redis Stack · Weaviate.
+Milvus · MongoDB · OpenSearch · pgvector · Pinecone · Qdrant · Redis Stack · Weaviate.
 
 ## Why LangChainV
 
