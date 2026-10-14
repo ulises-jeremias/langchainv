@@ -21,16 +21,18 @@ const max_tools = 128
 pub struct Client {
 	http_client httputil.HTTPClient
 pub:
-	base_url      string = default_base_url
-	model         string
-	format        string
-	format_schema map[string]json2.Any
-	keep_alive    string
+	base_url              string = default_base_url
+	model                 string
+	format                string
+	format_schema         map[string]json2.Any
+	keep_alive            string
+	legacy_server_version string
 pub mut:
 	callbacks ?callbacks.Handler
 }
 
-// Options configures the Ollama server, model, output format, model lifetime, and lifecycle callbacks.
+// Options configures the Ollama server, model, output format, legacy server
+// compatibility, model lifetime, and lifecycle callbacks.
 pub struct Options {
 pub:
 	base_url      string = default_base_url
@@ -38,7 +40,10 @@ pub:
 	format        string
 	format_schema string
 	keep_alive    string
-	callbacks     ?callbacks.Handler
+	// legacy_server_version is the exact Ollama server version expected when
+	// sending legacy runner options. It is verified through GET /api/version.
+	legacy_server_version string
+	callbacks             ?callbacks.Handler
 }
 
 struct ChatResponse {
@@ -106,6 +111,11 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 	if options.base_url.trim_space() == '' {
 		return error('Ollama base URL must not be empty')
 	}
+	if options.legacy_server_version.trim_space() != '' {
+		parse_ollama_version(options.legacy_server_version) or {
+			return error('Ollama legacy_server_version must use major.minor.patch format')
+		}
+	}
 	if options.format !in ['', 'json'] {
 		return error('Ollama format must be empty or `json`; use format_schema for a JSON Schema')
 	}
@@ -128,13 +138,14 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, '') or { return error('invalid Ollama base URL: ${err.msg()}') }
 	return Client{
-		http_client:   http_client
-		base_url:      base_url
-		model:         options.model.trim_space()
-		format:        options.format
-		format_schema: format_schema
-		keep_alive:    options.keep_alive.trim_space()
-		callbacks:     options.callbacks
+		http_client:           http_client
+		base_url:              base_url
+		model:                 options.model.trim_space()
+		format:                options.format
+		format_schema:         format_schema
+		keep_alive:            options.keep_alive.trim_space()
+		legacy_server_version: options.legacy_server_version.trim_space()
+		callbacks:             options.callbacks
 	}
 }
 
@@ -190,6 +201,7 @@ fn (client Client) generate_completion_request(mut ctx context.Context, prompt s
 		options.model.trim_space()
 	}
 	request := make_generate_request(client, model, prompt, options)!
+	client.validate_legacy_server_version(mut ctx, options.provider_options)!
 	if options.streaming_func != none || options.streaming_reasoning_func != none {
 		return client.generate_completion_stream(mut ctx, request, options)
 	}
@@ -266,6 +278,7 @@ fn (client Client) generate_content_request(mut ctx context.Context, messages []
 		options.model.trim_space()
 	}
 	request := make_request(client, model, messages, options)!
+	client.validate_legacy_server_version(mut ctx, options.provider_options)!
 	if _ := options.streaming_func {
 		return client.generate_stream(mut ctx, request, options)
 	}
@@ -498,18 +511,26 @@ fn validate_provider_options(provider_options map[string]json2.Any) ! {
 	for key, value in provider_options {
 		match key {
 			'num_ctx', 'num_batch', 'num_gpu', 'main_gpu', 'num_thread', 'repeat_last_n', 'seed',
-			'top_k', 'num_keep', 'num_predict', 'draft_num_predict', 'top_logprobs' {
+			'top_k', 'num_keep', 'num_predict', 'draft_num_predict', 'top_logprobs', 'num_gqa',
+			'mirostat' {
 				if !is_integer_value(value) {
 					return error('Ollama provider_options ${key} must be an integer')
 				}
+				if key == 'num_gqa' && value.i64() <= 0 {
+					return error('Ollama provider_options num_gqa must be positive')
+				}
+				if key == 'mirostat' && value.i64() !in [i64(0), i64(1), i64(2)] {
+					return error('Ollama provider_options mirostat must be 0, 1, or 2')
+				}
 			}
 			'typical_p', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'top_p',
-			'min_p', 'temperature' {
+			'min_p', 'temperature', 'tfs_z', 'mirostat_tau', 'mirostat_eta' {
 				if !is_numeric_value(value) || !math.is_finite(value.f64()) {
 					return error('Ollama provider_options ${key} must be numeric')
 				}
 			}
-			'use_mmap', 'logprobs', 'truncate', 'shift', 'raw' {
+			'use_mmap', 'logprobs', 'truncate', 'shift', 'raw', 'numa', 'low_vram', 'f16_kv',
+			'logits_all', 'vocab_only', 'use_mlock', 'penalize_newline' {
 				if value !is bool {
 					return error('Ollama provider_options ${key} must be a boolean')
 				}

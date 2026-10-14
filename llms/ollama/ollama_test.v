@@ -13,8 +13,9 @@ struct FakeHTTPClient {
 
 struct FakeHTTPState {
 mut:
-	requests []httputil.Request
-	response httputil.Response
+	requests         []httputil.Request
+	response         httputil.Response
+	version_response string
 }
 
 struct StreamCapture {
@@ -22,9 +23,22 @@ mut:
 	value string
 }
 
+struct LegacyOptionBoundaryCase {
+	version string
+	key     string
+	value   json2.Any
+}
+
 fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	if request.url.ends_with('/api/version') && state.version_response != '' {
+		return httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        state.version_response
+		}
+	}
 	return state.response
 }
 
@@ -42,19 +56,30 @@ fn (client FakeHTTPClient) do_stream(mut ctx context.Context, request httputil.R
 }
 
 fn new_fixture_client(body string, status int) (Client, &FakeHTTPState) {
+	return new_fixture_client_with_version(body, status, '')
+}
+
+fn new_fixture_client_with_version(body string, status int, legacy_server_version string) (Client, &FakeHTTPState) {
+	return new_fixture_client_with_server_version(body, status, legacy_server_version,
+		legacy_server_version)
+}
+
+fn new_fixture_client_with_server_version(body string, status int, legacy_server_version string, actual_version string) (Client, &FakeHTTPState) {
 	mut state := &FakeHTTPState{
-		response: httputil.Response{
+		response:         httputil.Response{
 			status_code: status
 			headers:     http.Header{}
 			body:        body
 		}
+		version_response: if actual_version != '' { '{"version":"${actual_version}"}' } else { '' }
 	}
 	client := new_client(FakeHTTPClient{
 		state: state
 	}, Options{
-		base_url:   'http://ollama.test:11434'
-		model:      'gemma4'
-		keep_alive: '5m'
+		base_url:              'http://ollama.test:11434'
+		model:                 'gemma4'
+		keep_alive:            '5m'
+		legacy_server_version: legacy_server_version
 	}) or { panic(err) }
 	return client, state
 }
@@ -297,12 +322,6 @@ fn test_generate_content_rejects_invalid_provider_options_before_network() {
 		{
 			'logprobs': json2.Any(1)
 		},
-		{
-			'mirostat': json2.Any(2)
-		},
-		{
-			'num_gqa': json2.Any(8)
-		},
 	] {
 		client, state := new_fixture_client('{}', 200)
 		client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
@@ -314,6 +333,173 @@ fn test_generate_content_rejects_invalid_provider_options_before_network() {
 		}
 		assert false, 'expected invalid provider options to be rejected'
 	}
+}
+
+fn test_legacy_runner_options_require_and_verify_a_matching_server_version() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"message":{"content":"ok"}}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		provider_options: {
+			'num_gqa': json2.Any(8)
+		}
+	}) or {
+		assert err.msg().contains('legacy_server_version')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected legacy provider option without a version contract to fail'
+}
+
+fn test_legacy_runner_options_send_only_after_matching_old_server_version() {
+	mut ctx := context.background()
+	client, state := new_fixture_client_with_version('{"message":{"content":"ok"}}', 200,
+		'0.1.34')
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		provider_options: {
+			'num_gqa':          json2.Any(8)
+			'numa':             json2.Any(true)
+			'tfs_z':            json2.Any(1.0)
+			'penalize_newline': json2.Any(false)
+			'low_vram':         json2.Any(false)
+			'f16_kv':           json2.Any(true)
+			'logits_all':       json2.Any(false)
+			'vocab_only':       json2.Any(false)
+			'use_mlock':        json2.Any(false)
+			'mirostat':         json2.Any(2)
+			'mirostat_tau':     json2.Any(5.0)
+			'mirostat_eta':     json2.Any(0.1)
+		}
+	}) or { panic(err) }
+	assert state.requests.len == 2
+	assert state.requests[0].url.ends_with('/api/version')
+	assert state.requests[1].url.ends_with('/api/chat')
+	assert state.requests[1].body.contains('"num_gqa":8')
+	assert state.requests[1].body.contains('"numa":true')
+	assert state.requests[1].body.contains('"tfs_z":1')
+	assert state.requests[1].body.contains('"penalize_newline":false')
+	assert state.requests[1].body.contains('"f16_kv":true')
+	assert state.requests[1].body.contains('"mirostat":2')
+	assert state.requests[1].body.contains('"mirostat_tau":5')
+	assert state.requests[1].body.contains('"mirostat_eta":0.1')
+}
+
+fn test_legacy_runner_options_never_reach_a_newer_server() {
+	mut ctx := context.background()
+	client, state := new_fixture_client_with_server_version('{"message":{"content":"unused"}}',
+		200, '0.6.8', '0.7.0')
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		provider_options: {
+			'mirostat': json2.Any(1)
+		}
+	}) or {
+		assert err.msg().contains('does not match server version')
+		assert state.requests.len == 1
+		return
+	}
+	assert false, 'expected mismatched server version to fail before generation'
+}
+
+fn test_legacy_sampling_options_reject_current_server_versions_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client_with_version('{}', 200, '0.7.0')
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		provider_options: {
+			'mirostat': json2.Any(1)
+		}
+	}) or {
+		assert err.msg().contains('not supported by server version')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected unsupported legacy option to fail before network'
+}
+
+fn test_legacy_options_validate_values_before_version_lookup() {
+	mut ctx := context.background()
+	for provider_options in [
+		{
+			'num_gqa': json2.Any(0)
+		},
+		{
+			'mirostat': json2.Any(3)
+		},
+	] {
+		client, state := new_fixture_client_with_version('{}', 200, '0.1.34')
+		client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+			provider_options: provider_options
+		}) or {
+			assert err.msg().contains('provider_options')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid legacy provider option to fail before network'
+	}
+}
+
+fn test_legacy_option_version_boundaries_reject_removed_fields_before_network() {
+	mut ctx := context.background()
+	for test_case in [
+		LegacyOptionBoundaryCase{
+			version: '0.1.33'
+			key:     'num_gqa'
+			value:   json2.Any(8)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.1.39'
+			key:     'num_gqa'
+			value:   json2.Any(8)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.4.0'
+			key:     'numa'
+			value:   json2.Any(true)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.5.12'
+			key:     'tfs_z'
+			value:   json2.Any(1.0)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.5.12'
+			key:     'penalize_newline'
+			value:   json2.Any(false)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.7.0'
+			key:     'low_vram'
+			value:   json2.Any(false)
+		},
+		LegacyOptionBoundaryCase{
+			version: '0.7.0'
+			key:     'mirostat'
+			value:   json2.Any(1)
+		},
+	] {
+		client, state := new_fixture_client_with_version('{}', 200, test_case.version)
+		mut provider_options := map[string]json2.Any{}
+		provider_options[test_case.key] = test_case.value
+		client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+			provider_options: provider_options
+		}) or {
+			assert err.msg().contains('Ollama')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected ${test_case.key} to be rejected for ${test_case.version}'
+	}
+}
+
+fn test_legacy_sampling_options_work_with_completion_after_version_check() {
+	mut ctx := context.background()
+	client, state := new_fixture_client_with_version('{"response":"legacy","done":true}', 200,
+		'0.6.8')
+	mut options := llms.CallOptions{}
+	options.provider_options['mirostat'] = json2.Any(2)
+	assert client.complete(mut ctx, 'prompt', options)! == 'legacy'
+	assert state.requests.len == 2
+	assert state.requests[0].url.ends_with('/api/version')
+	assert state.requests[1].url.ends_with('/api/generate')
+	assert state.requests[1].body.contains('"mirostat":2')
 }
 
 fn test_generate_content_streams_ndjson_content_and_usage() {
