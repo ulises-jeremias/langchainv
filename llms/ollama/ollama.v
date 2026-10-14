@@ -4,6 +4,7 @@ module ollama
 import context
 import encoding.base64
 import json2
+import math
 import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
@@ -365,9 +366,7 @@ fn (client Client) generate_stream(mut ctx context.Context, request map[string]j
 }
 
 fn validate_call_options(options llms.CallOptions) ! {
-	if options.provider_options.len > 0 {
-		return error('Ollama provider_options are not supported; use typed call options')
-	}
+	validate_provider_options(options.provider_options)!
 	if _ := options.web_search_options {
 		return error('Ollama web search options are not supported')
 	}
@@ -385,6 +384,54 @@ fn validate_call_options(options llms.CallOptions) ! {
 	}
 	if options.top_k < 0 {
 		return error('Ollama top_k cannot be negative')
+	}
+}
+
+// validate_provider_options accepts Ollama's native runner fields while
+// rejecting misspellings and values that would produce invalid API payloads.
+fn validate_provider_options(provider_options map[string]json2.Any) ! {
+	for key, value in provider_options {
+		match key {
+			'num_ctx', 'num_batch', 'num_gpu', 'main_gpu', 'num_thread', 'repeat_last_n', 'seed',
+			'top_k', 'num_keep', 'num_predict', 'draft_num_predict', 'top_logprobs' {
+				if !is_integer_value(value) {
+					return error('Ollama provider_options ${key} must be an integer')
+				}
+			}
+			'typical_p', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'top_p',
+			'min_p', 'temperature' {
+				if !is_numeric_value(value) || !math.is_finite(value.f64()) {
+					return error('Ollama provider_options ${key} must be numeric')
+				}
+			}
+			'use_mmap', 'logprobs', 'truncate', 'shift' {
+				if value !is bool {
+					return error('Ollama provider_options ${key} must be a boolean')
+				}
+			}
+			'think' {
+				if value !is bool && (value !is string || (value as string).trim_space() == '') {
+					return error('Ollama provider_options think must be a boolean or non-empty string')
+				}
+			}
+			else {
+				return error('Ollama provider_options key `${key}` is not supported; use stop_words for stop sequences')
+			}
+		}
+	}
+}
+
+fn is_integer_value(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		else { false }
+	}
+}
+
+fn is_numeric_value(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8, f64, f32 { true }
+		else { false }
 	}
 }
 
@@ -465,6 +512,13 @@ fn make_request(client Client, model string, messages []schema.Message, options 
 			stop_words << json2.Any(stop_word)
 		}
 		generation_options['stop'] = json2.Any(stop_words)
+	}
+	for key, value in options.provider_options {
+		if key in ['think', 'logprobs', 'top_logprobs', 'truncate', 'shift'] {
+			request[key] = value
+		} else {
+			generation_options[key] = value
+		}
 	}
 	if generation_options.len > 0 {
 		request['options'] = json2.Any(generation_options)
