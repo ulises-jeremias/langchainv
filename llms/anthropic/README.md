@@ -23,3 +23,9 @@ Set `Options.callbacks` at construction, or assign the client's `callbacks`
 field, to receive one generate-content start event before each request and
 then either an end event with the response or an error event, for streaming
 and non-streaming calls alike.
+
+Reasoning blocks round-trip. Thinking parts parsed from responses keep
+their signature, and redacted thinking parts keep their opaque data; sending
+those parts back on a later turn emits the original blocks. Thinking replay
+requires the signature from the original response, and thinking text,
+signatures, and redacted data are each capped at 1 MiB.

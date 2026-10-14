@@ -275,3 +275,76 @@ fn test_generate_content_does_not_return_provider_error_body() {
 	}
 	assert false, 'expected HTTP status error'
 }
+
+fn test_generate_content_replays_thinking_and_redacted_parts() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"content":[{"type":"text","text":"final answer"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":7}}', 200)
+	messages := [
+		schema.Message{
+			role:  .ai
+			parts: [
+				schema.ContentPart(schema.ThinkingPart{
+					text:      'let me think'
+					signature: 'sig-123'
+				}),
+				schema.ContentPart(schema.RedactedThinkingPart{
+					data: 'opaque-data'
+				}),
+				schema.ContentPart(schema.TextPart{
+					text: 'previous answer'
+				}),
+			]
+		},
+		schema.text_message(.human, 'continue'),
+	]
+	response := client.generate_content(mut ctx, messages, llms.CallOptions{}) or { panic(err) }
+	assert response.choices[0].content == 'final answer'
+	body := state.requests[0].body
+	assert body.contains('"type":"thinking"')
+	assert body.contains('"signature":"sig-123"')
+	assert body.contains('"type":"redacted_thinking"')
+	assert body.contains('"data":"opaque-data"')
+}
+
+fn test_generate_content_parses_thinking_signature_and_redacted() {
+	mut ctx := context.background()
+	client, _ := new_fixture_client('{"content":[{"type":"thinking","thinking":"deep thought","signature":"sig-xyz"},{"type":"redacted_thinking","data":"hidden"},{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":7}}', 200)
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'think')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	choice := response.choices[0]
+	assert choice.content == 'done'
+	assert choice.reasoning == 'deep thought'
+	assert choice.parts.len == 3
+	thinking := choice.parts[0]
+	assert thinking is schema.ThinkingPart
+	if thinking is schema.ThinkingPart {
+		assert thinking.signature == 'sig-xyz'
+	}
+	redacted := choice.parts[1]
+	assert redacted is schema.RedactedThinkingPart
+	if redacted is schema.RedactedThinkingPart {
+		assert redacted.data == 'hidden'
+	}
+}
+
+fn test_generate_content_rejects_unsigned_thinking_replay() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"content":[]}', 200)
+	messages := [
+		schema.Message{
+			role:  .ai
+			parts: [
+				schema.ContentPart(schema.ThinkingPart{
+					text: 'unsigned thought'
+				}),
+			]
+		},
+	]
+	client.generate_content(mut ctx, messages, llms.CallOptions{}) or {
+		assert err.msg().contains('signature')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected unsigned thinking replay to fail'
+}
