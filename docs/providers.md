@@ -35,6 +35,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 | Mistral | [Mistral](https://github.com/ulises-jeremias/langchainv/blob/main/llms/mistral/README.md) | Hosted Chat Completions API |
 | Ollama | [Ollama](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md) | Local server |
 | OpenAI | [Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md) | Hosted API or compatible endpoint |
+| Offline fake model | [Canned responses](https://github.com/ulises-jeremias/langchainv/blob/main/llms/fake/README.md) | In-process test fixture |
 
 ## Embeddings
 
