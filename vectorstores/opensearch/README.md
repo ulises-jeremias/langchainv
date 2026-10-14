@@ -38,3 +38,8 @@ result. Search uses the k-NN query DSL. See OpenSearch's documentation for
 [k-NN queries](https://docs.opensearch.org/latest/query-dsl/specialized/k-nn/index/),
 [efficient k-NN filters](https://docs.opensearch.org/latest/vector-search/filter-search-knn/efficient-knn-filtering/),
 and the [Bulk API](https://docs.opensearch.org/latest/api-reference/document-apis/bulk/).
+
+Search filters accept operator objects in addition to scalar equality:
+comparison operators become range clauses, `$in` and `$nin` become terms
+clauses, `$exists` becomes an exists clause, and `$and`, `$or`, and `$not`
+groups nest with the same bounds as the other stores.
