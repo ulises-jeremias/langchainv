@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Bedrock reasoning replay: `reasoningContent` blocks are parsed with
+  signatures and redacted data and sent back on later turns, bounded and
+  signature-checked like the Anthropic path.
+
 - OpenAI provider options: `user`, `parallel_tool_calls`, `service_tier`,
   `logprobs`, and `top_logprobs` through `provider_options`, validated
   before any request.

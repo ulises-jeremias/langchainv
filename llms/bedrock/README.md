@@ -20,3 +20,9 @@ custom model ARNs, and remaining provider-specific options are not implemented.
 Bedrock API keys are not included in tests or source code.
 
 Set `Options.callbacks` to receive one generate-content start event before each request and then either an end event with the response or an error event.
+
+Reasoning content round-trips. Responses keep the reasoning text, its
+signature, and any redacted content in the parsed parts, and sending those
+parts on a later turn emits the original `reasoningContent` blocks. Replay
+requires the signature from the original response, and each piece is capped
+at 1 MiB.
