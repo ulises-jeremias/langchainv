@@ -35,8 +35,8 @@ import ulises_jeremias.langchainv.schema
 fn main() {
 	mut client := watsonx.new_default_client(watsonx.Options{
 		project_id: os.getenv('WATSONX_PROJECT_ID')
-		model: 'ibm/granite-3-8b-instruct'
-		api_key: os.getenv('WATSONX_API_KEY')
+		model:      'ibm/granite-3-8b-instruct'
+		api_key:    os.getenv('WATSONX_API_KEY')
 	}) or { panic(err) }
 	stream := llms.StreamFunc(fn (mut _ context.Context, chunk []u8) ! {
 		print(chunk.bytestr())
