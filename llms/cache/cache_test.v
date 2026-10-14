@@ -54,7 +54,7 @@ fn test_reasoning_stream_requests_bypass_cache() {
 	model := fake.new_fake_llm(['first', 'second'])
 	cacher := new_cacher(llms.Model(model), backend)
 	mut ctx := context.background()
-	options := llms.CallOptions{streaming_reasoning_func: llms.ReasoningStreamFunc(fn (mut _ctx context.Context, _reasoning []u8, _content []u8) ! {})}
+	options := llms.CallOptions{ streaming_reasoning_func: llms.ReasoningStreamFunc(fn (mut _ctx context.Context, _reasoning []u8, _content []u8) ! {}) }
 	messages := [schema.text_message(.human, 'prompt')]
 	first := cacher.generate_content(mut ctx, messages, options)!
 	second := cacher.generate_content(mut ctx, messages, options)!
