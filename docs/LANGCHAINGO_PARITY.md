@@ -69,6 +69,19 @@ a release.
 | `testing/llmtest` | LLM provider compliance and test helpers | partial: opt-in core generation and canceled-context checks, with capability checks for multiturn history, streaming chunks/error propagation, tool-call JSON/replay, and typed token usage; includes a configurable concurrency-safe `MockModel` with copied response snapshots; calling `test_model` against a live provider is explicit |
 | `exp` | experimental public API surface | not applicable at the pinned snapshot: upstream contains only [`README.md`](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/exp/README.md) and [`doc.go`](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/exp/doc.go), with no Go implementation files |
 
+## Open parity issues
+
+These issues describe the remaining tracked gaps. Each issue links to the
+relevant LangChainGo source or official provider documentation and defines an
+accepted scope.
+
+| Area | Open issues |
+|---|---|
+| Agents and framework | [Agents](https://github.com/ulises-jeremias/langchainv/issues/107), [output parsers](https://github.com/ulises-jeremias/langchainv/issues/108), [prompt templates](https://github.com/ulises-jeremias/langchainv/issues/109), [text splitting](https://github.com/ulises-jeremias/langchainv/issues/110), [Cybertron embeddings](https://github.com/ulises-jeremias/langchainv/issues/111), [Cloud SQL and AlloyDB memory](https://github.com/ulises-jeremias/langchainv/issues/112), [Jina batching](https://github.com/ulises-jeremias/langchainv/issues/113), [Bedrock embeddings](https://github.com/ulises-jeremias/langchainv/issues/114), [Anthropic tools](https://github.com/ulises-jeremias/langchainv/issues/115), [Bedrock credentials and options](https://github.com/ulises-jeremias/langchainv/issues/116) |
+| LLM providers | [Cohere](https://github.com/ulises-jeremias/langchainv/issues/118), [ERNIE](https://github.com/ulises-jeremias/langchainv/issues/119), [Vertex AI](https://github.com/ulises-jeremias/langchainv/issues/120), [Hugging Face](https://github.com/ulises-jeremias/langchainv/issues/121), [llamafile](https://github.com/ulises-jeremias/langchainv/issues/122), [Maritaca](https://github.com/ulises-jeremias/langchainv/issues/123), [Mistral](https://github.com/ulises-jeremias/langchainv/issues/124), [OpenAI](https://github.com/ulises-jeremias/langchainv/issues/126), [watsonx](https://github.com/ulises-jeremias/langchainv/issues/127), [Ollama legacy options](https://github.com/ulises-jeremias/langchainv/issues/145) |
+| Vector stores | [AlloyDB and Cloud SQL](https://github.com/ulises-jeremias/langchainv/issues/128), [Bedrock Knowledge Bases](https://github.com/ulises-jeremias/langchainv/issues/129), [MongoDB Atlas](https://github.com/ulises-jeremias/langchainv/issues/130), [Dolt](https://github.com/ulises-jeremias/langchainv/issues/131), [MariaDB](https://github.com/ulises-jeremias/langchainv/issues/132), [Azure AI Search](https://github.com/ulises-jeremias/langchainv/issues/133), [Chroma](https://github.com/ulises-jeremias/langchainv/issues/134), [Qdrant](https://github.com/ulises-jeremias/langchainv/issues/135), [Pinecone](https://github.com/ulises-jeremias/langchainv/issues/136), [Milvus](https://github.com/ulises-jeremias/langchainv/issues/137), [OpenSearch](https://github.com/ulises-jeremias/langchainv/issues/138), [pgvector](https://github.com/ulises-jeremias/langchainv/issues/139), [Redis](https://github.com/ulises-jeremias/langchainv/issues/140), [Weaviate](https://github.com/ulises-jeremias/langchainv/issues/141) |
+| Document loaders | [Encrypted PDFs](https://github.com/ulises-jeremias/langchainv/issues/161) |
+
 ## LLM providers
 
 | Provider package | Status |
