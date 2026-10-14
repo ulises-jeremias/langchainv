@@ -57,8 +57,8 @@ is still checked before any legacy runner option is sent:
 ```v
 module main
 
-import encoding.json2
 import context
+import json2
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.llms.ollama
