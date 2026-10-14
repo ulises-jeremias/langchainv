@@ -239,3 +239,67 @@ fn test_qdrant_rejects_invalid_configuration_and_limits() {
 	}
 	assert false, 'expected over-limit search to fail'
 }
+
+fn test_qdrant_search_sends_condition_filters() {
+	mut state := &QdrantFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"result":{"points":[]}}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.filter['year'] = json2.Any({
+		'$gte': json2.Any(2020)
+		'$lt':  json2.Any(2030)
+	})
+	options.filter['kind'] = json2.Any({
+		'$in': json2.Any([json2.Any('guide'), json2.Any('api')])
+	})
+	options.filter['kind2'] = json2.Any({
+		'$ne': json2.Any('draft')
+	})
+	options.filter['$or'] = json2.Any([
+		json2.Any({
+			'lang': json2.Any('v')
+		}),
+		json2.Any({
+			'lang': json2.Any('go')
+		}),
+	])
+	documents := store.similarity_search(mut ctx, 'query', 3, options) or { panic(err) }
+	assert documents.len == 0
+	body := state.requests[0].body
+	assert body.contains('"range":{"gte":2020,"lt":2030}')
+	assert body.contains('"any":["guide","api"]')
+	assert body.contains('"must_not":[{"key":"metadata.kind2"')
+	assert body.contains('"should":[{"filter":')
+}
+
+fn test_qdrant_search_rejects_invalid_condition_filters() {
+	mut ctx := context.background()
+	for filter_value in [
+		json2.Any({
+			'$regex': json2.Any('^g')
+		}),
+		json2.Any({
+			'$gt': json2.Any('not-a-number')
+		}),
+		json2.Any({
+			'$in': json2.Any([]json2.Any{})
+		}),
+	] {
+		mut state := &QdrantFixtureState{}
+		mut store := fixture_store(state) or { panic(err) }
+		mut options := vectorstores.SearchOptions{}
+		options.filter['kind'] = filter_value
+		store.similarity_search(mut ctx, 'query', 3, options) or {
+			assert err.msg().contains('Qdrant filter')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid Qdrant filter to fail'
+	}
+}

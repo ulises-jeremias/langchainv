@@ -155,7 +155,8 @@ API-key or HTTPS authentication, payload metadata filters, namespaces, injected
 embeddings/transport, and bounded requests with preflight embedding-dimension
 validation for newly created collections; `SearchOptions.include_vectors`
 returns validated vectors from single-vector collections. Named or multi-vector
-search, the full filter DSL, and custom point IDs remain outstanding.
+search and custom point IDs remain outstanding; filters support equality,
+range, membership, existence, and bounded $and/$or/$not condition groups.
 Pinecone — partial: HTTPS upsert/query/delete against
 provisioned index hosts, API-key auth, namespaces, metadata filters with equality,
 comparison, membership, existence, and bounded $and/$or operator objects,

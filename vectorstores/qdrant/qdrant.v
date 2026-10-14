@@ -221,7 +221,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if options.include_vectors {
 		request['with_vector'] = json2.Any(true)
 	}
-	filter := make_filter(options.filter, options.namespace)
+	filter := make_filter(options.filter, options.namespace)!
 	if filter.len > 0 {
 		request['filter'] = json2.Any(filter)
 	}
@@ -365,29 +365,215 @@ fn (store Store) request_to(mut ctx context.Context, method http.Method, url str
 	return response
 }
 
-fn make_filter(metadata map[string]json2.Any, namespace string) map[string]json2.Any {
-	mut conditions := []json2.Any{}
-	for key, value in metadata {
-		conditions << json2.Any({
-			'key':   json2.Any('metadata.${key}')
-			'match': json2.Any({
-				'value': value
-			})
-		})
-	}
+fn make_filter(metadata map[string]json2.Any, namespace string) !map[string]json2.Any {
+	mut filter := build_filter(metadata, 0)!
 	if namespace != '' {
-		conditions << json2.Any({
+		condition := json2.Any({
 			'key':   json2.Any('namespace')
 			'match': json2.Any({
 				'value': json2.Any(namespace)
 			})
 		})
+		if must_any := filter['must'] {
+			mut must := must_any as []json2.Any
+			must << condition
+			filter['must'] = json2.Any(must)
+		} else {
+			filter['must'] = json2.Any([condition])
+		}
 	}
-	if conditions.len == 0 {
-		return map[string]json2.Any{}
+	return filter
+}
+
+const max_filter_depth = 3
+const max_filter_children = 50
+const max_filter_list_items = 100
+
+fn build_filter(metadata map[string]json2.Any, depth int) !map[string]json2.Any {
+	if depth > max_filter_depth {
+		return error('Qdrant filter nesting exceeds the supported depth')
 	}
-	return {
-		'must': json2.Any(conditions)
+	mut must := []json2.Any{}
+	mut should := []json2.Any{}
+	mut must_not := []json2.Any{}
+	for key, value in metadata {
+		if key.starts_with('$') {
+			match key {
+				'$and', '$or' {
+					children := filter_children(key, value)!
+					for child in children {
+						child_filter := build_filter(child, depth + 1)!
+						if child_filter.len == 0 {
+							continue
+						}
+						condition := json2.Any({
+							'filter': json2.Any(child_filter)
+						})
+						if key == '$and' {
+							must << condition
+						} else {
+							should << condition
+						}
+					}
+				}
+				'$not' {
+					if value !is map[string]json2.Any {
+						return error('Qdrant filter $not requires a filter object')
+					}
+					child_filter := build_filter(value as map[string]json2.Any, depth + 1)!
+					must_not << json2.Any({
+						'filter': json2.Any(child_filter)
+					})
+				}
+				else {
+					return error('Qdrant filter supports only $and, $or, and $not logical operators')
+				}
+			}
+			continue
+		}
+		if key.trim_space() == '' {
+			return error('Qdrant filters require non-empty metadata keys')
+		}
+		if value is map[string]json2.Any {
+			operators := value as map[string]json2.Any
+			if operators.len == 0 {
+				return error('Qdrant filter operator objects must not be empty')
+			}
+			mut range := map[string]json2.Any{}
+			for operator, operand in operators {
+				match operator {
+					'$eq' {
+						must << match_condition(key, operand)!
+					}
+					'$ne' {
+						must_not << match_condition(key, operand)!
+					}
+					'$in' {
+						must << any_condition(key, operand)!
+					}
+					'$nin' {
+						must_not << any_condition(key, operand)!
+					}
+					'$gt', '$gte', '$lt', '$lte' {
+						if !valid_filter_number(operand) {
+							return error('Qdrant filter ${operator} requires a numeric operand')
+						}
+						range[operator[1..]] = operand
+					}
+					'$exists' {
+						if operand !is bool {
+							return error('Qdrant filter $exists requires a boolean operand')
+						}
+						if operand as bool {
+							must_not << empty_condition(key)
+						} else {
+							must << empty_condition(key)
+						}
+					}
+					else {
+						return error('Qdrant filter operator ${operator} is not supported')
+					}
+				}
+			}
+			if range.len > 0 {
+				must << json2.Any({
+					'key':   json2.Any('metadata.${key}')
+					'range': json2.Any(range)
+				})
+			}
+		} else if value is []json2.Any {
+			must << any_condition(key, value)!
+		} else {
+			must << match_condition(key, value)!
+		}
+	}
+	mut filter := map[string]json2.Any{}
+	if must.len > 0 {
+		filter['must'] = json2.Any(must)
+	}
+	if should.len > 0 {
+		filter['should'] = json2.Any(should)
+	}
+	if must_not.len > 0 {
+		filter['must_not'] = json2.Any(must_not)
+	}
+	return filter
+}
+
+fn filter_children(operator string, value json2.Any) ![]map[string]json2.Any {
+	if value !is []json2.Any {
+		return error('Qdrant filter ${operator} requires an array of filter objects')
+	}
+	items := value as []json2.Any
+	if items.len == 0 || items.len > max_filter_children {
+		return error('Qdrant filter ${operator} requires between 1 and 50 filter objects')
+	}
+	mut children := []map[string]json2.Any{cap: items.len}
+	for item in items {
+		if item !is map[string]json2.Any {
+			return error('Qdrant filter ${operator} requires an array of filter objects')
+		}
+		children << item as map[string]json2.Any
+	}
+	return children
+}
+
+fn match_condition(key string, value json2.Any) !json2.Any {
+	if !valid_filter_scalar(value) {
+		return error('Qdrant filter values must be scalar')
+	}
+	return json2.Any({
+		'key':   json2.Any('metadata.${key}')
+		'match': json2.Any({
+			'value': value
+		})
+	})
+}
+
+fn any_condition(key string, value json2.Any) !json2.Any {
+	if value !is []json2.Any {
+		return error('Qdrant filter $in requires an array operand')
+	}
+	items := value as []json2.Any
+	if items.len == 0 || items.len > max_filter_list_items {
+		return error('Qdrant filter $in requires between 1 and 100 items')
+	}
+	for item in items {
+		if !valid_filter_scalar(item) {
+			return error('Qdrant filter $in requires scalar items')
+		}
+	}
+	return json2.Any({
+		'key':   json2.Any('metadata.${key}')
+		'match': json2.Any({
+			'any': json2.Any(items)
+		})
+	})
+}
+
+fn empty_condition(key string) json2.Any {
+	return json2.Any({
+		'is_empty': json2.Any({
+			'key': json2.Any('metadata.${key}')
+		})
+	})
+}
+
+fn valid_filter_scalar(value json2.Any) bool {
+	return match value {
+		string, bool, int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		f64 { math.is_finite(value as f64) }
+		f32 { math.is_finite(f64(value as f32)) }
+		else { false }
+	}
+}
+
+fn valid_filter_number(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		f64 { math.is_finite(value as f64) }
+		f32 { math.is_finite(f64(value as f32)) }
+		else { false }
 	}
 }
 
