@@ -3,6 +3,7 @@ module ollama
 import context
 import net.http
 import json2
+import time
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
@@ -13,9 +14,11 @@ struct FakeHTTPClient {
 
 struct FakeHTTPState {
 mut:
-	requests         []httputil.Request
-	response         httputil.Response
-	version_response string
+	requests          []httputil.Request
+	response          httputil.Response
+	version_response  string
+	pull_response     string
+	pull_deadline_set bool
 }
 
 struct StreamCapture {
@@ -29,9 +32,19 @@ struct LegacyOptionBoundaryCase {
 	value   json2.Any
 }
 
-fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
+fn (client FakeHTTPClient) do(mut ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	if request.url.ends_with('/api/pull') {
+		state.pull_deadline_set = ctx.deadline() != none
+		if state.pull_response != '' {
+			return httputil.Response{
+				status_code: 200
+				headers:     http.Header{}
+				body:        state.pull_response
+			}
+		}
+	}
 	if request.url.ends_with('/api/version') && state.version_response != '' {
 		return httputil.Response{
 			status_code: 200
@@ -500,6 +513,78 @@ fn test_legacy_sampling_options_work_with_completion_after_version_check() {
 	assert state.requests[0].url.ends_with('/api/version')
 	assert state.requests[1].url.ends_with('/api/generate')
 	assert state.requests[1].body.contains('"mirostat":2')
+}
+
+fn test_opt_in_model_pull_precedes_chat_and_uses_per_call_model() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response:      httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"message":{"content":"ready"}}'
+		}
+		pull_response: '{"status":"success"}'
+	}
+	client := new_client(FakeHTTPClient{ state: state }, Options{
+		base_url:   'http://ollama.test:11434'
+		model:      'gemma4'
+		pull_model: true
+	}) or { panic(err) }
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		model: 'llama3.2'
+	}) or { panic(err) }
+	assert state.requests.len == 2
+	assert state.requests[0].url.ends_with('/api/pull')
+	assert state.requests[0].body.contains('"name":"llama3.2"')
+	assert state.requests[1].url.ends_with('/api/chat')
+	assert state.requests[1].body.contains('"model":"llama3.2"')
+}
+
+fn test_opt_in_pull_timeout_adds_a_context_deadline() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response:      httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"message":{"content":"ready"}}'
+		}
+		pull_response: '{"status":"success"}'
+	}
+	client := new_client(FakeHTTPClient{ state: state }, Options{
+		base_url:     'http://ollama.test:11434'
+		model:        'gemma4'
+		pull_model:   true
+		pull_timeout: 5 * time.second
+	}) or { panic(err) }
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	assert state.pull_deadline_set
+	assert state.requests.len == 2
+}
+
+fn test_opt_in_pull_failure_stops_before_generation() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response:      httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"message":{"content":"must not be used"}}'
+		}
+		pull_response: '{"status":"failed"}'
+	}
+	client := new_client(FakeHTTPClient{ state: state }, Options{
+		base_url:   'http://ollama.test:11434'
+		model:      'gemma4'
+		pull_model: true
+	}) or { panic(err) }
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{}) or {
+		assert err.msg().contains('did not report success')
+		assert state.requests.len == 1
+		assert state.requests[0].url.ends_with('/api/pull')
+		return
+	}
+	assert false, 'expected pull failure to prevent generation'
 }
 
 fn test_generate_content_streams_ndjson_content_and_usage() {

@@ -2,6 +2,7 @@ module ollama
 
 import context
 import net.http
+import time
 import ulises_jeremias.langchainv.httputil
 
 struct FakeHTTPClient {
@@ -10,13 +11,25 @@ struct FakeHTTPClient {
 
 struct FakeHTTPState {
 mut:
-	requests []httputil.Request
-	response httputil.Response
+	requests          []httputil.Request
+	response          httputil.Response
+	pull_response     string
+	pull_deadline_set bool
 }
 
-fn (client FakeHTTPClient) do(mut _ctx context.Context, request httputil.Request) !httputil.Response {
+fn (client FakeHTTPClient) do(mut ctx context.Context, request httputil.Request) !httputil.Response {
 	mut state := client.state
 	state.requests << request
+	if request.url.ends_with('/api/pull') {
+		state.pull_deadline_set = ctx.deadline() != none
+		if state.pull_response != '' {
+			return httputil.Response{
+				status_code: 200
+				headers:     http.Header{}
+				body:        state.pull_response
+			}
+		}
+	}
 	return state.response
 }
 
@@ -78,4 +91,52 @@ fn test_create_embedding_rejects_http_errors_without_leaking_body() {
 		return
 	}
 	assert false, 'expected server error to fail'
+}
+
+fn test_opt_in_model_pull_precedes_embedding_and_has_a_timeout() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response:      httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"embeddings":[[0.1,0.2]]}'
+		}
+		pull_response: '{"status":"success"}'
+	}
+	client := new_client(FakeHTTPClient{ state: state }, Options{
+		base_url:     'http://ollama.test:11434'
+		model:        'nomic-embed-text'
+		pull_model:   true
+		pull_timeout: 5 * time.second
+	}) or { panic(err) }
+	client.create_embedding(mut ctx, ['first']) or { panic(err) }
+	assert state.requests.len == 2
+	assert state.requests[0].url.ends_with('/api/pull')
+	assert state.requests[0].body.contains('"name":"nomic-embed-text"')
+	assert state.requests[1].url.ends_with('/api/embed')
+	assert state.pull_deadline_set
+}
+
+fn test_opt_in_model_pull_failure_stops_before_embedding() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response:      httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"embeddings":[[0.1,0.2]]}'
+		}
+		pull_response: '{"status":"failed"}'
+	}
+	client := new_client(FakeHTTPClient{ state: state }, Options{
+		base_url:   'http://ollama.test:11434'
+		model:      'nomic-embed-text'
+		pull_model: true
+	}) or { panic(err) }
+	client.create_embedding(mut ctx, ['first']) or {
+		assert err.msg().contains('did not report success')
+		assert state.requests.len == 1
+		assert state.requests[0].url.ends_with('/api/pull')
+		return
+	}
+	assert false, 'expected pull failure to prevent embedding request'
 }

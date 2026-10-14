@@ -4,6 +4,7 @@ module ollama
 import context
 import json2
 import math
+import time
 import ulises_jeremias.langchainv.embeddings
 import ulises_jeremias.langchainv.httputil
 
@@ -25,8 +26,10 @@ struct EmbeddingResponse {
 pub struct Client {
 	http_client httputil.HTTPClient
 pub:
-	base_url string = default_base_url
-	model    string
+	base_url        string = default_base_url
+	model           string
+	auto_pull_model bool
+	pull_timeout    time.Duration
 }
 
 // Options configures the Ollama server and embedding model.
@@ -34,6 +37,10 @@ pub struct Options {
 pub:
 	base_url string = default_base_url
 	model    string
+	// pull_model downloads the model before each embedding call when enabled.
+	pull_model bool
+	// pull_timeout bounds a model pull and composes with the caller's context.
+	pull_timeout time.Duration
 }
 
 // new_client configures an Ollama embeddings client.
@@ -44,12 +51,17 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 	if options.base_url.trim_space() == '' {
 		return error('Ollama base URL must not be empty')
 	}
+	if options.pull_timeout < 0 {
+		return error('Ollama pull_timeout must not be negative')
+	}
 	base_url := options.base_url.trim_space().trim_right('/')
 	httputil.validate_url(base_url, '') or { return error('invalid Ollama base URL: ${err.msg()}') }
 	return Client{
-		http_client: http_client
-		base_url:    base_url
-		model:       options.model.trim_space()
+		http_client:     http_client
+		base_url:        base_url
+		model:           options.model.trim_space()
+		auto_pull_model: options.pull_model
+		pull_timeout:    options.pull_timeout
 	}
 }
 
@@ -84,6 +96,7 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 	if body.len > max_request_bytes {
 		return error('Ollama embedding request exceeds the 8 MiB size limit')
 	}
+	client.pull_model_if_enabled(mut ctx)!
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
 		url:     '${client.base_url}/api/embed'
@@ -124,6 +137,58 @@ pub fn (client Client) create_embedding(mut ctx context.Context, texts []string)
 		}
 	}
 	return decoded.embeddings.map(it.clone())
+}
+
+fn (client Client) pull_model_if_enabled(mut ctx context.Context) ! {
+	if !client.auto_pull_model {
+		return
+	}
+	if client.pull_timeout > 0 {
+		mut pull_ctx, cancel := context.with_timeout(mut ctx, client.pull_timeout)
+		defer {
+			cancel()
+		}
+		client.pull_model(mut pull_ctx)!
+		return
+	}
+	client.pull_model(mut ctx)!
+}
+
+fn (client Client) pull_model(mut ctx context.Context) ! {
+	body := json2.encode({
+		'name':   json2.Any(client.model)
+		'stream': json2.Any(false)
+	}, json2.EncoderOptions{})
+	response := client.http_client.do(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/api/pull'
+		headers: {
+			'Content-Type': 'application/json'
+			'Accept':       'application/json'
+		}
+		body:    body
+	}) or {
+		return error('Ollama model pull failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Ollama model pull returned HTTP ${response.status_code}')
+	}
+	if response.body.len > max_response_bytes {
+		return error('Ollama model pull response exceeds 16 MiB')
+	}
+	if response.body.trim_space() == '' {
+		return
+	}
+	decoded := json2.decode[PullResponse](response.body, json2.DecoderOptions{}) or {
+		return error('could not decode Ollama model pull response')
+	}
+	if decoded.status != 'success' {
+		return error('Ollama model pull did not report success')
+	}
+}
+
+struct PullResponse {
+	status string
 }
 
 // embedder builds the common batching and preprocessing adapter for this client.
