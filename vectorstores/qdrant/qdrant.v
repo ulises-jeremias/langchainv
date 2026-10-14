@@ -133,6 +133,21 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 		}
 		input_bytes += document.page_content.len + metadata_bytes
 	}
+	mut caller_ids := []string{cap: documents.len}
+	for document in documents {
+		if id_value := document.metadata['id'] {
+			if id_value !is string || !valid_uuid(id_value as string) {
+				return error('Qdrant document id metadata must be a UUID string')
+			}
+			caller_id := id_value as string
+			if caller_id in caller_ids {
+				return error('Qdrant document id metadata must be unique within one write')
+			}
+			caller_ids << caller_id
+		} else {
+			caller_ids << ''
+		}
+	}
 	texts := documents.map(it.page_content)
 	vectors := store.embedder.embed_documents(mut ctx, texts)!
 	if vectors.len != documents.len {
@@ -157,11 +172,13 @@ pub fn (store Store) add_documents(mut ctx context.Context, documents []schema.D
 			}
 			wire_vector << json2.Any(value)
 		}
-		id := rand.uuid_v4()
+		id := if caller_ids[index] != '' { caller_ids[index] } else { rand.uuid_v4() }
 		ids << id
+		mut stored_metadata := document.metadata.clone()
+		stored_metadata.delete('id')
 		mut payload := map[string]json2.Any{
 			'page_content': json2.Any(document.page_content)
-			'metadata':     json2.Any(document.metadata.clone())
+			'metadata':     json2.Any(stored_metadata)
 		}
 		if options.namespace != '' {
 			payload['namespace'] = json2.Any(options.namespace)

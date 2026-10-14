@@ -303,3 +303,43 @@ fn test_qdrant_search_rejects_invalid_condition_filters() {
 		assert false, 'expected invalid Qdrant filter to fail'
 	}
 }
+
+fn test_qdrant_add_documents_uses_caller_supplied_ids() {
+	mut state := &QdrantFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"status":"ok"}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut document := schema.new_document('custom id text')
+	document.metadata['id'] = json2.Any('123e4567-e89b-12d3-a456-426614174000')
+	ids := store.add_documents(mut ctx, [document], vectorstores.StoreOptions{}) or { panic(err) }
+	assert ids == ['123e4567-e89b-12d3-a456-426614174000']
+	assert state.requests[0].body.contains('"id":"123e4567-e89b-12d3-a456-426614174000"')
+	assert !state.requests[0].body.contains('"metadata":{"id"')
+}
+
+fn test_qdrant_add_documents_rejects_invalid_or_duplicate_ids() {
+	mut ctx := context.background()
+	for id_value in ['not-a-uuid', '123e4567-e89b-12d3-a456-426614174000'] {
+		mut state := &QdrantFixtureState{}
+		mut store := fixture_store(state) or { panic(err) }
+		mut first := schema.new_document('one')
+		first.metadata['id'] = json2.Any(id_value)
+		mut documents := [first]
+		if id_value != 'not-a-uuid' {
+			mut second := schema.new_document('two')
+			second.metadata['id'] = json2.Any(id_value)
+			documents << second
+		}
+		store.add_documents(mut ctx, documents, vectorstores.StoreOptions{}) or {
+			assert err.msg().contains('Qdrant document id')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid or duplicate document id to fail'
+	}
+}
