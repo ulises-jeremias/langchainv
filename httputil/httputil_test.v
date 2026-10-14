@@ -2,6 +2,7 @@ module httputil
 
 import context
 import net.http
+import time
 
 struct FixtureHTTPClient {
 	state &FixtureHTTPClientState
@@ -135,6 +136,30 @@ fn test_default_client_rejects_non_http_urls_before_network() {
 		return
 	}
 	assert false, 'expected non-HTTP scheme to fail'
+}
+
+fn test_request_timeout_respects_context_deadline() {
+	mut parent := context.background()
+	mut ctx, cancel := context.with_timeout(mut parent, 250 * time.millisecond)
+	defer {
+		cancel()
+	}
+	timeout := request_timeout(ctx, 30000)!
+	assert timeout <= 250 * time.millisecond
+	assert timeout > 0 * time.millisecond
+}
+
+fn test_request_timeout_rejects_elapsed_context_deadline() {
+	mut parent := context.background()
+	mut ctx, cancel := context.with_timeout(mut parent, 0 * time.second)
+	defer {
+		cancel()
+	}
+	request_timeout(ctx, 30000) or {
+		assert err.msg().contains('deadline exceeded')
+		return
+	}
+	assert false, 'expected elapsed context deadline to stop the request'
 }
 
 fn test_default_client_rejects_urls_with_user_information() {

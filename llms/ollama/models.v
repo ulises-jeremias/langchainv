@@ -106,6 +106,22 @@ pub fn (client Client) pull_model(mut ctx context.Context, name string) ! {
 	}
 }
 
+// pull_model_if_enabled opts into pulling the requested model before generation.
+fn (client Client) pull_model_if_enabled(mut ctx context.Context, model string) ! {
+	if !client.auto_pull_model {
+		return
+	}
+	if client.pull_timeout > 0 {
+		mut pull_ctx, cancel := context.with_timeout(mut ctx, client.pull_timeout)
+		defer {
+			cancel()
+		}
+		client.pull_model(mut pull_ctx, model)!
+		return
+	}
+	client.pull_model(mut ctx, model)!
+}
+
 // delete_model removes one local model through DELETE /api/delete.
 pub fn (client Client) delete_model(mut ctx context.Context, name string) ! {
 	validate_model_name(name)!

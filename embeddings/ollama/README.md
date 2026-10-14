@@ -13,3 +13,9 @@ tests. The client does not download models or connect to the server until an
 embedding request is made. Wrap it with `default_embedder()` or
 `embedder(embeddings.Options{...})` for common newline preprocessing and
 sequential batch handling.
+
+Set `Options.pull_model: true` to pull the configured model before each
+embedding request. Pulling is disabled by default. `Options.pull_timeout` adds a
+deadline that composes with the caller context and transport timeout. For large
+downloads, inject an `httputil.DefaultClient` configured with a suitable
+`timeout_ms`.

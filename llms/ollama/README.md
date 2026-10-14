@@ -109,6 +109,14 @@ field. Chat calls emit generate-content start/end or error events. Completion
 calls emit completion start/end or error events. Both paths use the same
 callback behavior for streaming and non-streaming requests.
 
+Set `Options.pull_model: true` to pull the selected model before each chat or
+completion request. Pulling is disabled by default so constructing or calling a
+client never downloads a model implicitly. `Options.pull_timeout` adds a
+deadline to the pull and composes with the caller context; the injected HTTP
+transport can impose a shorter timeout. For a long pull, configure a
+`httputil.DefaultClient` with an appropriate `timeout_ms` and pass it to
+`new_client`.
+
 Generate completion prompts and request bodies are capped at 8 MiB. Streaming
 `/api/generate` responses use bounded NDJSON parsing and require a final
 `done: true` record; callbacks receive response and reasoning deltas as they

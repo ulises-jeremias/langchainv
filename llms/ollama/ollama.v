@@ -5,6 +5,7 @@ import context
 import encoding.base64
 import json2
 import math
+import time
 import ulises_jeremias.langchainv.callbacks
 import ulises_jeremias.langchainv.httputil
 import ulises_jeremias.langchainv.llms
@@ -27,6 +28,8 @@ pub:
 	format_schema         map[string]json2.Any
 	keep_alive            string
 	legacy_server_version string
+	auto_pull_model       bool
+	pull_timeout          time.Duration
 pub mut:
 	callbacks ?callbacks.Handler
 }
@@ -43,7 +46,11 @@ pub:
 	// legacy_server_version is the exact Ollama server version expected when
 	// sending legacy runner options. It is verified through GET /api/version.
 	legacy_server_version string
-	callbacks             ?callbacks.Handler
+	// pull_model downloads the model before each generation call when enabled.
+	pull_model bool
+	// pull_timeout bounds a model pull and composes with the caller's context.
+	pull_timeout time.Duration
+	callbacks    ?callbacks.Handler
 }
 
 struct ChatResponse {
@@ -111,6 +118,9 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 	if options.base_url.trim_space() == '' {
 		return error('Ollama base URL must not be empty')
 	}
+	if options.pull_timeout < 0 {
+		return error('Ollama pull_timeout must not be negative')
+	}
 	if options.legacy_server_version.trim_space() != '' {
 		parse_ollama_version(options.legacy_server_version) or {
 			return error('Ollama legacy_server_version must use major.minor.patch format')
@@ -145,6 +155,8 @@ pub fn new_client(http_client httputil.HTTPClient, options Options) !Client {
 		format_schema:         format_schema
 		keep_alive:            options.keep_alive.trim_space()
 		legacy_server_version: options.legacy_server_version.trim_space()
+		auto_pull_model:       options.pull_model
+		pull_timeout:          options.pull_timeout
 		callbacks:             options.callbacks
 	}
 }
@@ -202,6 +214,7 @@ fn (client Client) generate_completion_request(mut ctx context.Context, prompt s
 	}
 	request := make_generate_request(client, model, prompt, options)!
 	client.validate_legacy_server_version(mut ctx, options.provider_options)!
+	client.pull_model_if_enabled(mut ctx, model)!
 	if options.streaming_func != none || options.streaming_reasoning_func != none {
 		return client.generate_completion_stream(mut ctx, request, options)
 	}
@@ -279,6 +292,7 @@ fn (client Client) generate_content_request(mut ctx context.Context, messages []
 	}
 	request := make_request(client, model, messages, options)!
 	client.validate_legacy_server_version(mut ctx, options.provider_options)!
+	client.pull_model_if_enabled(mut ctx, model)!
 	if _ := options.streaming_func {
 		return client.generate_stream(mut ctx, request, options)
 	}
