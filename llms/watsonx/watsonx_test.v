@@ -63,7 +63,7 @@ fn test_generate_content_maps_text_usage_and_generation_options() {
 	assert response.usage.completion_tokens == 4
 	assert response.usage.total_tokens == 13
 	assert state.requests.len == 1
-	assert state.requests[0].url == 'https://watsonx.test/ml/v1-beta/generation/text?version=2024-05-20'
+	assert state.requests[0].url == 'https://watsonx.test/ml/v1/text/generation?version=2024-05-20'
 	assert state.requests[0].headers['Authorization'] == 'Bearer iam-access-token'
 	assert state.requests[0].body.contains('"project_id":"project-123"')
 	assert state.requests[0].body.contains('"model_id":"ibm/granite-3-8b-instruct"')
@@ -85,7 +85,7 @@ fn test_generate_content_rejects_unsupported_input_before_network() {
 	assert false, 'expected multi-message input to be rejected'
 }
 
-fn test_generate_content_rejects_streaming_before_network() {
+fn test_generate_content_requires_a_streaming_transport() {
 	mut ctx := context.background()
 	mut client, state := new_fixture_client('{}', 200)
 	client.generate_content(mut ctx, [schema.text_message(.human, 'question')], llms.CallOptions{
@@ -95,7 +95,7 @@ fn test_generate_content_rejects_streaming_before_network() {
 		assert state.requests.len == 0
 		return
 	}
-	assert false, 'expected unsupported streaming to be rejected'
+	assert false, 'expected a streaming transport to be required'
 }
 
 fn test_generate_content_hides_provider_error_body_and_requires_results() {

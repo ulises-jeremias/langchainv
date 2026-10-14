@@ -15,6 +15,41 @@ the returned token until 60 seconds before its expiry. `Options.iam_url` and
 defaults to the version used by upstream `watsonx-go` v1.0.0. Tests use injected
 fake HTTP for both IAM and generation and do not call IBM Cloud.
 
-Multimodal/chat history, streaming, multiple candidates, and unsupported common
-generation options are rejected before an API request. Prompts default to a
-256 KiB bound; requests and decoded responses are capped at 512 KiB and 4 MiB.
+Streaming uses IBM's stable `/ml/v1/text/generation_stream` SSE endpoint and
+requires an `httputil.StreamingHTTPClient`. The callback receives incremental
+text chunks; the returned choice contains their concatenation and the latest
+stop reason and token usage. Non-streaming requests use
+`/ml/v1/text/generation`. Both use the configured API version, which defaults
+to `2024-05-20`. See IBM's [text streaming tutorial](https://www.ibm.com/docs/en/watsonx/saas?topic=hub-stream-text-tutorial)
+for the wire format.
+
+```v
+module main
+
+import context
+import os
+import ulises_jeremias.langchainv.llms
+import ulises_jeremias.langchainv.llms.watsonx
+import ulises_jeremias.langchainv.schema
+
+fn main() {
+	mut client := watsonx.new_default_client(watsonx.Options{
+		project_id: os.getenv('WATSONX_PROJECT_ID')
+		model: 'ibm/granite-3-8b-instruct'
+		api_key: os.getenv('WATSONX_API_KEY')
+	}) or { panic(err) }
+	stream := llms.StreamFunc(fn (mut _ context.Context, chunk []u8) ! {
+		print(chunk.bytestr())
+	})
+	mut ctx := context.background()
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'Say hello.')], llms.CallOptions{
+		streaming_func: stream
+	}) or { panic(err) }
+	println('Tokens: ${response.usage.total_tokens}')
+}
+```
+
+Multimodal/chat history, reasoning-stream callbacks, multiple candidates, and
+unsupported common generation options are rejected before an API request.
+Prompts default to a 256 KiB bound; request bodies and decoded or streamed
+responses are capped at 512 KiB and 4 MiB.

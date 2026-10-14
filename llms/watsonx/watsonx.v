@@ -42,6 +42,16 @@ mut:
 	expiration   i64
 }
 
+struct StreamState {
+mut:
+	content               string
+	stop_reason           string
+	input_token_count     int
+	generated_token_count int
+	received_bytes        i64
+	received_result       bool
+}
+
 // Options configures project/model selection, API-key or IAM-token auth, and HTTPS endpoints.
 pub struct Options {
 pub:
@@ -179,10 +189,21 @@ pub fn (mut client Client) generate_content(mut ctx context.Context, messages []
 	if ctx_error !is none {
 		return ctx_error
 	}
+	if _ := options.streaming_func {
+		if client.http_client !is httputil.StreamingHTTPClient {
+			return error('configured watsonx HTTP transport does not support streaming responses')
+		}
+		access_token := client.resolve_access_token(mut ctx)!
+		answer := client.generate_stream(mut ctx, access_token, request_body, options)!
+		if mut handler := client.callbacks {
+			handler.llm_generate_content_end(mut ctx, answer)
+		}
+		return answer
+	}
 	access_token := client.resolve_access_token(mut ctx)!
 	response := client.http_client.do(mut ctx, httputil.Request{
 		method:  .post
-		url:     '${client.base_url}/ml/v1-beta/generation/text?version=${client.api_version}'
+		url:     '${client.base_url}/ml/v1/text/generation?version=${client.api_version}'
 		headers: {
 			'Authorization': 'Bearer ${access_token}'
 			'Content-Type':  'application/json'
@@ -223,6 +244,87 @@ pub fn (mut client Client) generate_content(mut ctx context.Context, messages []
 		handler.llm_generate_content_end(mut ctx, answer)
 	}
 	return answer
+}
+
+fn (mut client Client) generate_stream(mut ctx context.Context, access_token string, request_body string, options llms.CallOptions) !llms.Response {
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut decoder := httputil.new_sse_decoder(max_response_bytes)!
+	mut state := &StreamState{}
+	mut process_event := fn [options, mut state] (mut callback_ctx context.Context, event []u8) ! {
+		if event.bytestr() == '[DONE]' {
+			return
+		}
+		decoded := json2.decode[GenerateResponse](event.bytestr(), json2.DecoderOptions{}) or {
+			return error('could not decode watsonx generation stream event')
+		}
+		if decoded.results.len == 0 {
+			return
+		}
+		if decoded.results.len != 1 {
+			return error('watsonx generation stream returned an unexpected number of results')
+		}
+		result := decoded.results[0]
+		state.received_result = true
+		state.content += result.generated_text
+		state.stop_reason = result.stop_reason
+		if result.input_token_count > 0 {
+			state.input_token_count = result.input_token_count
+		}
+		state.generated_token_count = result.generated_token_count
+		if result.generated_text != '' {
+			if callback := options.streaming_func {
+				callback(mut callback_ctx, result.generated_text.bytes()) or {
+					return error('watsonx streaming callback failed: ${err.msg()}')
+				}
+			}
+		}
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/ml/v1/text/generation_stream?version=${client.api_version}'
+		headers: {
+			'Authorization': 'Bearer ${access_token}'
+			'Content-Type':  'application/json'
+			'Accept':        'text/event-stream'
+		}
+		body:    request_body
+	}, fn [mut decoder, mut process_event, mut state] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > i64(max_response_bytes) {
+			return error('watsonx generation stream exceeds 4 MiB')
+		}
+		events := decoder.push(bytes) or {
+			return error('could not decode watsonx generation stream: ${err.msg()}')
+		}
+		for event in events {
+			process_event(mut callback_ctx, event)!
+		}
+	}) or {
+		return error('watsonx generation stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('watsonx generation stream returned HTTP ${response.status_code}')
+	}
+	for event in decoder.finish()! {
+		process_event(mut ctx, event)!
+	}
+	if !state.received_result {
+		return error('watsonx returned no generation stream results')
+	}
+	if state.content == '' {
+		return error('watsonx returned an empty completion')
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:     state.content
+			stop_reason: state.stop_reason
+		}]
+		usage:   llms.Usage{
+			prompt_tokens:     state.input_token_count
+			completion_tokens: state.generated_token_count
+			total_tokens:      state.input_token_count + state.generated_token_count
+		}
+	}
 }
 
 fn (mut client Client) resolve_access_token(mut ctx context.Context) !string {
@@ -313,8 +415,8 @@ fn validate_options(options llms.CallOptions) ! {
 	if options.candidate_count > 1 || options.n > 1 || options.min_length != 0 || options.max_length != 0
 		|| options.json_mode || options.tools.len > 0 || options.tool_choice != none || options.functions.len > 0
 		|| options.function_call_behavior != '' || options.frequency_penalty != 0
-		|| options.presence_penalty != 0 || options.streaming_func != none
-		|| options.streaming_reasoning_func != none || options.web_search_options != none
+		|| options.presence_penalty != 0 || options.streaming_reasoning_func != none
+		|| options.web_search_options != none
 		|| options.provider_options.len > 0 || options.metadata.len > 0 {
 		return error('watsonx requested option is unsupported by this client')
 	}
