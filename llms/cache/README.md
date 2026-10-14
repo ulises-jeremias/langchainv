@@ -6,9 +6,15 @@ typed multimodal parts, metadata, and every `CallOptions` field except callback
 functions. Prompt and response content is never written to logs by this package.
 
 `llms/cache/inmemory` provides a concurrency-safe FIFO cache with a fixed entry
-limit. Choose a capacity based on response sizes: the bound limits entry count,
-not total bytes. Use a persistent backend when entries must survive process
-restarts.
+limit. `new_cache_with_limits` adds a combined byte bound measured as the JSON
+encoded response payload size. Oversized responses are returned by the wrapped
+model but skipped by the cache. This payload bound does not include V heap,
+allocator, or map overhead.
+
+`llms/cache/sqlite` persists response entries across process restarts and
+enforces both entry and encoded-payload byte limits. SQLite stores response
+payloads in plaintext; protect the database file with appropriate filesystem
+permissions and encryption-at-rest controls for your environment.
 
 ```v
 import context
@@ -20,7 +26,7 @@ import os
 
 fn main() {
 	client := openai.new_default_client(os.getenv('OPENAI_API_KEY')) or { panic(err) }
-	backend := inmemory.new_cache(256) or { panic(err) }
+	backend := inmemory.new_cache_with_limits(256, 64 * 1024 * 1024) or { panic(err) }
 	model := cache.new_cacher(llms.Model(client), backend)
 	mut ctx := context.background()
 	_ = model
