@@ -14,6 +14,7 @@ import ulises_jeremias.langchainv.schema
 const default_model = 'anthropic.claude-3-5-haiku-20241022-v1:0'
 const max_request_bytes = 5 * 1024 * 1024
 const max_response_bytes = 8 * 1024 * 1024
+const max_reasoning_bytes = 1024 * 1024
 const max_image_bytes = 3 * 1024 * 1024
 const max_message_content_bytes = 4 * 1024 * 1024
 const max_stream_frame_bytes = 1024 * 1024
@@ -737,8 +738,31 @@ fn convert_message(message schema.Message, mut limits ConversionLimits) !map[str
 			schema.ImageURLPart {
 				return error('Amazon Bedrock Converse requires inline image data')
 			}
-			schema.ThinkingPart, schema.RedactedThinkingPart {
-				return error('Amazon Bedrock Converse does not support reasoning replay')
+			schema.ThinkingPart {
+				if part.signature.trim_space() == '' {
+					return error('Amazon Bedrock reasoning replay requires a signature from the original response')
+				}
+				if part.text.len > max_reasoning_bytes || part.signature.len > max_reasoning_bytes {
+					return error('Amazon Bedrock reasoning replay exceeds the 1 MiB size limit')
+				}
+				content << json2.Any({
+					'reasoningContent': json2.Any({
+						'reasoningText': json2.Any({
+							'text':      json2.Any(part.text)
+							'signature': json2.Any(part.signature)
+						})
+					})
+				})
+			}
+			schema.RedactedThinkingPart {
+				if part.data.trim_space() == '' || part.data.len > max_reasoning_bytes {
+					return error('Amazon Bedrock redacted reasoning replay requires opaque data up to 1 MiB')
+				}
+				content << json2.Any({
+					'reasoningContent': json2.Any({
+						'redactedContent': json2.Any(part.data)
+					})
+				})
 			}
 		}
 	}
@@ -768,6 +792,7 @@ fn parse_response(response map[string]json2.Any) !llms.Response {
 		return error('Amazon Bedrock response content is invalid')
 	}
 	mut content := ''
+	mut reasoning := ''
 	mut parts := []schema.ContentPart{}
 	mut tool_calls := []schema.ToolCall{}
 	for block_value in blocks_value as []json2.Any {
@@ -781,6 +806,32 @@ fn parse_response(response map[string]json2.Any) !llms.Response {
 			parts << schema.ContentPart(schema.TextPart{
 				text: text
 			})
+		}
+		if reasoning_value := block['reasoningContent'] {
+			if reasoning_value !is map[string]json2.Any {
+				return error('Amazon Bedrock reasoningContent block is invalid')
+			}
+			reasoning_block := reasoning_value as map[string]json2.Any
+			if reasoning_text_value := reasoning_block['reasoningText'] {
+				if reasoning_text_value !is map[string]json2.Any {
+					return error('Amazon Bedrock reasoningText block is invalid')
+				}
+				reasoning_text := reasoning_text_value as map[string]json2.Any
+				thought := any_string(reasoning_text['text'] or { json2.Any('') })
+				reasoning += thought
+				parts << schema.ContentPart(schema.ThinkingPart{
+					text:      thought
+					signature: any_string(reasoning_text['signature'] or { json2.Any('') })
+				})
+			}
+			if redacted := reasoning_block['redactedContent'] {
+				redacted_text := any_string(redacted)
+				if redacted_text != '' {
+					parts << schema.ContentPart(schema.RedactedThinkingPart{
+						data: redacted_text
+					})
+				}
+			}
 		}
 		if tool_use_value := block['toolUse'] {
 			if tool_use_value !is map[string]json2.Any {
@@ -822,6 +873,7 @@ fn parse_response(response map[string]json2.Any) !llms.Response {
 	return llms.Response{
 		choices: [llms.Choice{
 			content:     content
+			reasoning:   reasoning
 			stop_reason: stop_reason
 			tool_calls:  tool_calls
 			parts:       parts

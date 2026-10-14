@@ -296,3 +296,57 @@ fn test_eventstream_decoder_rejects_bad_checksums_and_truncated_frames() {
 	}
 	assert false, 'expected truncated event stream frame to fail'
 }
+
+fn test_converse_parses_and_replays_reasoning_content() {
+	mut ctx := context.background()
+	client, state := new_bedrock_fixture('{"output":{"message":{"role":"assistant","content":[{"reasoningContent":{"reasoningText":{"text":"deep thought","signature":"sig-9"}}},{"reasoningContent":{"redactedContent":"hidden"}},{"text":"done"}]}},"stopReason":"end_turn","usage":{"inputTokens":5,"outputTokens":7,"totalTokens":12}}')
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'think')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	choice := response.choices[0]
+	assert choice.content == 'done'
+	assert choice.reasoning == 'deep thought'
+	assert choice.parts.len == 3
+	thinking := choice.parts[0]
+	if thinking is schema.ThinkingPart {
+		assert thinking.signature == 'sig-9'
+	} else {
+		assert false, 'expected a thinking part'
+	}
+
+	replay_client, replay_state := new_bedrock_fixture('{"output":{"message":{"role":"assistant","content":[{"text":"next"}]}},"stopReason":"end_turn"}')
+	messages := [
+		schema.Message{
+			role:  .ai
+			parts: choice.parts.clone()
+		},
+		schema.text_message(.human, 'continue'),
+	]
+	replay_client.generate_content(mut ctx, messages, llms.CallOptions{}) or { panic(err) }
+	body := replay_state.requests[0].body
+	assert body.contains('"reasoningContent":{"reasoningText":{"signature":"sig-9","text":"deep thought"}}')
+		|| body.contains('"signature":"sig-9"')
+	assert body.contains('"redactedContent":"hidden"')
+	assert state.requests.len == 1
+}
+
+fn test_converse_rejects_unsigned_reasoning_replay() {
+	mut ctx := context.background()
+	client, state := new_bedrock_fixture('{}')
+	messages := [
+		schema.Message{
+			role:  .ai
+			parts: [
+				schema.ContentPart(schema.ThinkingPart{
+					text: 'unsigned thought'
+				}),
+			]
+		},
+	]
+	client.generate_content(mut ctx, messages, llms.CallOptions{}) or {
+		assert err.msg().contains('signature')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected unsigned reasoning replay to fail'
+}
