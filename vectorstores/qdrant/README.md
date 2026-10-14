@@ -36,3 +36,8 @@ configuration, payload schema management, and custom point IDs remain
 unsupported. The adapter stores page content and metadata in a
 payload envelope and requires the Qdrant REST API to be reachable at the
 configured base URL.
+
+To choose point IDs yourself, set the `id` metadata entry to a UUID string.
+IDs must be unique within one write and are validated before any request.
+The entry is consumed as the point ID and is not stored as metadata; without
+it, a random UUID is generated as before.

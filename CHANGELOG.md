@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Caller-supplied Qdrant point IDs through the `id` metadata entry,
+  validated as unique UUIDs before any request.
+
 - Local schema references in `jsonschema`: `$ref` into `$defs` and
   schema-valued `additionalProperties`, resolved and enforced during
   instance validation.
