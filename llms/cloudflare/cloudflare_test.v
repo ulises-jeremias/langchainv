@@ -113,6 +113,100 @@ fn test_streaming_translates_workers_ai_token_limit() {
 	assert !state.requests[0].body.contains('"max_completion_tokens"')
 }
 
+fn test_reject_if_busy_is_added_to_synchronous_requests() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"choices":[{"message":{"content":"ok"}}]}'
+		}
+	}
+	client := new_client_with_options('test-token', FakeHTTPClient{
+		state: state
+	}, Options{
+		account_id:     test_account_id
+		model:          '@cf/meta/llama-3.1-8b-instruct'
+		reject_if_busy: true
+	}) or { panic(err) }
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{}) or {
+		panic(err)
+	}
+	assert state.requests.len == 1
+	assert state.requests[0].body.contains('"options":{"rejectIfBusy":true}')
+}
+
+fn test_reject_if_busy_is_omitted_from_streaming_requests() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+		}
+	}
+	client := new_client_with_options('test-token', FakeHTTPClient{
+		state: state
+	}, Options{
+		account_id:     test_account_id
+		model:          '@cf/meta/llama-3.1-8b-instruct'
+		reject_if_busy: true
+	}) or { panic(err) }
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		streaming_func: llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	}) or { panic(err) }
+	assert state.requests.len == 1
+	assert state.requests[0].body.contains('"stream":true')
+	assert !state.requests[0].body.contains('"rejectIfBusy"')
+}
+
+fn test_create_embedding_uses_configured_workers_ai_model() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"data":[{"index":1,"embedding":[0.0,1.0]},{"index":0,"embedding":[1.0,0.0]}]}'
+		}
+	}
+	client := new_client_with_options('test-token', FakeHTTPClient{
+		state: state
+	}, Options{
+		account_id:      test_account_id
+		model:           '@cf/meta/llama-3.1-8b-instruct'
+		embedding_model: '@cf/baai/bge-base-en-v1.5'
+		reject_if_busy:  true
+	}) or { panic(err) }
+	vectors := client.create_embedding(mut ctx, ['first text', 'second text']) or { panic(err) }
+	assert vectors == [[f32(1), 0], [0, f32(1)]]
+	assert state.requests.len == 1
+	assert state.requests[0].url == 'https://api.cloudflare.com/client/v4/accounts/${test_account_id}/ai/v1/embeddings'
+	assert (state.requests[0].headers['Authorization'] or { '' }) == 'Bearer test-token'
+	assert state.requests[0].body.contains('"model":"@cf/baai/bge-base-en-v1.5"')
+	assert state.requests[0].body.contains('"first text"')
+	assert !state.requests[0].body.contains('"rejectIfBusy"')
+}
+
+fn test_standalone_embedding_client_needs_no_chat_model() {
+	mut ctx := context.background()
+	mut state := &FakeHTTPState{
+		response: httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"data":[{"index":0,"embedding":[0.25,0.75]}]}'
+		}
+	}
+	client := new_embedding_client_with_options('test-token', FakeHTTPClient{
+		state: state
+	}, EmbeddingOptions{
+		account_id: test_account_id
+	}) or { panic(err) }
+	vectors := client.create_embedding(mut ctx, ['embedding only']) or { panic(err) }
+	assert vectors == [[f32(0.25), 0.75]]
+	assert client.model == '@cf/baai/bge-base-en-v1.5'
+	assert state.requests[0].url == 'https://api.cloudflare.com/client/v4/accounts/${test_account_id}/ai/v1/embeddings'
+}
+
 fn test_constructor_rejects_malformed_account_id_before_request() {
 	new_client('test-token', 'not-an-account-id', '@cf/model', FakeHTTPClient{
 		state: &FakeHTTPState{}
