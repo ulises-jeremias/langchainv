@@ -201,9 +201,7 @@ fn (client Client) generate_chat_content(mut ctx context.Context, messages []sch
 		|| options.repetition_penalty != 0 {
 		return error('OpenAI Chat Completions does not support one or more requested generation options')
 	}
-	if options.provider_options.len > 0 {
-		return error('OpenAI provider_options are not supported yet; use typed call options')
-	}
+	validate_provider_options(options.provider_options)!
 	model := if options.model.trim_space() == '' {
 		client.model
 	} else {
@@ -556,7 +554,54 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 		|| options.frequency_penalty != 0 || options.seed != none {
 		return error('sampling controls are not supported for OpenAI reasoning models')
 	}
+	for key, value in options.provider_options {
+		result[key] = value
+	}
 	return result
+}
+
+// validate_provider_options checks the typed OpenAI-specific options accepted
+// in CallOptions.provider_options. Unknown keys and wrongly typed values are
+// rejected so a misspelled option cannot be silently dropped.
+fn validate_provider_options(provider_options map[string]json2.Any) ! {
+	for key, value in provider_options {
+		match key {
+			'user' {
+				if value !is string {
+					return error('OpenAI provider_options user must be a string')
+				}
+				user := value as string
+				if user.len == 0 || user.len > 256 || user.bytes().any(it < ` ` || it == 0x7f) {
+					return error('OpenAI provider_options user must contain 1..256 bytes without control characters')
+				}
+			}
+			'parallel_tool_calls', 'logprobs' {
+				if value !is bool {
+					return error('OpenAI provider_options ${key} must be a boolean')
+				}
+			}
+			'service_tier' {
+				if value !is string || (value as string) !in ['auto', 'default', 'flex', 'priority'] {
+					return error('OpenAI provider_options service_tier must be auto, default, flex, or priority')
+				}
+			}
+			'top_logprobs' {
+				if !is_integer_value(value) || value.int() < 0 || value.int() > 20 {
+					return error('OpenAI provider_options top_logprobs must be an integer between 0 and 20')
+				}
+			}
+			else {
+				return error('OpenAI provider_options key `${key}` is not supported')
+			}
+		}
+	}
+}
+
+fn is_integer_value(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		else { false }
+	}
 }
 
 fn validate_response_format(response_format ?ResponseFormat) ! {
