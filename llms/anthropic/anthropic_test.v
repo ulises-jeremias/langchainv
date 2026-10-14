@@ -88,6 +88,44 @@ fn test_generate_content_sends_text_messages_and_maps_usage() {
 	assert state.requests[0].body.contains('"role":"user"')
 }
 
+fn test_generate_content_sends_adaptive_thinking_and_effort_options() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"content":[{"type":"text","text":"hello"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":2}}', 200)
+	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		max_tokens:       128
+		provider_options: {
+			'thinking':      json2.Any(map[string]json2.Any{
+				'type': json2.Any('adaptive')
+			})
+			'output_config': json2.Any(map[string]json2.Any{
+				'effort': json2.Any('high')
+			})
+		}
+	}) or { panic(err) }
+	assert response.choices[0].content == 'hello'
+	assert state.requests[0].body.contains('"thinking":{"type":"adaptive"}')
+	assert state.requests[0].body.contains('"output_config":{"effort":"high"}')
+}
+
+fn test_generate_content_rejects_invalid_thinking_budget_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{}', 200)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+		max_tokens:       2048
+		provider_options: {
+			'thinking': json2.Any(map[string]json2.Any{
+				'type':          json2.Any('enabled')
+				'budget_tokens': json2.Any(2048)
+			})
+		}
+	}) or {
+		assert err.msg().contains('budget_tokens')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected invalid thinking budget to fail'
+}
+
 fn test_generate_content_streams_text_and_usage() {
 	mut ctx := context.background()
 	body := 'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":5}}}\n\nevent: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hel"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}\n\nevent: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n'

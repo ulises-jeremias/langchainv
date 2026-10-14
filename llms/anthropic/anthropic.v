@@ -388,8 +388,10 @@ fn validate_options(options llms.CallOptions) ! {
 	if options.top_k < 0 || options.temperature < 0 || options.temperature > 1 {
 		return error('Anthropic top_k must be non-negative and temperature must be between zero and one')
 	}
-	if options.provider_options.len > 0 || options.functions.len > 0 || options.web_search_options != none {
-		return error('Anthropic provider_options, legacy functions, and web search options are not supported')
+	max_tokens := if options.max_tokens > 0 { options.max_tokens } else { default_max_tokens }
+	validate_provider_options(options.provider_options, max_tokens)!
+	if options.functions.len > 0 || options.web_search_options != none {
+		return error('Anthropic legacy functions and web search options are not supported')
 	}
 	if options.tool_choice != none && options.tools.len == 0 {
 		return error('Anthropic tool_choice requires at least one tool definition')
@@ -460,10 +462,79 @@ fn make_request(model string, messages []schema.Message, options llms.CallOption
 		}
 		request['tools'] = json2.Any(tools)
 	}
+	for key, value in options.provider_options {
+		request[key] = value
+	}
 	if tool_choice := options.tool_choice {
 		request['tool_choice'] = json2.Any(convert_tool_choice(tool_choice)!)
 	}
 	return request
+}
+
+fn validate_provider_options(provider_options map[string]json2.Any, max_tokens int) ! {
+	for key, value in provider_options {
+		match key {
+			'thinking' {
+				if value !is map[string]json2.Any {
+					return error('Anthropic provider_options thinking must be an object')
+				}
+				thinking := value as map[string]json2.Any
+				type_value := thinking['type'] or {
+					return error('Anthropic provider_options thinking.type is required')
+				}
+				if type_value !is string || (type_value as string) !in ['adaptive', 'enabled',
+					'disabled'] {
+					return error('Anthropic provider_options thinking.type must be adaptive, enabled, or disabled')
+				}
+				thinking_type := type_value as string
+				for thinking_key, thinking_value in thinking {
+					if thinking_key == 'type' {
+						continue
+					}
+					if thinking_key != 'budget_tokens' || thinking_type != 'enabled'
+						|| !is_integer_value(thinking_value) {
+						return error('Anthropic provider_options thinking has an unsupported field or value')
+					}
+				}
+				if thinking_type == 'enabled' {
+					budget := thinking['budget_tokens'] or {
+						return error('Anthropic provider_options thinking.budget_tokens is required when enabled')
+					}
+					if !is_integer_value(budget) || budget.int() < 1024 || budget.int() >= max_tokens {
+						return error('Anthropic provider_options thinking.budget_tokens must be at least 1024 and less than max_tokens')
+					}
+				} else if thinking.keys().contains('budget_tokens') {
+					return error('Anthropic provider_options thinking.budget_tokens is only valid when thinking is enabled')
+				}
+			}
+			'output_config' {
+				if value !is map[string]json2.Any {
+					return error('Anthropic provider_options output_config must be an object')
+				}
+				output_config := value as map[string]json2.Any
+				if output_config.len != 1 {
+					return error('Anthropic provider_options output_config accepts only effort')
+				}
+				effort := output_config['effort'] or {
+					return error('Anthropic provider_options output_config.effort is required')
+				}
+				if effort !is string || (effort as string) !in ['low', 'medium', 'high', 'xhigh',
+					'max'] {
+					return error('Anthropic provider_options output_config.effort must be low, medium, high, xhigh, or max')
+				}
+			}
+			else {
+				return error('Anthropic provider_options key `${key}` is not supported')
+			}
+		}
+	}
+}
+
+fn is_integer_value(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		else { false }
+	}
 }
 
 fn convert_tool_choice(choice schema.ToolChoice) !map[string]json2.Any {
