@@ -34,9 +34,47 @@ For `/api/generate`, `system`, `suffix`, `template`, and `raw` are also accepted
 as typed provider options and sent as top-level prompt-generation fields;
 `truncate` and `shift` are rejected because that endpoint does not support them.
 
-The option allowlist follows the current Ollama API. Legacy LangChainGo adapter
-fields removed from current Ollama (`num_gqa` and Mirostat controls) are not
-sent, because the current server does not define them.
+The default option allowlist follows the current Ollama API. Legacy runner
+options require an explicit `Options.legacy_server_version` and are sent only
+after the client queries `/api/version` and confirms an exact version match.
+This protects a current server from legacy fields when the configured version
+is stale or incorrect. Compatibility is verified for server versions from
+`0.1.34` onward, with these removal boundaries from the Ollama API types:
+`num_gqa` before `0.1.39`; `numa` before `0.4.0`; `tfs_z` and
+`penalize_newline` before `0.5.12`; and `low_vram`, `f16_kv`, `logits_all`,
+`vocab_only`, `use_mlock`, and Mirostat controls before `0.7.0`. The client
+rejects options outside this verified span or for mismatched servers before
+calling the generation endpoint. Options documented upstream as unused or
+absent from the Ollama API remain unsupported. The boundaries come from the
+tagged [Ollama API types for v0.1.34 and v0.1.39](https://github.com/ollama/ollama/compare/v0.1.34...v0.1.39),
+[v0.3.0 and v0.4.0](https://github.com/ollama/ollama/compare/v0.3.0...v0.4.0),
+[v0.5.0 and v0.5.12](https://github.com/ollama/ollama/compare/v0.5.0...v0.5.12),
+and [v0.6.8 and v0.7.0](https://github.com/ollama/ollama/compare/v0.6.8...v0.7.0).
+
+For example, an old server can be configured explicitly; the runtime version
+is still checked before any legacy runner option is sent:
+
+```v
+module main
+
+import context
+import json2
+import ulises_jeremias.langchainv.httputil
+import ulises_jeremias.langchainv.llms
+import ulises_jeremias.langchainv.llms.ollama
+
+fn main() {
+	http_client := httputil.HTTPClient(httputil.new_default_client())
+	client := ollama.new_client(http_client, ollama.Options{
+		model:                 'llama2:70b'
+		legacy_server_version: '0.1.34'
+	}) or { panic(err) }
+	mut options := llms.CallOptions{}
+	options.provider_options['num_gqa'] = json2.Any(8)
+	mut ctx := context.background()
+	println(client.complete(mut ctx, 'Write one greeting.', options) or { panic(err) })
+}
+```
 
 Set `Options.format_schema` to a JSON object string to send a schema as Ollama's
 `format` value. The schema is decoded and validated at client construction,
