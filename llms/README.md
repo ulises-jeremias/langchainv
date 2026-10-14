@@ -8,6 +8,8 @@ supported options, streaming behavior, limits, authentication, and errors.
 For offline tests or examples, [`llms/fake`](fake/README.md) provides a
 sequential canned-response model. Use [`testing/llmtest.MockModel`](../testing/llmtest/README.md)
 when tests need structured responses, configurable errors, or call counts.
+For reusable generation results, [`llms/cache`](cache/README.md) wraps any
+model with a pluggable backend and includes a bounded in-memory FIFO backend.
 
 ## Lifecycle callbacks
 
