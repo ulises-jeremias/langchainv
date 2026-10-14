@@ -50,6 +50,7 @@ for model configuration and request limits.
 | Google AI | [Google AI embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/googleai/README.md) |
 | Hugging Face | [Hugging Face feature extraction](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/huggingface/README.md) |
 | Jina AI | [Jina embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/jina/README.md) |
+| Mistral | [Mistral embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/mistral/README.md) |
 | Ollama | [Ollama embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/ollama/README.md) |
 | OpenAI | [OpenAI embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/openai/README.md) |
 | Voyage AI | [Voyage AI embeddings](https://github.com/ulises-jeremias/langchainv/blob/main/embeddings/voyageai/README.md) |

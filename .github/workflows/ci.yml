@@ -88,7 +88,7 @@ jobs:
           - group: LLM providers
             packages: 'llms/openai llms/llamafile llms/local llms/bedrock llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai llms/vertex llms/watsonx'
           - group: embedding providers
-            packages: 'embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/voyageai embeddings/huggingface embeddings/bedrock'
+            packages: 'embeddings embeddings/openai embeddings/ollama embeddings/googleai embeddings/jina embeddings/mistral embeddings/voyageai embeddings/huggingface embeddings/bedrock'
           - group: vector stores
             packages: 'vectorstores vectorstores/azureaisearch vectorstores/chroma vectorstores/dolt vectorstores/mariadb vectorstores/milvus vectorstores/opensearch vectorstores/pgvector vectorstores/redis vectorstores/mongodb vectorstores/qdrant vectorstores/pinecone vectorstores/weaviate'
           - group: tools and document processing
