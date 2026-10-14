@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Google SQL connection helpers in `util/alloydbutil` and
+  `util/cloudsqlutil`: validated instance connection names and
+  percent-encoded PostgreSQL DSNs for use with the existing SQL adapters.
+
 - MongoDB vector store in `vectorstores/mongodb`, over an injected
   collection interface with bounded cosine scanning.
 
