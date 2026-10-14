@@ -123,3 +123,25 @@ fn test_generate_content_propagates_stream_callback_errors() {
 	}
 	assert false, 'expected callback failure to stop the stream'
 }
+
+fn test_generate_content_rejects_stream_ending_before_terminal_result() {
+	mut state := &StreamFixtureState{
+		body: 'data: {"results":[{"generated_text":"partial","generated_token_count":1,"input_token_count":1,"stop_reason":"not_finished"}]}\n\n'
+	}
+	mut client := new_client(Options{
+		project_id:   'project-123'
+		model:        'ibm/granite-3-8b-instruct'
+		access_token: 'iam-access-token'
+		base_url:     'https://watsonx.test'
+	}, httputil.HTTPClient(StreamFixtureClient{
+		state: state
+	})) or { panic(err) }
+	mut ctx := context.background()
+	client.generate_content(mut ctx, [schema.text_message(.human, 'question')], llms.CallOptions{
+		streaming_func: llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
+	}) or {
+		assert err.msg().contains('before a terminal stop reason')
+		return
+	}
+	assert false, 'expected incomplete stream to fail'
+}

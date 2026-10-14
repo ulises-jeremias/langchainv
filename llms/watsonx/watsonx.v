@@ -50,6 +50,7 @@ mut:
 	generated_token_count int
 	received_bytes        i64
 	received_result       bool
+	received_terminal     bool
 }
 
 // Options configures project/model selection, API-key or IAM-token auth, and HTTPS endpoints.
@@ -267,6 +268,7 @@ fn (mut client Client) generate_stream(mut ctx context.Context, access_token str
 		state.received_result = true
 		state.content += result.generated_text
 		state.stop_reason = result.stop_reason
+		state.received_terminal = result.stop_reason != '' && result.stop_reason != 'not_finished'
 		if result.input_token_count > 0 {
 			state.input_token_count = result.input_token_count
 		}
@@ -310,6 +312,9 @@ fn (mut client Client) generate_stream(mut ctx context.Context, access_token str
 	}
 	if !state.received_result {
 		return error('watsonx returned no generation stream results')
+	}
+	if !state.received_terminal {
+		return error('watsonx generation stream ended before a terminal stop reason')
 	}
 	if state.content == '' {
 		return error('watsonx returned an empty completion')

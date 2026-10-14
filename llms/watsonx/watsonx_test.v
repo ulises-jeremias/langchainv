@@ -91,7 +91,7 @@ fn test_generate_content_requires_a_streaming_transport() {
 	client.generate_content(mut ctx, [schema.text_message(.human, 'question')], llms.CallOptions{
 		streaming_func: llms.StreamFunc(fn (mut _ context.Context, _ []u8) ! {})
 	}) or {
-		assert err.msg().contains('unsupported')
+		assert err.msg().contains('does not support streaming responses')
 		assert state.requests.len == 0
 		return
 	}
