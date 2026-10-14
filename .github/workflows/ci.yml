@@ -84,7 +84,7 @@ jobs:
       matrix:
         include:
           - group: core and framework packages
-          packages: 'schema jsonschema llms llms/fake llms/cache llms/cache/inmemory llms/middleware callbacks chains agents prompts outputparser memory memory/sqlite memory/sqlhistory memory/mongodb memory/zep testing/llmtest util/alloydbutil util/cloudsqlutil'
+            packages: 'schema jsonschema llms llms/fake llms/cache llms/cache/inmemory llms/middleware callbacks chains agents prompts outputparser memory memory/sqlite memory/sqlhistory memory/mongodb memory/zep testing/llmtest util/alloydbutil util/cloudsqlutil'
           - group: LLM providers
             packages: 'llms/openai llms/llamafile llms/local llms/bedrock llms/anthropic llms/cohere llms/ernie llms/maritaca llms/mistral llms/huggingface llms/cloudflare llms/ollama llms/googleai llms/vertex llms/watsonx'
           - group: embedding providers
