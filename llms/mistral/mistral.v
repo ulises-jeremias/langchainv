@@ -20,16 +20,18 @@ pub:
 	model    string = default_model
 }
 
-// Options configures the Mistral endpoint and default model.
+// Options configures the Mistral endpoint, default model, and safety flag.
 pub struct Options {
 pub:
-	base_url  string = default_base_url
-	model     string = default_model
-	callbacks ?callbacks.Handler
+	base_url    string = default_base_url
+	model       string = default_model
+	safe_prompt bool
+	callbacks   ?callbacks.Handler
 }
 
 struct MistralHTTPClient {
-	inner httputil.HTTPClient
+	inner       httputil.HTTPClient
+	safe_prompt bool
 }
 
 // new_client creates a Mistral client with its default endpoint and model.
@@ -50,7 +52,8 @@ pub fn new_client_with_options(api_key string, http_client httputil.HTTPClient, 
 	base_url := options.base_url.trim_space().trim_right('/')
 	model := options.model.trim_space()
 	inner := openai.new_client_with_options(api_key, httputil.HTTPClient(MistralHTTPClient{
-		inner: http_client
+		inner:       http_client
+		safe_prompt: options.safe_prompt
 	}), openai.Options{
 		base_url:  base_url
 		model:     model
@@ -76,37 +79,19 @@ pub fn (client Client) generate_content(mut ctx context.Context, messages []sche
 
 fn (client MistralHTTPClient) do(mut ctx context.Context, request httputil.Request) !httputil.Response {
 	if request.body != '' {
-		mut payload := json2.decode[map[string]json2.Any](request.body, json2.DecoderOptions{}) or {
-			return error('could not decode Mistral-compatible request')
-		}
-		if max_tokens := payload['max_completion_tokens'] {
-			payload['max_tokens'] = max_tokens
-			payload.delete('max_completion_tokens')
-		}
-		if seed := payload['seed'] {
-			payload['random_seed'] = seed
-			payload.delete('seed')
-		}
 		translated := httputil.Request{
 			method:  request.method
 			url:     request.url
 			headers: request.headers
-			body:    json2.encode(payload, json2.EncoderOptions{})
+			body:    client.translate_payload(request.body)!
 		}
 		return client.inner.do(mut ctx, translated)
 	}
 	return client.inner.do(mut ctx, request)
 }
 
-fn (client MistralHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
-	if client.inner !is httputil.StreamingHTTPClient {
-		return error('configured Mistral HTTP transport does not support streaming responses')
-	}
-	stream_client := client.inner as httputil.StreamingHTTPClient
-	if request.body == '' {
-		return stream_client.do_stream(mut ctx, request, handler)
-	}
-	mut payload := json2.decode[map[string]json2.Any](request.body, json2.DecoderOptions{}) or {
+fn (client MistralHTTPClient) translate_payload(body string) !string {
+	mut payload := json2.decode[map[string]json2.Any](body, json2.DecoderOptions{}) or {
 		return error('could not decode Mistral-compatible request')
 	}
 	if max_tokens := payload['max_completion_tokens'] {
@@ -117,10 +102,25 @@ fn (client MistralHTTPClient) do_stream(mut ctx context.Context, request httputi
 		payload['random_seed'] = seed
 		payload.delete('seed')
 	}
+	if client.safe_prompt {
+		payload['safe_prompt'] = json2.Any(true)
+	}
+	return json2.encode(payload, json2.EncoderOptions{})
+}
+
+fn (client MistralHTTPClient) do_stream(mut ctx context.Context, request httputil.Request, handler httputil.StreamHandler) !httputil.Response {
+	if client.inner !is httputil.StreamingHTTPClient {
+		return error('configured Mistral HTTP transport does not support streaming responses')
+	}
+	stream_client := client.inner as httputil.StreamingHTTPClient
+	if request.body == '' {
+		return stream_client.do_stream(mut ctx, request, handler)
+	}
+	body := client.translate_payload(request.body)!
 	return stream_client.do_stream(mut ctx, httputil.Request{
 		method:  request.method
 		url:     request.url
 		headers: request.headers
-		body:    json2.encode(payload, json2.EncoderOptions{})
+		body:    body
 	}, handler)
 }
