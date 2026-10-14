@@ -88,6 +88,75 @@ fn test_generate_content_sends_chat_options_and_maps_usage() {
 	assert state.requests[0].body.contains('"stop":["END"]')
 }
 
+fn test_complete_uses_generate_endpoint_and_maps_response() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"response":"completed","done":true,"done_reason":"stop","prompt_eval_count":7,"eval_count":3}', 200)
+	completion := client.complete(mut ctx, 'write a sentence', llms.CallOptions{ max_tokens: 64 })!
+	assert completion == 'completed'
+	assert state.requests.len == 1
+	assert state.requests[0].url == 'http://ollama.test:11434/api/generate'
+	assert state.requests[0].body.contains('"prompt":"write a sentence"')
+	assert state.requests[0].body.contains('"stream":false')
+	assert state.requests[0].body.contains('"keep_alive":"5m"')
+	assert state.requests[0].body.contains('"num_predict":64')
+	assert !state.requests[0].body.contains('"messages"')
+}
+
+fn test_generate_completion_sends_typed_prompt_options_and_json_format() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"response":"{}","done":true}', 200)
+	mut options := llms.CallOptions{ json_mode: true, max_tokens: 48 }
+	options.provider_options['system'] = json2.Any('use concise answers')
+	options.provider_options['suffix'] = json2.Any('END')
+	options.provider_options['template'] = json2.Any('{{ .Prompt }}')
+	options.provider_options['raw'] = json2.Any(true)
+	client.complete(mut ctx, 'prompt', options) or { panic(err) }
+	body := state.requests[0].body
+	assert body.contains('"format":"json"')
+	assert body.contains('"system":"use concise answers"')
+	assert body.contains('"suffix":"END"')
+	assert body.contains('"template":"{{ .Prompt }}"')
+	assert body.contains('"raw":true')
+	assert body.contains('"num_predict":48')
+}
+
+fn test_generate_completion_streams_ndjson_and_maps_usage() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"response":"hel","done":false}\n{"response":"lo","done":true,"done_reason":"stop","prompt_eval_count":7,"eval_count":3}\n', 200)
+	mut streamed := &StreamCapture{}
+	callback := llms.StreamFunc(fn [mut streamed] (mut _ctx context.Context, chunk []u8) ! {
+		streamed.value += chunk.bytestr()
+	})
+	response := client.generate_completion(mut ctx, 'say hello', llms.CallOptions{ streaming_func: callback })!
+	assert streamed.value == 'hello'
+	assert response.choices[0].content == 'hello'
+	assert response.choices[0].stop_reason == 'stop'
+	assert response.usage.total_tokens == 10
+	assert state.requests[0].url.ends_with('/api/generate')
+	assert state.requests[0].body.contains('"stream":true')
+}
+
+fn test_generate_completion_rejects_incomplete_response() {
+	mut ctx := context.background()
+	client, _ := new_fixture_client('{"response":"partial","done":false}', 200)
+	client.complete(mut ctx, 'prompt', llms.CallOptions{}) or {
+		assert err.msg().contains('incomplete')
+		return
+	}
+	assert false, 'expected incomplete response to fail'
+}
+
+fn test_generate_completion_rejects_tools_before_network() {
+	mut ctx := context.background()
+	client, state := new_fixture_client('{"response":"unused","done":true}', 200)
+	client.complete(mut ctx, 'prompt', llms.CallOptions{ tools: [schema.ToolDefinition{ name: 'tool' }] }) or {
+		assert err.msg().contains('tool calls')
+		assert state.requests.len == 0
+		return
+	}
+	assert false, 'expected unsupported completion tools to fail'
+}
+
 fn test_generate_content_encodes_tools_and_maps_tool_calls() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"lookup","arguments":{"q":"v"}}}]},"done_reason":"tool_calls"}', 200)

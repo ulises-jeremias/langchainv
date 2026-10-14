@@ -1,7 +1,9 @@
-# Ollama Chat
+# Ollama chat and completion
 
-`ollama.Client` implements `llms.Model` and `llms.CompletionModel` using
-Ollama's `POST /api/chat` endpoint. It supports text and bounded inline image
+`ollama.Client` implements `llms.Model` through `POST /api/chat` and
+`llms.CompletionModel` through the prompt-oriented `POST /api/generate` endpoint.
+`complete` sends the prompt directly to generate; call `generate_content` when
+you want chat semantics. The chat API supports text and bounded inline image
 messages, client tool definitions and tool-call responses, JSON mode and
 JSON-Schema-constrained output, generation options, thinking replay, and
 prompt/completion usage counts. Streaming requests
@@ -27,6 +29,10 @@ Unknown keys and values with the wrong type fail before the request. Use the
 common `CallOptions.stop_words` field for stop sequences. Provider options are
 included in both streaming and non-streaming chat requests and take precedence
 over matching common generation fields when both are set.
+
+For `/api/generate`, `system`, `suffix`, `template`, and `raw` are also accepted
+as typed provider options and sent as top-level prompt-generation fields;
+`truncate` and `shift` are rejected because that endpoint does not support them.
 
 The option allowlist follows the current Ollama API. Legacy LangChainGo adapter
 fields removed from current Ollama (`num_gqa` and Mirostat controls) are not
@@ -54,16 +60,23 @@ fn main() {
 }
 ```
 
-Inline image data is limited to 5 MiB per request; chat histories are capped at
+Inline image data is limited to 5 MiB per chat request; chat histories are capped at
 1,024 messages and 128 tools. HTTP request and response bodies are capped at
 8 MiB and 16 MiB. Image URLs are rejected because Ollama's chat endpoint
 accepts base64 image data. See the [Ollama chat API](https://docs.ollama.com/api/chat)
 for the wire contract.
 
 Set `Options.callbacks` at construction, or assign the client's `callbacks`
-field, to receive one generate-content start event before each request and
-then either an end event with the response or an error event, for streaming
-and non-streaming calls alike.
+field. Chat calls emit generate-content start/end or error events. Completion
+calls emit completion start/end or error events. Both paths use the same
+callback behavior for streaming and non-streaming requests.
+
+Generate completion prompts and request bodies are capped at 8 MiB. Streaming
+`/api/generate` responses use bounded NDJSON parsing and require a final
+`done: true` record; callbacks receive response and reasoning deltas as they
+arrive. `CallOptions.provider_options` accepts validated generate fields,
+including `system`, `suffix`, `template`, and `raw`. Tool calls remain a chat
+API feature. See the [Ollama generate API](https://docs.ollama.com/api/generate).
 
 Model management uses the server endpoints directly: `list_models` reads
 `/api/tags`, `show_model` reads `/api/show`, `pull_model` downloads through
