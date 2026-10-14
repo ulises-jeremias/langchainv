@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Weaviate filter operators: comparison, `ContainsAny` membership,
+  `IsNull` existence, and bounded `$and`/`$or` groups in search filters.
+
 - Milvus L2 score filtering: `min_score` now works with the L2 metric as a
   maximum-distance threshold instead of being rejected.
 

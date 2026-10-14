@@ -193,7 +193,7 @@ syntax remain outstanding;
 Weaviate — partial: batch object upsert and delete against a provisioned class,
 GraphQL near-vector and metadata searches, namespaces, scalar equality filters,
 certainty thresholds, injected embeddings/transport, and bounded requests;
-class/schema management and advanced filter operators remain outstanding;
+class/schema management remains outstanding; filters support equality, comparison, ContainsAny membership, IsNull existence, and bounded $and/$or operator objects;
 `SearchOptions.include_vectors` returns validated vectors when requested.
 
 ## Document loaders and tools

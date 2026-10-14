@@ -6,7 +6,8 @@ the configured text, namespace, and metadata properties. The adapter does not
 create or alter schemas.
 
 The adapter supports batch upserts and deletes of up to 64 objects, GraphQL
-near-vector and metadata searches, namespace isolation, exact equality filters
+near-vector and metadata searches, namespace isolation, and metadata filters
+with equality, comparison, membership, existence, and logical operators
 for scalar metadata, and optional certainty thresholds. It uses an injected
 embedder and HTTP client for offline tests. Remote endpoints require HTTPS;
 plain HTTP is allowed only on loopback. Requests and responses are capped at
@@ -23,6 +24,6 @@ mut store := weaviate.new_store(embedder, weaviate.Options{
 })!
 ```
 
-Schema management and filters beyond scalar equality remain unsupported. Since
+Schema management remains unsupported. Since
 namespace is stored in a class property, configure that property as a filterable
 scalar in the existing schema.
