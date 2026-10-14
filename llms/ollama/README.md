@@ -10,10 +10,23 @@ as chunks arrive.
 
 `new_default_client(model)` targets `http://127.0.0.1:11434`. Use
 `new_client(http_client, options)` for an alternate endpoint or deterministic
-tests. The client does not download or pull models automatically. Model
-management and provider-specific generation options are not implemented. Streaming requires a
+tests. The client does not download or pull models automatically unless the
+application explicitly calls a model-management method. Streaming requires a
 transport that implements the streaming HTTP contract. Unsupported common
 options return errors rather than being silently ignored.
+
+Ollama runner options can be supplied per call through
+`llms.CallOptions.provider_options`. Supported keys are `num_ctx`, `num_batch`,
+`num_gqa`, `num_gpu`, `main_gpu`, `num_thread`, `repeat_last_n`, `seed`,
+`top_k`, `num_keep`, `mirostat`, `num_predict`, `rope_frequency_base`,
+`rope_frequency_scale`, `typical_p`, `repeat_penalty`, `presence_penalty`,
+`frequency_penalty`, `tfs_z`, `mirostat_tau`, `mirostat_eta`, `top_p`,
+`temperature`, `numa`, `logits_all`, `vocab_only`, `use_mmap`, `use_mlock`,
+`embedding_only`, `f16_kv`, `low_vram`, `penalize_newline`, and `think`.
+Unknown keys and values with the wrong type fail before the request. Use the
+common `CallOptions.stop_words` field for stop sequences. Provider options are
+included in both streaming and non-streaming chat requests and take precedence
+over matching common generation fields when both are set.
 
 Set `Options.format_schema` to a JSON object string to send a schema as Ollama's
 `format` value. The schema is decoded and validated at client construction,

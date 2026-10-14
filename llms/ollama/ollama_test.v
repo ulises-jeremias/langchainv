@@ -188,19 +188,61 @@ fn test_generate_content_sends_schema_valued_format() {
 	assert state.requests[0].body.contains('"required":["name"]')
 }
 
-fn test_generate_content_rejects_unsupported_provider_options_before_network() {
+fn test_generate_content_sends_ollama_provider_options() {
 	mut ctx := context.background()
-	client, state := new_fixture_client('{}', 200)
-	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		provider_options: {
-			'unsupported': json2.Any(true)
-		}
-	}) or {
-		assert err.msg().contains('provider_options are not supported')
-		assert state.requests.len == 0
-		return
+	client, state := new_fixture_client('{"message":{"content":"ok"}}', 200)
+	mut options := llms.CallOptions{
+		max_tokens:  96
+		temperature: 0.2
+		stop_words:  ['END']
 	}
-	assert false, 'expected unsupported provider options to be rejected'
+	options.provider_options['num_ctx'] = json2.Any(4096)
+	options.provider_options['num_thread'] = json2.Any(4)
+	options.provider_options['mirostat'] = json2.Any(2)
+	options.provider_options['typical_p'] = json2.Any(0.8)
+	options.provider_options['numa'] = json2.Any(false)
+	options.provider_options['think'] = json2.Any(true)
+	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], options) or {
+		panic(err)
+	}
+	body := state.requests[0].body
+	assert body.contains('"num_predict":96')
+	assert body.contains('"temperature":0.2')
+	assert body.contains('"stop":["END"]')
+	assert body.contains('"num_ctx":4096')
+	assert body.contains('"num_thread":4')
+	assert body.contains('"mirostat":2')
+	assert body.contains('"typical_p":0.8')
+	assert body.contains('"numa":false')
+	assert body.contains('"think":true')
+}
+
+fn test_generate_content_rejects_invalid_provider_options_before_network() {
+	mut ctx := context.background()
+	for provider_options in [
+		{
+			'unsupported': json2.Any(true)
+		},
+		{
+			'num_ctx': json2.Any('large')
+		},
+		{
+			'numa': json2.Any(1)
+		},
+		{
+			'mirostat': json2.Any(3)
+		},
+	] {
+		client, state := new_fixture_client('{}', 200)
+		client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
+			provider_options: provider_options
+		}) or {
+			assert err.msg().contains('provider_options')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid provider options to be rejected'
+	}
 }
 
 fn test_generate_content_streams_ndjson_content_and_usage() {
@@ -212,13 +254,17 @@ fn test_generate_content_streams_ndjson_content_and_usage() {
 		streamed.value += chunk.bytestr()
 	})
 	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		streaming_func: stream
+		streaming_func:   stream
+		provider_options: {
+			'num_ctx': json2.Any(2048)
+		}
 	}) or { panic(err) }
 	assert streamed.value == 'hello'
 	assert response.choices[0].content == 'hello'
 	assert response.choices[0].stop_reason == 'stop'
 	assert response.usage.total_tokens == 4
 	assert state.requests[0].body.contains('"stream":true')
+	assert state.requests[0].body.contains('"num_ctx":2048')
 	assert (state.requests[0].headers['Accept'] or { '' }) == 'application/x-ndjson'
 }
 
