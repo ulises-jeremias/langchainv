@@ -30,7 +30,12 @@ UTF-8.
 provider-specific encoding package. Its `encode` method runs once per input;
 chunks are decoded from overlapping token windows. Implementations may wrap a
 local tokenizer library or a provider tokenizer. This package does not make
-network calls to download tokenizer data.
+network calls to download tokenizer data. `SimpleTokenizer` is a built-in
+dictionary tokenizer: byte ids keep it lossless for any UTF-8 text, and 43
+common English fragments encode as single tokens. Its counts approximate
+provider token counts on English text but match no provider encoding, so
+inject a provider tokenizer when exact counts matter.
+`new_simple_token_splitter` builds a splitter with it directly.
 
 ## Markdown splitting
 
