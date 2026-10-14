@@ -52,6 +52,16 @@ Do not run live provider calls or incur API charges in routine validation.
   services must be opt-in and documented.
 - Keep VSL/VTL numerical adapters optional and isolated.
 
+## Finding an issue
+
+- Start with `docs/LANGCHAINGO_PARITY.md` and choose a linked open issue for the package you want to change.
+- Issues labeled `good first issue` are scoped for a first contribution. Read the acceptance criteria and leave a comment before starting if the issue has no assignee or recent activity.
+- Parity issues link to the pinned LangChainGo source or the relevant provider documentation. Use those references to confirm behavior; do not copy Go implementation code.
+- If a gap has no issue, open one with the feature request template. Include the affected package, expected behavior, upstream reference and smallest useful scope.
+- Ask questions in the issue before expanding its scope. Keep a pull request focused on one issue and link it in the PR description.
+
+For a first contribution, see the open [`good first issue` list](https://github.com/ulises-jeremias/langchainv/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
 ## Pull requests
 
 - Make one logical change per commit and use an imperative subject such as
@@ -60,3 +70,6 @@ Do not run live provider calls or incur API charges in routine validation.
   parity ledger updates together.
 - Request human review before merge. A local compile or partial check does not
   establish full upstream parity.
+- Link the issue being addressed and report the exact validation commands and
+  outcomes. CI runs the complete package matrix and compiles the Markdown
+  examples in the tutorials.
