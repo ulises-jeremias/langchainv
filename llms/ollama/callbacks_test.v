@@ -38,6 +38,17 @@ fn (mut handler CallbackRecorder) llm_generate_content_start(mut _ctx context.Co
 	state.events << 'start'
 }
 
+fn (mut handler CallbackRecorder) llm_start(mut _ctx context.Context, _prompts []string) {
+	mut state := handler.state
+	state.events << 'completion_start'
+}
+
+fn (mut handler CallbackRecorder) llm_complete_end(mut _ctx context.Context, response string) {
+	mut state := handler.state
+	state.events << 'completion_end'
+	state.content = response
+}
+
 fn (mut handler CallbackRecorder) llm_generate_content_end(mut _ctx context.Context, response llms.Response) {
 	mut state := handler.state
 	state.events << 'end'
@@ -93,4 +104,14 @@ fn test_generate_content_dispatches_error_callback() {
 		return
 	}
 	assert false, 'expected the HTTP error to fail'
+}
+
+fn test_generate_completion_dispatches_completion_callbacks() {
+	mut recorder := &CallbackRecorderState{}
+	client := new_callback_client('{"response":"hello","done":true}', 200, recorder)
+	mut ctx := context.background()
+	response := client.complete(mut ctx, 'write hello', llms.CallOptions{}) or { panic(err) }
+	assert response == 'hello'
+	assert recorder.events == ['completion_start', 'completion_end']
+	assert recorder.content == 'hello'
 }

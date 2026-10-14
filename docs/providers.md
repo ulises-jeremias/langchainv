@@ -33,7 +33,7 @@ and [model callbacks tutorial](../tutorials/model-callbacks/).
 | Local executable | [Local model process](https://github.com/ulises-jeremias/langchainv/blob/main/llms/local/README.md) | Explicitly configured local process |
 | Maritaca | [Maritaca](https://github.com/ulises-jeremias/langchainv/blob/main/llms/maritaca/README.md) | Hosted OpenAI-compatible API |
 | Mistral | [Mistral](https://github.com/ulises-jeremias/langchainv/blob/main/llms/mistral/README.md) | Hosted Chat Completions API |
-| Ollama | [Ollama](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md) | Local server |
+| Ollama | [Ollama chat and completion](https://github.com/ulises-jeremias/langchainv/blob/main/llms/ollama/README.md) | Local server (`/api/chat`, `/api/generate`) |
 | OpenAI | [Chat Completions](https://github.com/ulises-jeremias/langchainv/blob/main/llms/openai/README.md) | Hosted API or compatible endpoint |
 | Offline fake model | [Canned responses](https://github.com/ulises-jeremias/langchainv/blob/main/llms/fake/README.md) | In-process test fixture |
 | Response cache | [Model response cache](https://github.com/ulises-jeremias/langchainv/blob/main/llms/cache/README.md) | Pluggable backend; bounded in-memory FIFO included |

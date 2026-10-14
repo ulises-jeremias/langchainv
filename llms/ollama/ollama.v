@@ -48,6 +48,28 @@ struct ChatResponse {
 	eval_count        int
 }
 
+struct GenerateResponse {
+	response          string
+	thinking          string
+	done              bool
+	done_reason       string
+	prompt_eval_count int
+	eval_count        int
+}
+
+struct GenerateStreamState {
+mut:
+	buffer            string
+	content           string
+	thinking          string
+	done_reason       string
+	prompt_tokens     int
+	completion_tokens int
+	received_bytes    i64
+	done              bool
+	error             string
+}
+
 struct OllamaStreamState {
 mut:
 	buffer            string
@@ -123,13 +145,86 @@ pub fn new_default_client(model string) !Client {
 	})
 }
 
-// complete implements CompletionModel by wrapping the prompt in a user message.
+// complete implements CompletionModel through Ollama's prompt-oriented /api/generate endpoint.
 pub fn (client Client) complete(mut ctx context.Context, prompt string, options llms.CallOptions) !string {
-	response := client.generate_content(mut ctx, [schema.text_message(.human, prompt)], options)!
+	response := client.generate_completion(mut ctx, prompt, options)!
 	if response.choices.len == 0 {
 		return error('Ollama returned no completion choices')
 	}
 	return response.choices[0].content
+}
+
+// generate_completion sends a prompt to /api/generate and returns its response,
+// usage, stop reason, and optional reasoning. It does not convert the prompt to chat.
+pub fn (client Client) generate_completion(mut ctx context.Context, prompt string, options llms.CallOptions) !llms.Response {
+	options.validate()!
+	validate_completion_options(options)!
+	if prompt.len > max_request_bytes {
+		return error('Ollama generate request exceeds the 8 MiB size limit')
+	}
+	if mut handler := client.callbacks {
+		handler.llm_start(mut ctx, [prompt])
+	}
+	response := client.generate_completion_request(mut ctx, prompt, options) or {
+		if mut handler := client.callbacks {
+			handler.llm_error(mut ctx, err)
+		}
+		return err
+	}
+	if mut handler := client.callbacks {
+		if response.choices.len > 0 {
+			handler.llm_complete_end(mut ctx, response.choices[0].content)
+		}
+	}
+	return response
+}
+
+fn (client Client) generate_completion_request(mut ctx context.Context, prompt string, options llms.CallOptions) !llms.Response {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	model := if options.model.trim_space() == '' {
+		client.model
+	} else {
+		options.model.trim_space()
+	}
+	request := make_generate_request(client, model, prompt, options)!
+	if options.streaming_func != none || options.streaming_reasoning_func != none {
+		return client.generate_completion_stream(mut ctx, request, options)
+	}
+	body := json2.encode(request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('Ollama generate request exceeds the 8 MiB size limit')
+	}
+	response := client.http_client.do(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/api/generate'
+		headers: {
+			'Content-Type': 'application/json'
+			'Accept':       'application/json'
+		}
+		body:    body
+	}) or {
+		return error('Ollama generate request failed: ${err.msg()}')
+	}
+	ctx_error_after_request := ctx.err()
+	if ctx_error_after_request !is none {
+		return ctx_error_after_request
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Ollama generate request returned HTTP ${response.status_code}')
+	}
+	if response.body.len > max_response_bytes {
+		return error('Ollama generate response exceeds the 16 MiB size limit')
+	}
+	decoded := json2.decode[GenerateResponse](response.body, json2.DecoderOptions{}) or {
+		return error('could not decode Ollama generate response: ${err.msg()}')
+	}
+	if !decoded.done {
+		return error('Ollama generate response is incomplete')
+	}
+	return response_from_generate(decoded)
 }
 
 // generate_content implements streaming and non-streaming Ollama /api/chat requests.
@@ -387,6 +482,16 @@ fn validate_call_options(options llms.CallOptions) ! {
 	}
 }
 
+fn validate_completion_options(options llms.CallOptions) ! {
+	validate_call_options(options)!
+	if options.tools.len > 0 || options.functions.len > 0 || options.function_call_behavior != '' {
+		return error('Ollama /api/generate does not support tool calls')
+	}
+	if 'truncate' in options.provider_options || 'shift' in options.provider_options {
+		return error('Ollama /api/generate does not support truncate or shift options')
+	}
+}
+
 // validate_provider_options accepts Ollama's native runner fields while
 // rejecting misspellings and values that would produce invalid API payloads.
 fn validate_provider_options(provider_options map[string]json2.Any) ! {
@@ -404,9 +509,14 @@ fn validate_provider_options(provider_options map[string]json2.Any) ! {
 					return error('Ollama provider_options ${key} must be numeric')
 				}
 			}
-			'use_mmap', 'logprobs', 'truncate', 'shift' {
+			'use_mmap', 'logprobs', 'truncate', 'shift', 'raw' {
 				if value !is bool {
 					return error('Ollama provider_options ${key} must be a boolean')
+				}
+			}
+			'suffix', 'system', 'template' {
+				if value !is string {
+					return error('Ollama provider_options ${key} must be a string')
 				}
 			}
 			'think' {
@@ -541,6 +651,177 @@ fn make_request(client Client, model string, messages []schema.Message, options 
 		request['tools'] = json2.Any(wire_tools)
 	}
 	return request
+}
+
+fn make_generate_request(client Client, model string, prompt string, options llms.CallOptions) !map[string]json2.Any {
+	validate_provider_options(options.provider_options)!
+	mut request := map[string]json2.Any{
+		'model':  json2.Any(model)
+		'prompt': json2.Any(prompt)
+		'stream': json2.Any(options.streaming_func != none || options.streaming_reasoning_func != none)
+	}
+	if client.format_schema.len > 0 {
+		request['format'] = json2.Any(client.format_schema)
+	} else {
+		format := if options.json_mode || options.response_mime_type == 'application/json' {
+			'json'
+		} else {
+			client.format
+		}
+		if format != '' {
+			request['format'] = json2.Any(format)
+		}
+	}
+	if client.keep_alive != '' {
+		request['keep_alive'] = json2.Any(client.keep_alive)
+	}
+	mut generation_options := map[string]json2.Any{}
+	if options.max_tokens > 0 { generation_options['num_predict'] = json2.Any(options.max_tokens) }
+	if options.temperature != 0 {
+		generation_options['temperature'] = json2.Any(options.temperature)
+	}
+	if options.top_k > 0 { generation_options['top_k'] = json2.Any(options.top_k) }
+	if options.top_p > 0 { generation_options['top_p'] = json2.Any(options.top_p) }
+	if seed := options.seed { generation_options['seed'] = json2.Any(seed) }
+	if options.repetition_penalty != 0 {
+		generation_options['repeat_penalty'] = json2.Any(options.repetition_penalty)
+	}
+	if options.frequency_penalty != 0 {
+		generation_options['frequency_penalty'] = json2.Any(options.frequency_penalty)
+	}
+	if options.presence_penalty != 0 {
+		generation_options['presence_penalty'] = json2.Any(options.presence_penalty)
+	}
+	if options.stop_words.len > 0 {
+		mut stop := []json2.Any{cap: options.stop_words.len}
+		for word in options.stop_words { stop << json2.Any(word) }
+		generation_options['stop'] = json2.Any(stop)
+	}
+	for key, value in options.provider_options {
+		if key in ['think', 'logprobs', 'top_logprobs', 'raw', 'suffix', 'system', 'template'] {
+			request[key] = value
+		} else if key !in ['truncate', 'shift'] {
+			generation_options[key] = value
+		}
+	}
+	if generation_options.len > 0 {
+		request['options'] = json2.Any(generation_options)
+	}
+	return request
+}
+
+fn response_from_generate(decoded GenerateResponse) llms.Response {
+	mut parts := []schema.ContentPart{}
+	if decoded.thinking != '' {
+		parts << schema.ContentPart(schema.ThinkingPart{ text: decoded.thinking })
+	}
+	if decoded.response != '' {
+		parts << schema.ContentPart(schema.TextPart{ text: decoded.response })
+	}
+	return llms.Response{
+		choices: [llms.Choice{
+			content:     decoded.response
+			stop_reason: decoded.done_reason
+			reasoning:   decoded.thinking
+			parts:       parts
+		}]
+		usage:   llms.Usage{
+			prompt_tokens:     decoded.prompt_eval_count
+			completion_tokens: decoded.eval_count
+			total_tokens:      decoded.prompt_eval_count + decoded.eval_count
+		}
+	}
+}
+
+fn (client Client) generate_completion_stream(mut ctx context.Context, request map[string]json2.Any, options llms.CallOptions) !llms.Response {
+	if client.http_client !is httputil.StreamingHTTPClient {
+		return error('configured Ollama HTTP transport does not support streaming responses')
+	}
+	stream_client := client.http_client as httputil.StreamingHTTPClient
+	mut state := &GenerateStreamState{}
+	mut process_line := fn [options, mut state] (mut callback_ctx context.Context, line string) {
+		if line.trim_space() == '' { return }
+		chunk := json2.decode[GenerateResponse](line, json2.DecoderOptions{}) or {
+			state.error = 'could not decode Ollama generate streaming response'
+			return
+		}
+		if chunk.response != '' {
+			state.content += chunk.response
+			if callback := options.streaming_func {
+				callback(mut callback_ctx, chunk.response.bytes()) or {
+					state.error = 'Ollama generate streaming callback failed: ${err.msg()}'
+					return
+				}
+				ctx_error := callback_ctx.err()
+				if ctx_error !is none {
+					state.error = ctx_error.msg()
+					return
+				}
+			}
+		}
+		if chunk.thinking != '' { state.thinking += chunk.thinking }
+		if reasoning_callback := options.streaming_reasoning_func {
+			reasoning_callback(mut callback_ctx, chunk.thinking.bytes(), chunk.response.bytes()) or {
+				state.error = 'Ollama generate reasoning callback failed: ${err.msg()}'
+				return
+			}
+			ctx_error := callback_ctx.err()
+			if ctx_error !is none {
+				state.error = ctx_error.msg()
+				return
+			}
+		}
+		if chunk.done_reason != '' { state.done_reason = chunk.done_reason }
+		if chunk.prompt_eval_count > 0 { state.prompt_tokens = chunk.prompt_eval_count }
+		if chunk.eval_count > 0 { state.completion_tokens = chunk.eval_count }
+		state.done = chunk.done
+	}
+	body := json2.encode(request, json2.EncoderOptions{})
+	if body.len > max_request_bytes {
+		return error('Ollama generate request exceeds the 8 MiB size limit')
+	}
+	response := stream_client.do_stream(mut ctx, httputil.Request{
+		method:  .post
+		url:     '${client.base_url}/api/generate'
+		headers: {
+			'Content-Type': 'application/json'
+			'Accept':       'application/x-ndjson'
+		}
+		body:    body
+	}, fn [mut state, mut process_line] (mut callback_ctx context.Context, bytes []u8) ! {
+		state.received_bytes += i64(bytes.len)
+		if state.received_bytes > max_response_bytes {
+			return error('Ollama generate response exceeds the 16 MiB size limit')
+		}
+		state.buffer += bytes.bytestr()
+		for {
+			line_end := state.buffer.index('\n') or { break }
+			line := state.buffer[..line_end].trim_right('\r')
+			state.buffer = state.buffer[line_end + 1..]
+			process_line(mut callback_ctx, line)
+			if state.error != '' { return error(state.error) }
+		}
+	}) or {
+		return error('Ollama generate stream failed: ${err.msg()}')
+	}
+	if response.status_code < 200 || response.status_code >= 300 {
+		return error('Ollama generate request returned HTTP ${response.status_code}')
+	}
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
+	}
+	if state.buffer.trim_space() != '' { process_line(mut ctx, state.buffer.trim_right('\r')) }
+	if state.error != '' { return error(state.error) }
+	if !state.done { return error('Ollama generate stream ended before completion') }
+	return response_from_generate(GenerateResponse{
+		response:          state.content
+		thinking:          state.thinking
+		done:              state.done
+		done_reason:       state.done_reason
+		prompt_eval_count: state.prompt_tokens
+		eval_count:        state.completion_tokens
+	})
 }
 
 fn convert_message(message schema.Message) !map[string]json2.Any {
