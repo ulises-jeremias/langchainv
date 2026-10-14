@@ -11,23 +11,53 @@ import ulises_jeremias.langchainv.schema
 @[heap]
 struct State {
 mut:
-	mutex  sync.Mutex
-	values map[string]llms.Response
-	keys   []string
+	mutex       sync.Mutex
+	values      map[string]llms.Response
+	entry_bytes map[string]i64
+	keys        []string
+	used_bytes  i64
 }
 
-// Cache is a concurrency-safe FIFO cache with a fixed maximum entry count.
+// Cache is a concurrency-safe FIFO cache with configurable entry and payload limits.
 pub struct Cache {
-	state    &State
-	capacity int
+	state     &State
+	capacity  int
+	max_bytes i64
 }
 
-// new_cache creates a cache that retains at most capacity entries.
+// new_cache creates a cache that retains at most capacity entries without a
+// total response-payload byte limit.
 pub fn new_cache(capacity int) !Cache {
 	if capacity <= 0 {
 		return error('cache capacity must be greater than zero')
 	}
-	return Cache{ state: &State{ values: map[string]llms.Response{} }, capacity: capacity }
+	return Cache{
+		state:    &State{
+			values:      map[string]llms.Response{}
+			entry_bytes: map[string]i64{}
+		}
+		capacity: capacity
+	}
+}
+
+// new_cache_with_limits creates a FIFO cache bounded by both entry count and
+// the combined JSON-encoded response size. A response larger than max_bytes is
+// not cached; existing entries remain available.
+pub fn new_cache_with_limits(capacity int, max_bytes i64) !Cache {
+	if capacity <= 0 {
+		return error('cache capacity must be greater than zero')
+	}
+	if max_bytes <= 0 || max_bytes > 1024 * 1024 * 1024 {
+		return error('cache byte limit must be between 1 byte and 1 GiB')
+	}
+	return Cache{
+		state:     &State{
+			values:      map[string]llms.Response{}
+			entry_bytes: map[string]i64{}
+		}
+		capacity:  capacity
+		max_bytes: max_bytes
+	}
 }
 
 // get returns an independent snapshot of the cached response, if present.
@@ -53,17 +83,31 @@ pub fn (cache Cache) put(mut ctx context.Context, key string, response llms.Resp
 	if ctx_error !is none {
 		return ctx_error
 	}
+	mut response_bytes := i64(0)
+	if cache.max_bytes > 0 {
+		response_bytes = i64(json2.encode(response, json2.EncoderOptions{}).len)
+	}
+	if cache.max_bytes > 0 && response_bytes > cache.max_bytes {
+		return
+	}
+	response_snapshot := clone_response(response)
 	mut state := cache.state
 	state.mutex.lock()
-	if key !in state.values {
-		if state.keys.len >= cache.capacity {
-			oldest := state.keys[0]
-			state.keys.delete(0)
-			state.values.delete(oldest)
-		}
+	if key in state.values {
+		state.used_bytes -= state.entry_bytes[key]
+	} else {
 		state.keys << key
 	}
-	state.values[key] = clone_response(response)
+	state.values[key] = response_snapshot
+	state.entry_bytes[key] = response_bytes
+	state.used_bytes += response_bytes
+	for state.keys.len > cache.capacity || (cache.max_bytes > 0 && state.used_bytes > cache.max_bytes) {
+		oldest := state.keys[0]
+		state.keys.delete(0)
+		state.values.delete(oldest)
+		state.used_bytes -= state.entry_bytes[oldest]
+		state.entry_bytes.delete(oldest)
+	}
 	state.mutex.unlock()
 }
 
