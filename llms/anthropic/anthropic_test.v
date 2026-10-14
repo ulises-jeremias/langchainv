@@ -92,9 +92,9 @@ fn test_generate_content_sends_adaptive_thinking_and_effort_options() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{"content":[{"type":"text","text":"hello"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":2}}', 200)
 	response := client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		max_tokens: 128
+		max_tokens:       128
 		provider_options: {
-			'thinking': json2.Any(map[string]json2.Any{
+			'thinking':      json2.Any(map[string]json2.Any{
 				'type': json2.Any('adaptive')
 			})
 			'output_config': json2.Any(map[string]json2.Any{
@@ -111,10 +111,10 @@ fn test_generate_content_rejects_invalid_thinking_budget_before_network() {
 	mut ctx := context.background()
 	client, state := new_fixture_client('{}', 200)
 	client.generate_content(mut ctx, [schema.text_message(.human, 'hi')], llms.CallOptions{
-		max_tokens: 2048
+		max_tokens:       2048
 		provider_options: {
 			'thinking': json2.Any(map[string]json2.Any{
-				'type':         json2.Any('enabled')
+				'type':          json2.Any('enabled')
 				'budget_tokens': json2.Any(2048)
 			})
 		}

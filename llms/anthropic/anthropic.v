@@ -482,7 +482,8 @@ fn validate_provider_options(provider_options map[string]json2.Any, max_tokens i
 				type_value := thinking['type'] or {
 					return error('Anthropic provider_options thinking.type is required')
 				}
-				if type_value !is string || (type_value as string) !in ['adaptive', 'enabled', 'disabled'] {
+				if type_value !is string || (type_value as string) !in ['adaptive', 'enabled',
+					'disabled'] {
 					return error('Anthropic provider_options thinking.type must be adaptive, enabled, or disabled')
 				}
 				thinking_type := type_value as string
@@ -517,7 +518,8 @@ fn validate_provider_options(provider_options map[string]json2.Any, max_tokens i
 				effort := output_config['effort'] or {
 					return error('Anthropic provider_options output_config.effort is required')
 				}
-				if effort !is string || (effort as string) !in ['low', 'medium', 'high', 'xhigh', 'max'] {
+				if effort !is string || (effort as string) !in ['low', 'medium', 'high', 'xhigh',
+					'max'] {
 					return error('Anthropic provider_options output_config.effort must be low, medium, high, xhigh, or max')
 				}
 			}
