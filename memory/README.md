@@ -62,3 +62,11 @@ messages; `clear` deletes memory for that session. The default HTTP client
 requires HTTPS, disables redirects, applies a timeout, and caps responses.
 Tests inject a fake HTTP client and need no Zep account. See the
 [Zep history guide](zep/README.md) for setup and limits.
+
+`memory/mongodb` implements the same typed history contract over an injected
+MongoDB collection. No driver is bundled: the caller adapts a driver
+collection to the `MongoCollection` interface (insert one, find sorted,
+delete many). Messages are stored as documents with a session id, a sequence
+number, and the JSON-encoded payload, bounded and trimmed like the SQL
+histories. See the [MongoDB history guide](mongodb/README.md) for setup and
+limits.
