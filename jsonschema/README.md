@@ -27,6 +27,7 @@ Instances are capped at 10,000 nodes, 1 MiB of aggregate scalar/key bytes, and
 The upstream [LangChainGo `Definition` helper](https://github.com/tmc/langchaingo/blob/6351d0d03286ba1f8be78b572d88c9b43ed6b869/jsonschema/json.go)
 does not model references, formats, schema-valued `additionalProperties`, or
 schema composition, so those parts of this package are V-native extensions
-beyond upstream. References and schema-valued `additionalProperties` remain
-outside the typed `Definition` API. Pass a raw schema to a tool when the
+beyond upstream. Local `#/$defs/` references (`ref` plus the `defs` map) and schema-valued
+`additionalProperties` are part of the typed API and are enforced during
+instance validation. External references remain outside it. Pass a raw schema to a tool when the
 provider supports those features.
