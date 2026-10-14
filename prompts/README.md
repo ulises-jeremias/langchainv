@@ -13,8 +13,10 @@ and malformed actions fail with an error.
 
 ChatPromptTemplate combines ordered role-tagged text templates, reports their
 unique input variables in first-seen order, and renders schema.Message values.
-Chat templates are text-only and use the f-string syntax; multimodal chat
-templates remain unimplemented.
+Chat templates use the f-string syntax. `ChatPromptTemplate` stays
+text-only; `MultimodalPromptTemplate` renders text and image URL part
+templates into typed message parts. Binary parts are built directly as
+`schema.BinaryPart` values, not through string templates.
 
 FewShotPromptTemplate formats fixed string examples between an optional prefix
 and suffix. It validates example variables when constructed and renders caller

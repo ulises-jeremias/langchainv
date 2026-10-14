@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Multimodal chat prompt templates in `prompts`: text and image URL part
+  templates rendered into typed message parts.
+
 - Caller-supplied Qdrant point IDs through the `id` metadata entry,
   validated as unique UUIDs before any request.
 
