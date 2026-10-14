@@ -92,6 +92,22 @@ fn test_streaming_callback_error_is_returned_and_response_is_consumed() {
 	assert false, 'expected the streaming callback error'
 }
 
+fn test_streaming_callback_cancellation_is_returned() {
+	model := new_fake_llm(['response'])
+	mut parent := context.background()
+	mut ctx, cancel := context.with_cancel(mut parent)
+	stream := llms.StreamFunc(fn [cancel] (mut _ctx context.Context, _chunk []u8) ! {
+		cancel()
+	})
+	model.generate_content(mut ctx, [schema.text_message(.human, 'hello')], llms.CallOptions{
+		streaming_func: stream
+	}) or {
+		assert err.msg().contains('cancel')
+		return
+	}
+	assert false, 'expected callback cancellation to abort generation'
+}
+
 fn test_call_and_completion_model_use_the_response_sequence() {
 	model := new_fake_llm(['reply'])
 	mut ctx := context.background()

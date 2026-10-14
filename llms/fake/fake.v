@@ -35,7 +35,7 @@ pub fn new_fake_llm(responses []string) LLM {
 // consuming a response and sends the response to the streaming callback when
 // one is configured.
 pub fn (llm LLM) generate_content(mut ctx context.Context, _messages []schema.Message, options llms.CallOptions) !llms.Response {
-	ctx_error := ctx.err()
+	mut ctx_error := ctx.err()
 	if ctx_error !is none {
 		return ctx_error
 	}
@@ -56,6 +56,10 @@ pub fn (llm LLM) generate_content(mut ctx context.Context, _messages []schema.Me
 	if stream := options.streaming_func {
 		stream(mut ctx, response_text.bytes()) or {
 			return err
+		}
+		ctx_error = ctx.err()
+		if ctx_error !is none {
+			return ctx_error
 		}
 	}
 
