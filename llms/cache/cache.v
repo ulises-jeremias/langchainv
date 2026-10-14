@@ -12,19 +12,26 @@ import ulises_jeremias.langchainv.schema
 // Backend stores responses under opaque, content-derived keys. Implementations
 // must honor context cancellation and must return an independent response value.
 pub interface Backend {
-	get(mut ctx context.Context, key string) !?llms.Response
+	get(mut ctx context.Context, key string) !Lookup
 	put(mut ctx context.Context, key string, response llms.Response) !
+}
+
+// Lookup is a backend read result. found distinguishes a miss from an empty response.
+pub struct Lookup {
+pub:
+	found    bool
+	response llms.Response
 }
 
 // Cacher wraps a model and stores successful responses in a backend.
 pub struct Cacher {
-	model llms.Model
+	model   llms.Model
 	backend Backend
 }
 
 // new_cacher creates a cached model wrapper.
 pub fn new_cacher(model llms.Model, backend Backend) Cacher {
-	return Cacher{model: model, backend: backend}
+	return Cacher{ model: model, backend: backend }
 }
 
 // generate_content returns a cached response or calls the wrapped model.
@@ -35,11 +42,14 @@ pub fn (cacher Cacher) generate_content(mut ctx context.Context, messages []sche
 		return cacher.model.generate_content(mut ctx, messages, options)
 	}
 	key := cache_key(messages, options)
-	if cached := cacher.backend.get(mut ctx, key)! {
+	lookup := cacher.backend.get(mut ctx, key)!
+	if lookup.found {
+		cached := lookup.response
 		if stream := options.streaming_func {
 			if cached.choices.len > 0 {
 				stream(mut ctx, cached.choices[0].content.bytes())!
-				if ctx_error := ctx.err(); ctx_error !is none {
+				ctx_error := ctx.err()
+				if ctx_error !is none {
 					return ctx_error
 				}
 			}
@@ -53,19 +63,19 @@ pub fn (cacher Cacher) generate_content(mut ctx context.Context, messages []sche
 
 struct CachePart {
 pub:
-	type       string
-	text       string
-	url        string
-	detail     string
-	mime_type  string
-	data       string
-	name       string
-	arguments  string
-	id         string
-	call_type  string
-	call_id    string
-	content    string
-	signature  string
+	type      string
+	text      string
+	url       string
+	detail    string
+	mime_type string
+	data      string
+	name      string
+	arguments string
+	id        string
+	call_type string
+	call_id   string
+	content   string
+	signature string
 }
 
 struct CacheMessage {
@@ -82,7 +92,7 @@ pub:
 	max_tokens             int
 	temperature            f64
 	top_p                  f64
-	top_k                 int
+	top_k                  int
 	stop_words             []string
 	seed                   ?int
 	min_length             int
@@ -102,54 +112,69 @@ pub:
 	provider_options       map[string]json2.Any
 }
 
+struct CacheRequest {
+pub:
+	messages []CacheMessage
+	options  CacheKeyOptions
+}
+
 fn cache_key(messages []schema.Message, options llms.CallOptions) string {
 	mut normalized := []CacheMessage{cap: messages.len}
 	for message in messages {
 		mut parts := []CachePart{cap: message.parts.len}
 		for part in message.parts {
 			parts << match part {
-				schema.BinaryPart { CachePart{type: 'binary', mime_type: part.mime_type, data: base64.encode(part.data)} }
-				schema.ImageURLPart { CachePart{type: 'image_url', url: part.url, detail: part.detail} }
-				schema.RedactedThinkingPart { CachePart{type: 'redacted_thinking', data: part.data} }
-				schema.TextPart { CachePart{type: 'text', text: part.text} }
-				schema.ThinkingPart { CachePart{type: 'thinking', text: part.text, signature: part.signature} }
-				schema.ToolCall { CachePart{type: 'tool_call', id: part.id, call_type: part.call_type, name: part.function_call.name, arguments: part.function_call.arguments} }
-				schema.ToolResult { CachePart{type: 'tool_result', call_id: part.call_id, name: part.name, content: part.content} }
+				schema.BinaryPart {
+					CachePart{ type: 'binary', mime_type: part.mime_type, data: base64.encode(part.data) }
+				}
+				schema.ImageURLPart {
+					CachePart{ type: 'image_url', url: part.url, detail: part.detail }
+				}
+				schema.RedactedThinkingPart {
+					CachePart{ type: 'redacted_thinking', data: part.data }
+				}
+				schema.TextPart { CachePart{ type: 'text', text: part.text } }
+				schema.ThinkingPart {
+					CachePart{ type: 'thinking', text: part.text, signature: part.signature }
+				}
+				schema.ToolCall {
+					CachePart{ type: 'tool_call', id: part.id, call_type: part.call_type, name: part.function_call.name, arguments: part.function_call.arguments }
+				}
+				schema.ToolResult {
+					CachePart{ type: 'tool_result', call_id: part.call_id, name: part.name, content: part.content }
+				}
 			}
 		}
-		normalized << CacheMessage{role: message.role.str(), parts: parts, metadata: message.metadata}
+		normalized << CacheMessage{ role: message.role.str(), parts: parts, metadata: message.metadata }
 	}
 	key_options := CacheKeyOptions{
-		model: options.model
-		candidate_count: options.candidate_count
-		max_tokens: options.max_tokens
-		temperature: options.temperature
-		top_p: options.top_p
-		top_k: options.top_k
-		stop_words: options.stop_words
-		seed: options.seed
-		min_length: options.min_length
-		max_length: options.max_length
-		n: options.n
-		repetition_penalty: options.repetition_penalty
-		frequency_penalty: options.frequency_penalty
-		presence_penalty: options.presence_penalty
-		json_mode: options.json_mode
-		tools: options.tools
-		tool_choice: options.tool_choice
-		functions: options.functions
+		model:                  options.model
+		candidate_count:        options.candidate_count
+		max_tokens:             options.max_tokens
+		temperature:            options.temperature
+		top_p:                  options.top_p
+		top_k:                  options.top_k
+		stop_words:             options.stop_words
+		seed:                   options.seed
+		min_length:             options.min_length
+		max_length:             options.max_length
+		n:                      options.n
+		repetition_penalty:     options.repetition_penalty
+		frequency_penalty:      options.frequency_penalty
+		presence_penalty:       options.presence_penalty
+		json_mode:              options.json_mode
+		tools:                  options.tools
+		tool_choice:            options.tool_choice
+		functions:              options.functions
 		function_call_behavior: options.function_call_behavior
-		response_mime_type: options.response_mime_type
-		web_search_options: options.web_search_options
-		metadata: options.metadata
-		provider_options: options.provider_options
+		response_mime_type:     options.response_mime_type
+		web_search_options:     options.web_search_options
+		metadata:               options.metadata
+		provider_options:       options.provider_options
 	}
-	encoded := json2.encode(struct {
-		messages []CacheMessage
-		options  CacheKeyOptions
-	}{
+	encoded := json2.encode(CacheRequest{
 		messages: normalized
 		options:  key_options
 	})
-	return hex.encode(sha256.sum256(encoded.bytes()), .{})
+	return hex.encode(sha256.sum256(encoded.bytes()), hex.EncodeParams{})
 }

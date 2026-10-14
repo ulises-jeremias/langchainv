@@ -4,13 +4,14 @@ module inmemory
 import context
 import json2
 import sync
+import ulises_jeremias.langchainv.llms.cache as responsecache
 import ulises_jeremias.langchainv.llms
 import ulises_jeremias.langchainv.schema
 
 @[heap]
 struct State {
 mut:
-	mutex sync.Mutex
+	mutex  sync.Mutex
 	values map[string]llms.Response
 	keys   []string
 }
@@ -26,29 +27,31 @@ pub fn new_cache(capacity int) !Cache {
 	if capacity <= 0 {
 		return error('cache capacity must be greater than zero')
 	}
-	return Cache{state: &State{values: map[string]llms.Response{}}, capacity: capacity}
+	return Cache{ state: &State{ values: map[string]llms.Response{} }, capacity: capacity }
 }
 
 // get returns an independent snapshot of the cached response, if present.
-pub fn (cache Cache) get(mut ctx context.Context, key string) !?llms.Response {
-	if err := ctx.err(); err !is none {
-		return err
+pub fn (cache Cache) get(mut ctx context.Context, key string) !responsecache.Lookup {
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
 	}
 	mut state := cache.state
 	state.mutex.lock()
 	if response := state.values[key] {
 		cloned := clone_response(response)
 		state.mutex.unlock()
-		return cloned
+		return responsecache.Lookup{ found: true, response: cloned }
 	}
 	state.mutex.unlock()
-	return none
+	return responsecache.Lookup{}
 }
 
 // put stores a snapshot, evicting the oldest inserted key when full.
 pub fn (cache Cache) put(mut ctx context.Context, key string, response llms.Response) ! {
-	if err := ctx.err(); err !is none {
-		return err
+	ctx_error := ctx.err()
+	if ctx_error !is none {
+		return ctx_error
 	}
 	mut state := cache.state
 	state.mutex.lock()
@@ -70,7 +73,9 @@ fn clone_response(response llms.Response) llms.Response {
 		mut parts := []schema.ContentPart{cap: choice.parts.len}
 		for part in choice.parts {
 			parts << match part {
-				schema.BinaryPart { schema.ContentPart(schema.BinaryPart{mime_type: part.mime_type, data: part.data.clone()}) }
+				schema.BinaryPart {
+					schema.ContentPart(schema.BinaryPart{ mime_type: part.mime_type, data: part.data.clone() })
+				}
 				schema.ImageURLPart { schema.ContentPart(part) }
 				schema.RedactedThinkingPart { schema.ContentPart(part) }
 				schema.TextPart { schema.ContentPart(part) }
@@ -83,9 +88,9 @@ fn clone_response(response llms.Response) llms.Response {
 		for key, value in choice.generation_info {
 			info[key] = clone_any(value)
 		}
-		choices << llms.Choice{content: choice.content, stop_reason: choice.stop_reason, function_call: choice.function_call, tool_calls: choice.tool_calls.clone(), reasoning: choice.reasoning, parts: parts, generation_info: info}
+		choices << llms.Choice{ content: choice.content, stop_reason: choice.stop_reason, function_call: choice.function_call, tool_calls: choice.tool_calls.clone(), reasoning: choice.reasoning, parts: parts, generation_info: info }
 	}
-	return llms.Response{choices: choices, usage: response.usage}
+	return llms.Response{ choices: choices, usage: response.usage }
 }
 
 fn clone_any(value json2.Any) json2.Any {
