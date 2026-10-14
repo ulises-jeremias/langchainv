@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Built-in `SimpleTokenizer` and `new_simple_token_splitter` in
+  `textsplitter`: a lossless dictionary tokenizer for offline token
+  splitting that does not claim provider-exact counts.
+
 - Qdrant filter conditions: range, membership, existence, negation, and
   bounded `$and`/`$or`/`$not` groups in search filters, validated before
   any request.
