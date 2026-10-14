@@ -239,15 +239,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 	if options.filter.len > 128 || options.namespace.len > 65536 {
 		return error('OpenSearch filters or namespace exceed configured limits')
 	}
-	for key, value in options.filter {
-		if !valid_field_name(key) || key == store.vector_field || key == store.text_field
-			|| key == store.metadata_field || key == store.namespace_field || !valid_filter_value(value) {
-			return error('OpenSearch filters support scalar metadata equality on valid non-reserved fields')
-		}
-		if value is string && (value as string).len > 4096 {
-			return error('OpenSearch filter values are limited to 4 KiB')
-		}
-	}
+	store.validate_filter(options.filter, 0)!
 	vector := store.embedder.embed_query(mut ctx, query)!
 	if vector.len == 0 || vector.len > max_embedding_values {
 		return error('OpenSearch query embedding must contain between 1 and 16000 values')
@@ -260,6 +252,7 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 		vector_values << json2.Any(value)
 	}
 	mut filters := []json2.Any{cap: options.filter.len + 1}
+	mut excluded := []json2.Any{}
 	if options.namespace != '' {
 		filters << json2.Any({
 			'term': json2.Any({
@@ -267,22 +260,27 @@ pub fn (store Store) similarity_search(mut ctx context.Context, query string, li
 			})
 		})
 	}
-	for key, value in options.filter {
-		filters << json2.Any({
-			'term': json2.Any({
-				'${store.metadata_field}.${key}': value
-			})
-		})
+	filter_must, filter_must_not := store.build_filter_clauses(options.filter, 0)!
+	for clause in filter_must {
+		filters << clause
+	}
+	for clause in filter_must_not {
+		excluded << clause
 	}
 	mut knn := map[string]json2.Any{
 		'vector': json2.Any(vector_values)
 		'k':      json2.Any(limit)
 	}
-	if filters.len > 0 {
+	if filters.len > 0 || excluded.len > 0 {
+		mut bool_filter := map[string]json2.Any{}
+		if filters.len > 0 {
+			bool_filter['filter'] = json2.Any(filters)
+		}
+		if excluded.len > 0 {
+			bool_filter['must_not'] = json2.Any(excluded)
+		}
 		knn['filter'] = json2.Any({
-			'bool': json2.Any({
-				'filter': json2.Any(filters)
-			})
+			'bool': json2.Any(bool_filter)
 		})
 	}
 	mut source_fields := [json2.Any(store.text_field), json2.Any(store.metadata_field),
@@ -492,6 +490,245 @@ fn valid_field_name(value string) bool {
 		}
 	}
 	return true
+}
+
+const max_filter_depth = 3
+const max_filter_children = 50
+const max_filter_list_items = 100
+
+fn (store Store) validate_filter(filter map[string]json2.Any, depth int) ! {
+	if depth > max_filter_depth {
+		return error('OpenSearch filter nesting exceeds the supported depth')
+	}
+	for key, value in filter {
+		if key.starts_with('$') {
+			if key !in ['$and', '$or', '$not'] {
+				return error('OpenSearch filter supports only $and, $or, and $not logical operators')
+			}
+			if key == '$not' {
+				if value !is map[string]json2.Any {
+					return error('OpenSearch filter $not requires a filter object')
+				}
+				store.validate_filter(value as map[string]json2.Any, depth + 1)!
+				continue
+			}
+			children := filter_children(key, value)!
+			for child in children {
+				store.validate_filter(child, depth + 1)!
+			}
+			continue
+		}
+		if !valid_field_name(key) || key == store.vector_field || key == store.text_field
+			|| key == store.metadata_field || key == store.namespace_field {
+			return error('OpenSearch filters require valid non-reserved property names')
+		}
+		if value is map[string]json2.Any {
+			operators := value as map[string]json2.Any
+			if operators.len == 0 {
+				return error('OpenSearch filter operator objects must not be empty')
+			}
+			for operator, operand in operators {
+				validate_filter_operator(operator, operand)!
+			}
+		} else if value is []json2.Any {
+			validate_filter_items(value as []json2.Any)!
+		} else if !valid_filter_value(value) {
+			return error('OpenSearch filters support scalar metadata values')
+		}
+		if value is string && (value as string).len > 4096 {
+			return error('OpenSearch filter values are limited to 4 KiB')
+		}
+	}
+}
+
+fn filter_children(operator string, value json2.Any) ![]map[string]json2.Any {
+	if value !is []json2.Any {
+		return error('OpenSearch filter ${operator} requires an array of filter objects')
+	}
+	items := value as []json2.Any
+	if items.len == 0 || items.len > max_filter_children {
+		return error('OpenSearch filter ${operator} requires between 1 and 50 filter objects')
+	}
+	mut children := []map[string]json2.Any{cap: items.len}
+	for item in items {
+		if item !is map[string]json2.Any {
+			return error('OpenSearch filter ${operator} requires an array of filter objects')
+		}
+		children << item as map[string]json2.Any
+	}
+	return children
+}
+
+fn validate_filter_items(value []json2.Any) ! {
+	if value.len == 0 || value.len > max_filter_list_items {
+		return error('OpenSearch filter $in requires between 1 and 100 items')
+	}
+	for item in value {
+		if !valid_filter_value(item) {
+			return error('OpenSearch filter $in requires scalar items')
+		}
+	}
+}
+
+fn validate_filter_operator(operator string, operand json2.Any) ! {
+	match operator {
+		'$eq', '$ne' {
+			if !valid_filter_value(operand) {
+				return error('OpenSearch filter ${operator} requires a scalar operand')
+			}
+		}
+		'$gt', '$gte', '$lt', '$lte' {
+			if !valid_filter_number(operand) {
+				return error('OpenSearch filter ${operator} requires a numeric operand')
+			}
+		}
+		'$in', '$nin' {
+			if operand !is []json2.Any {
+				return error('OpenSearch filter ${operator} requires an array operand')
+			}
+			validate_filter_items(operand as []json2.Any)!
+		}
+		'$exists' {
+			if operand !is bool {
+				return error('OpenSearch filter $exists requires a boolean operand')
+			}
+		}
+		else {
+			return error('OpenSearch filter operator ${operator} is not supported')
+		}
+	}
+}
+
+fn valid_filter_number(value json2.Any) bool {
+	return match value {
+		int, i64, i32, i16, i8, u64, u32, u16, u8 { true }
+		f32 { math.is_finite(f64(value)) }
+		f64 { math.is_finite(value) }
+		else { false }
+	}
+}
+
+fn (store Store) build_filter_clauses(filter map[string]json2.Any, depth int) !([]json2.Any, []json2.Any) {
+	mut must := []json2.Any{}
+	mut must_not := []json2.Any{}
+	for key, value in filter {
+		if key.starts_with('$') {
+			match key {
+				'$and' {
+					for child in filter_children(key, value)! {
+						child_must, child_must_not := store.build_filter_clauses(child, depth + 1)!
+						for clause in child_must {
+							must << clause
+						}
+						for clause in child_must_not {
+							must_not << clause
+						}
+					}
+				}
+				'$or' {
+					mut should := []json2.Any{}
+					for child in filter_children(key, value)! {
+						child_must, child_must_not := store.build_filter_clauses(child, depth + 1)!
+						should << bool_clause(child_must, child_must_not)
+					}
+					must << json2.Any({
+						'bool': json2.Any({
+							'should':               json2.Any(should)
+							'minimum_should_match': json2.Any(1)
+						})
+					})
+				}
+				'$not' {
+					child_must, child_must_not := store.build_filter_clauses(value as map[string]json2.Any,
+						depth + 1)!
+					must_not << bool_clause(child_must, child_must_not)
+				}
+				else {}
+			}
+			continue
+		}
+		field := '${store.metadata_field}.${key}'
+		if value is map[string]json2.Any {
+			operators := value as map[string]json2.Any
+			mut range := map[string]json2.Any{}
+			for operator, operand in operators {
+				match operator {
+					'$eq' {
+						must << term_clause(field, operand)
+					}
+					'$ne' {
+						must_not << term_clause(field, operand)
+					}
+					'$in' {
+						must << terms_clause(field, operand)
+					}
+					'$nin' {
+						must_not << terms_clause(field, operand)
+					}
+					'$gt', '$gte', '$lt', '$lte' {
+						range[operator[1..]] = operand
+					}
+					'$exists' {
+						if operand as bool {
+							must << exists_clause(field)
+						} else {
+							must_not << exists_clause(field)
+						}
+					}
+					else {}
+				}
+			}
+			if range.len > 0 {
+				mut range_clause := map[string]json2.Any{}
+				range_clause[field] = json2.Any(range)
+				must << json2.Any({
+					'range': json2.Any(range_clause)
+				})
+			}
+		} else if value is []json2.Any {
+			must << terms_clause(field, value)
+		} else {
+			must << term_clause(field, value)
+		}
+	}
+	return must, must_not
+}
+
+fn bool_clause(must []json2.Any, must_not []json2.Any) json2.Any {
+	mut bool_filter := map[string]json2.Any{}
+	if must.len > 0 {
+		bool_filter['filter'] = json2.Any(must)
+	}
+	if must_not.len > 0 {
+		bool_filter['must_not'] = json2.Any(must_not)
+	}
+	return json2.Any({
+		'bool': json2.Any(bool_filter)
+	})
+}
+
+fn term_clause(field string, value json2.Any) json2.Any {
+	mut clause := map[string]json2.Any{}
+	clause[field] = value
+	return json2.Any({
+		'term': json2.Any(clause)
+	})
+}
+
+fn terms_clause(field string, value json2.Any) json2.Any {
+	mut clause := map[string]json2.Any{}
+	clause[field] = value
+	return json2.Any({
+		'terms': json2.Any(clause)
+	})
+}
+
+fn exists_clause(field string) json2.Any {
+	return json2.Any({
+		'exists': json2.Any({
+			'field': json2.Any(field)
+		})
+	})
 }
 
 fn valid_filter_value(value json2.Any) bool {

@@ -8,6 +8,9 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- OpenSearch filter operators: term, terms, range, and exists clauses plus
+  bounded `$and`/`$or`/`$not` groups in k-NN search filters.
+
 - Mistral `safe_prompt` option, applied to streamed and non-streamed
   requests through the shared payload translation.
 

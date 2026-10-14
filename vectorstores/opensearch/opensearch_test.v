@@ -273,3 +273,67 @@ fn test_opensearch_uses_basic_auth_when_configured() {
 	store.similarity_search(mut ctx, 'query', 1, vectorstores.SearchOptions{}) or { panic(err) }
 	assert (state.requests[0].headers['Authorization'] or { '' }) == 'Basic ${base64.encode('user:secret'.bytes())}'
 }
+
+fn test_opensearch_search_sends_operator_filters() {
+	mut state := &OpenSearchFixtureState{
+		responses: [httputil.Response{
+			status_code: 200
+			headers:     http.Header{}
+			body:        '{"hits":{"hits":[]}}'
+		}]
+	}
+	mut store := fixture_store(state) or { panic(err) }
+	mut ctx := context.background()
+	mut options := vectorstores.SearchOptions{}
+	options.filter['year'] = json2.Any({
+		'$gte': json2.Any(2020)
+		'$lt':  json2.Any(2030)
+	})
+	options.filter['kind'] = json2.Any({
+		'$in': json2.Any([json2.Any('guide'), json2.Any('api')])
+	})
+	options.filter['kind2'] = json2.Any({
+		'$ne': json2.Any('draft')
+	})
+	options.filter['$or'] = json2.Any([
+		json2.Any({
+			'lang': json2.Any('v')
+		}),
+		json2.Any({
+			'lang': json2.Any('go')
+		}),
+	])
+	documents := store.similarity_search(mut ctx, 'query', 3, options) or { panic(err) }
+	assert documents.len == 0
+	body := state.requests[0].body
+	assert body.contains('"range":{"metadata.year":{"gte":2020,"lt":2030}}')
+	assert body.contains('"terms":{"metadata.kind":["guide","api"]}')
+	assert body.contains('"must_not":[{"term":{"metadata.kind2":"draft"}}]')
+	assert body.contains('"minimum_should_match":1')
+}
+
+fn test_opensearch_search_rejects_invalid_operator_filters() {
+	mut ctx := context.background()
+	for filter_value in [
+		json2.Any({
+			'$regex': json2.Any('^g')
+		}),
+		json2.Any({
+			'$gt': json2.Any('not-a-number')
+		}),
+		json2.Any({
+			'$in': json2.Any([]json2.Any{})
+		}),
+	] {
+		mut state := &OpenSearchFixtureState{}
+		mut store := fixture_store(state) or { panic(err) }
+		mut options := vectorstores.SearchOptions{}
+		options.filter['kind'] = filter_value
+		store.similarity_search(mut ctx, 'query', 3, options) or {
+			assert err.msg().contains('OpenSearch filter')
+			assert state.requests.len == 0
+			continue
+		}
+		assert false, 'expected invalid OpenSearch filter to fail'
+	}
+}

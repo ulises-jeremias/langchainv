@@ -171,10 +171,10 @@ management, collection administration, advanced filters remain outstanding; mini
 filtering applies to every metric, as a maximum-distance threshold for L2; `SearchOptions.include_vectors` returns
 validated vectors when requested.
 OpenSearch — partial: bulk index/search/delete against an existing k-NN index,
-API-key or basic authentication, scalar metadata equality filters, namespaces,
-cosine scores, injected embeddings/transport, and bounded requests; index
-replacement/migration, alternate metrics, and advanced filters remain
-outstanding; `SearchOptions.include_vectors` returns validated vectors when
+API-key or basic authentication, metadata filters with term, terms, range,
+exists, and bounded logical operator objects, namespaces, cosine scores,
+injected embeddings/transport, and bounded requests; index
+replacement/migration and alternate metrics remain outstanding; `SearchOptions.include_vectors` returns validated vectors when
 requested. Explicit initialization creates a cosine k-NN mapping but does not
 manage, replace, or migrate existing indexes.
 pgvector — partial: parameterized insert/search/delete against an existing
