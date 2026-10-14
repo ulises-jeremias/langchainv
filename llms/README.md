@@ -5,6 +5,10 @@ multimodal messages and common generation options, and returns choices and
 usage. Provider adapters live in isolated subpackages; inspect their guides for
 supported options, streaming behavior, limits, authentication, and errors.
 
+For offline tests or examples, [`llms/fake`](fake/README.md) provides a
+sequential canned-response model. Use [`testing/llmtest.MockModel`](../testing/llmtest/README.md)
+when tests need structured responses, configurable errors, or call counts.
+
 ## Lifecycle callbacks
 
 Adapters that do not expose a callback field can be wrapped with

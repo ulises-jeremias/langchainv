@@ -15,3 +15,6 @@ with `set_error`, and inspect the number of attempts with `call_count`. It
 copies response slices, nested JSON values, and multimodal content at the
 configuration and call boundaries. An optional streaming callback receives
 the first choice's text as one chunk. The mock makes no network requests.
+
+For a small sequential text fixture implementing `llms.Model`, see
+[`llms/fake`](../../llms/fake/README.md).
