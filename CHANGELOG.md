@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- Local schema references in `jsonschema`: `$ref` into `$defs` and
+  schema-valued `additionalProperties`, resolved and enforced during
+  instance validation.
+
 - Bedrock reasoning replay: `reasoningContent` blocks are parsed with
   signatures and redacted data and sent back on later turns, bounded and
   signature-checked like the Anthropic path.

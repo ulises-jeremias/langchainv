@@ -41,27 +41,30 @@ pub fn (data_type DataType) str() string {
 // Definition describes the JSON Schema subset supported by LangChainGo tools.
 pub struct Definition {
 pub:
-	type_                 ?DataType
-	types                 []DataType
-	description           string
-	enum_values           []string
-	properties            map[string]Definition
-	required              []string
-	items                 ?&Definition
-	minimum               ?f64
-	maximum               ?f64
-	exclusive_minimum     ?f64
-	exclusive_maximum     ?f64
-	min_length            ?int
-	max_length            ?int
-	min_items             ?int
-	max_items             ?int
-	additional_properties ?bool
-	format                string
-	all_of                []Definition
-	any_of                []Definition
-	one_of                []Definition
-	not                   ?&Definition
+	type_                        ?DataType
+	types                        []DataType
+	description                  string
+	enum_values                  []string
+	properties                   map[string]Definition
+	required                     []string
+	items                        ?&Definition
+	minimum                      ?f64
+	maximum                      ?f64
+	exclusive_minimum            ?f64
+	exclusive_maximum            ?f64
+	min_length                   ?int
+	max_length                   ?int
+	min_items                    ?int
+	max_items                    ?int
+	additional_properties        ?bool
+	format                       string
+	ref                          string
+	defs                         map[string]Definition
+	additional_properties_schema ?&Definition
+	all_of                       []Definition
+	any_of                       []Definition
+	one_of                       []Definition
+	not                          ?&Definition
 }
 
 // to_any validates the definition and converts it to a JSON value.
@@ -116,8 +119,20 @@ fn (definition Definition) to_any_depth(depth int) !json2.Any {
 	if max_items := definition.max_items {
 		result['maxItems'] = json2.Any(max_items)
 	}
-	if additional_properties := definition.additional_properties {
+	if definition.ref != '' {
+		result['$ref'] = json2.Any(definition.ref)
+	}
+	if additional_schema := definition.additional_properties_schema {
+		result['additionalProperties'] = additional_schema.to_any_depth(depth + 1)!
+	} else if additional_properties := definition.additional_properties {
 		result['additionalProperties'] = json2.Any(additional_properties)
+	}
+	if definition.defs.len > 0 {
+		mut defs := map[string]json2.Any{}
+		for name, sub_schema in definition.defs {
+			defs[name] = sub_schema.to_any_depth(depth + 1)!
+		}
+		result['$defs'] = json2.Any(defs)
 	}
 	if definition.enum_values.len > 0 {
 		mut values := []json2.Any{cap: definition.enum_values.len}
@@ -178,6 +193,43 @@ pub fn (definition Definition) encode() !string {
 // validate checks the supported schema invariants recursively.
 pub fn (definition Definition) validate() ! {
 	definition.validate_depth(0)!
+	definition.validate_ref_targets(definition.defs, 0)!
+}
+
+fn (definition Definition) validate_ref_targets(defs map[string]Definition, depth int) ! {
+	if depth > max_schema_depth {
+		return error('JSON Schema definition nesting exceeds the 64-level limit')
+	}
+	if definition.ref != '' {
+		name := definition.ref['#/$defs/'.len..]
+		if name !in defs {
+			return error('JSON Schema $ref `${definition.ref}` does not resolve to a $defs entry')
+		}
+	}
+	for _, property in definition.properties {
+		property.validate_ref_targets(defs, depth + 1)!
+	}
+	if items := definition.items {
+		items.validate_ref_targets(defs, depth + 1)!
+	}
+	if additional_schema := definition.additional_properties_schema {
+		additional_schema.validate_ref_targets(defs, depth + 1)!
+	}
+	for sub_schema in definition.all_of {
+		sub_schema.validate_ref_targets(defs, depth + 1)!
+	}
+	for sub_schema in definition.any_of {
+		sub_schema.validate_ref_targets(defs, depth + 1)!
+	}
+	for sub_schema in definition.one_of {
+		sub_schema.validate_ref_targets(defs, depth + 1)!
+	}
+	if not_schema := definition.not {
+		not_schema.validate_ref_targets(defs, depth + 1)!
+	}
+	for _, sub_schema in definition.defs {
+		sub_schema.validate_ref_targets(defs, depth + 1)!
+	}
 }
 
 // validate_instance checks a JSON value against this definition's supported
@@ -186,7 +238,7 @@ pub fn (definition Definition) validate_instance(instance json2.Any) ! {
 	definition.validate()!
 	mut budget := InstanceBudget{}
 	inspect_instance(instance, '$', 0, mut budget)!
-	definition.validate_instance_at(instance, '$', 0)!
+	definition.validate_instance_at(instance, '$', 0, definition.defs)!
 }
 
 fn inspect_instance(instance json2.Any, path string, depth int, mut budget InstanceBudget) ! {
@@ -226,9 +278,16 @@ fn inspect_instance(instance json2.Any, path string, depth int, mut budget Insta
 	}
 }
 
-fn (definition Definition) validate_instance_at(instance json2.Any, path string, depth int) ! {
+fn (definition Definition) validate_instance_at(instance json2.Any, path string, depth int, defs map[string]Definition) ! {
 	if depth > max_schema_depth {
 		return error('JSON Schema instance nesting exceeds the 64-level limit at ${path}')
+	}
+	if definition.ref != '' {
+		name := definition.ref['#/$defs/'.len..]
+		target := defs[name] or {
+			return error('JSON Schema $ref `${definition.ref}` does not resolve to a $defs entry')
+		}
+		target.validate_instance_at(instance, path, depth + 1, defs)!
 	}
 	if !instance_matches_definition_type(instance, definition) {
 		expected := if definition.types.len > 0 {
@@ -275,7 +334,7 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 			}
 			if items := definition.items {
 				for index, item in instance {
-					items.validate_instance_at(item, '${path}[${index}]', depth + 1)!
+					items.validate_instance_at(item, '${path}[${index}]', depth + 1, defs)!
 				}
 			}
 		}
@@ -287,7 +346,10 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 			}
 			for name, value in instance {
 				if property := definition.properties[name] {
-					property.validate_instance_at(value, '${path}.${name}', depth + 1)!
+					property.validate_instance_at(value, '${path}.${name}', depth + 1, defs)!
+				} else if additional_schema := definition.additional_properties_schema {
+					additional_schema.validate_instance_at(value, '${path}.${name}', depth + 1,
+						defs)!
 				} else if additional_properties := definition.additional_properties {
 					if !additional_properties {
 						return error('JSON Schema additional property `${name}` is not allowed at ${path}')
@@ -320,13 +382,13 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 		}
 	}
 	for sub_schema in definition.all_of {
-		sub_schema.validate_instance_at(instance, path, depth + 1)!
+		sub_schema.validate_instance_at(instance, path, depth + 1, defs)!
 	}
 	if definition.any_of.len > 0 {
 		mut matched := false
 		for sub_schema in definition.any_of {
 			mut failed := false
-			sub_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+			sub_schema.validate_instance_at(instance, path, depth + 1, defs) or { failed = true }
 			if !failed {
 				matched = true
 				break
@@ -340,7 +402,7 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 		mut matches := 0
 		for sub_schema in definition.one_of {
 			mut failed := false
-			sub_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+			sub_schema.validate_instance_at(instance, path, depth + 1, defs) or { failed = true }
 			if !failed {
 				matches++
 			}
@@ -351,7 +413,7 @@ fn (definition Definition) validate_instance_at(instance json2.Any, path string,
 	}
 	if not_schema := definition.not {
 		mut failed := false
-		not_schema.validate_instance_at(instance, path, depth + 1) or { failed = true }
+		not_schema.validate_instance_at(instance, path, depth + 1, defs) or { failed = true }
 		if !failed {
 			return error('JSON Schema instance must not match the `not` schema at ${path}')
 		}
@@ -436,7 +498,8 @@ fn (definition Definition) validate_depth(depth int) ! {
 		if data_type != .array && (definition.min_items != none || definition.max_items != none) {
 			return error('JSON Schema minItems and maxItems are only valid for array definitions')
 		}
-		if data_type != .object && definition.additional_properties != none {
+		if data_type != .object && (definition.additional_properties != none
+			|| definition.additional_properties_schema != none) {
 			return error('JSON Schema additionalProperties is only valid for object definitions')
 		}
 	}
@@ -455,7 +518,7 @@ fn (definition Definition) validate_depth(depth int) ! {
 			return error('JSON Schema items requires array in types')
 		}
 		if (definition.required.len > 0 || definition.properties.len > 0
-			|| definition.additional_properties != none) && DataType.object !in definition.types {
+			|| definition.additional_properties != none || definition.additional_properties_schema != none) && DataType.object !in definition.types {
 			return error('JSON Schema object constraints require object in types')
 		}
 		if (definition.minimum != none || definition.maximum != none
@@ -582,6 +645,21 @@ fn (definition Definition) validate_depth(depth int) ! {
 	}
 	if items := definition.items {
 		items.validate_depth(depth + 1)!
+	}
+	if definition.ref != '' && !definition.ref.starts_with('#/$defs/') {
+		return error('JSON Schema $ref supports only local #/$defs/ references')
+	}
+	if definition.ref.starts_with('#/$defs/') && definition.ref['#/$defs/'.len..].trim_space() == '' {
+		return error('JSON Schema $ref must name a $defs entry')
+	}
+	if definition.additional_properties != none && definition.additional_properties_schema != none {
+		return error('JSON Schema additionalProperties cannot set both the boolean and schema forms')
+	}
+	for _, sub_schema in definition.defs {
+		sub_schema.validate_depth(depth + 1)!
+	}
+	if additional_schema := definition.additional_properties_schema {
+		additional_schema.validate_depth(depth + 1)!
 	}
 	for sub_schema in definition.all_of {
 		sub_schema.validate_depth(depth + 1)!
