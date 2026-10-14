@@ -8,6 +8,10 @@ uses conventional commit prefixes in its history.
 
 ### Added
 
+- OpenAI provider options: `user`, `parallel_tool_calls`, `service_tier`,
+  `logprobs`, and `top_logprobs` through `provider_options`, validated
+  before any request.
+
 - Anthropic reasoning replay: thinking signatures and redacted thinking
   data are parsed from responses (including streamed signature deltas) and
   sent back on later turns, with size bounds and signature validation.

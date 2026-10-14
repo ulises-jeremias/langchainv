@@ -55,3 +55,10 @@ tool-call assembly, and usage are supported. Provider reasoning replay, binary
 audio, the Responses API, and remaining provider-specific options are not
 implemented yet. Unsupported common generation options fail explicitly instead
 of being silently ignored.
+
+OpenAI-specific options go in `CallOptions.provider_options` and are
+validated before any request: `user` (string up to 256 bytes),
+`parallel_tool_calls` and `logprobs` (booleans), `service_tier` (`auto`,
+`default`, `flex`, or `priority`), and `top_logprobs` (integer 0 to 20).
+Unknown keys and wrongly typed values are rejected instead of dropped.
+Logprob values are requested but not parsed into choices.
