@@ -9,6 +9,11 @@ layout_class: home
   <h1>Build language model applications with V.</h1>
   <p>Compose models, prompts, tools, memory, retrieval and vector stores with bounded I/O, injectable transports and clear capability limits.</p>
   <div class="actions"><a class="button primary" href="{{ '/getting-started/' | relative_url }}">Start building</a><a class="button" href="{{ '/tutorials/' | relative_url }}">Explore tutorials</a></div>
+  <div class="hero-meta" aria-label="Project highlights">
+    <span><strong>Core dependencies</strong> none</span>
+    <span><strong>Provider tests</strong> offline-first</span>
+    <span><strong>Compatibility</strong> tracked openly</span>
+  </div>
 </section>
 
 ## Choose a path

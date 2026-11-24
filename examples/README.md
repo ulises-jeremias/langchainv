@@ -13,6 +13,7 @@ Examples are standalone V programs. CI compiles and runs every example with the 
 | [Azure AI Search retrieval](azure_retrieval/main.v) | Persistent vector search with Azure AI Search and OpenAI embeddings | Live opt-in; Azure admin key, OpenAI API key, network access, and usage charges |
 | [Conversation memory](conversation_memory/main.v) | Conversation chain with process-local history and a deterministic completion fake | Offline; no credentials |
 | [Tool-calling agent](tool_calling_agent/main.v) | Bounded executor, calculator tool, and staged fake model | Offline; no credentials |
+| [SQLite response cache](sqlite_cache/main.v) | Persistent response caching with a deterministic fake model and cleanup | Offline; no credentials |
 | [Zep chat history](zep_history/main.v) | Read bounded session memory and optionally append a message | Live opt-in; Zep API key, session ID, and network access; appending persists data |
 
 Run it from the repository root:
@@ -50,6 +51,18 @@ To run the tool-calling agent without configuring a model provider:
 ```sh
 v run examples/tool_calling_agent/main.v
 ```
+
+To see a response cached in SQLite without configuring a model provider:
+
+```sh
+v run examples/sqlite_cache/main.v
+```
+
+The example creates a uniquely named temporary database, demonstrates that the
+second identical request reuses the first response, and removes the database
+when the process exits. SQLite cache payloads are stored as plaintext; real
+applications should protect the file with appropriate permissions and
+encryption-at-rest controls.
 
 To opt in to the Azure AI Search retrieval walkthrough, configure the variables
 listed in [the tutorial](../docs/tutorials/azure-ai-search-retrieval.md), then
