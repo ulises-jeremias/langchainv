@@ -15,7 +15,7 @@ concurrency:
 
 env:
   VJOBS: '2'
-  V_COMPILER_REF: 7f5b9a3
+  V_COMPILER_REF: 7f5b9a3ddedafcfa86a88a4697c12c10e5901168
 
 jobs:
   v-static:
@@ -32,31 +32,10 @@ jobs:
       - name: Check CI package coverage and command policy
         run: python3 langchainv/scripts/check_ci_coverage.py
 
-      - name: Check out pinned V compiler
-        uses: actions/checkout@v7
+      - name: Setup pinned V compiler
+        uses: vlang/setup-v@663cc08827d1fc0532ee755b4dedbb183c11d06a # v1.7
         with:
-          repository: vlang/v
-          ref: ${{ env.V_COMPILER_REF }}
-          path: vlang
-          persist-credentials: false
-
-      - name: Cache pinned V compiler
-        id: v-compiler-cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            vlang/v
-            vlang/thirdparty/tcc/lib/libgc.a
-          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}-with-libgc
-
-      - name: Build V compiler
-        if: steps.v-compiler-cache.outputs.cache-hit != 'true'
-        run: make -C vlang
-
-      - name: Add V compiler to PATH
-        run: |
-          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
-          ./vlang/v version
+          version: ${{ env.V_COMPILER_REF }}
 
       - name: Install under the V module path
         run: |
@@ -102,31 +81,10 @@ jobs:
           path: langchainv
           persist-credentials: false
 
-      - name: Check out pinned V compiler
-        uses: actions/checkout@v7
+      - name: Setup pinned V compiler
+        uses: vlang/setup-v@663cc08827d1fc0532ee755b4dedbb183c11d06a # v1.7
         with:
-          repository: vlang/v
-          ref: ${{ env.V_COMPILER_REF }}
-          path: vlang
-          persist-credentials: false
-
-      - name: Cache pinned V compiler
-        id: v-compiler-cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            vlang/v
-            vlang/thirdparty/tcc/lib/libgc.a
-          key: ${{ runner.os }}-ubuntu-24.04-v-${{ env.V_COMPILER_REF }}-with-libgc
-
-      - name: Build V compiler
-        if: steps.v-compiler-cache.outputs.cache-hit != 'true'
-        run: make -C vlang
-
-      - name: Add V compiler to PATH
-        run: |
-          echo "$GITHUB_WORKSPACE/vlang" >> "$GITHUB_PATH"
-          ./vlang/v version
+          version: ${{ env.V_COMPILER_REF }}
 
       - name: Install PDF text extractor
         if: contains(matrix.packages, 'documentloaders')

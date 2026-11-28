@@ -134,8 +134,10 @@ Each package also carries its own README next to the code. Start with the
 ## Compatibility
 
 - V 0.5.2 or newer.
-- PDF loading shells out to Poppler's `pdftotext` (arguments passed without a
-  shell); everything else is pure V.
+- PDF loading shells out to Poppler's `pdftotext` without a shell. Encrypted
+  PDFs remain unsupported by `PDFLoader` because Poppler exposes passwords in
+  process arguments; `documentloaders/README.md` documents a qpdf stdin-based
+  manual extraction alternative.
 - Hosted CI runs `v fmt -verify`, compiles every Markdown code block, tests
   all packages, and builds and runs every standalone example.
 

@@ -13,9 +13,35 @@ diagnostic output, execution time, and page count are bounded to 16 MiB, 16 MiB,
 30 seconds, and 10,000 pages by default; configurable hard caps are 64 MiB and
 120 seconds. The loader rejects symbolic links, propagates context cancellation,
 and terminates the extractor process group on cancellation, timeout, or output
-overflow. It invokes the executable directly without a shell. Encrypted PDFs
-requiring a password are not supported; Poppler accepts passwords only as
-process arguments, which would expose them in process listings.
+overflow. It invokes the executable directly without a shell.
+
+`PDFLoader` deliberately does not accept passwords: Poppler's `pdftotext`
+password options put the secret in process arguments. For manual extraction,
+qpdf can read the password from standard input and stream a decrypted PDF to
+Poppler, which reads its PDF from standard input. This avoids both a password
+argument and an intermediate decrypted PDF file; it is not integrated with
+`PDFLoader`, does not preserve page metadata, and requires Bash, qpdf, and
+Poppler. qpdf reads only the first input line, so this workflow does not
+support passwords containing a newline:
+
+```bash
+(
+  set -o pipefail
+  pdf_path='/path/to/encrypted.pdf'
+  IFS= read -r -s -p 'PDF password: ' pdf_password || exit 1
+  printf '\n'
+  printf '%s\n' "$pdf_password" |
+    qpdf --password-file=- --decrypt "$pdf_path" - |
+    pdftotext -enc UTF-8 - -
+  status=$?
+  unset pdf_password
+  exit "$status"
+)
+```
+
+The extracted text is written to standard output; redirect it only to a
+destination with appropriate permissions. Do not enable shell tracing while
+entering the password.
 
 `AssemblyAILoader` submits an HTTPS media URL to AssemblyAI's transcript API,
 polls until completion, and returns one document with the transcript text and
