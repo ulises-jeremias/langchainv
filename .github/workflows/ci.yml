@@ -15,7 +15,7 @@ concurrency:
 
 env:
   VJOBS: '2'
-  V_COMPILER_REF: 7f5b9a3
+  V_COMPILER_REF: 7f5b9a3ddedafcfa86a88a4697c12c10e5901168
 
 jobs:
   v-static:
